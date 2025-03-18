@@ -6,7 +6,7 @@
     "paths": {
       "@shared/*":["src/app/shared/*"],
       "@features/*":["src/app/features/*"],
-      "@envs/*":["src/environments/*"],
+      "@envs/*":["src/app/environments/*"],
       "@components/*":["src/app/components/*"]
     },
     "outDir": "./dist/out-tsc",
