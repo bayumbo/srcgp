@@ -1,20 +1,20 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
-import { provideRouter, ROUTES } from '@angular/router';
-
+import { ApplicationConfig, importProvidersFrom } from '@angular/core';
+import { provideZoneChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { APP_ROUTES } from './app.routes';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
-import { getAuth, provideAuth } from '@angular/fire/auth';
-import { getFirestore, provideFirestore } from '@angular/fire/firestore';
-import { getFunctions, provideFunctions } from '@angular/fire/functions';
-import { getStorage, provideStorage } from '@angular/fire/storage';
-import { environment} from '../environments/environment';
+
+import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
+import { provideFirestore, getFirestore } from '@angular/fire/firestore';
+
+import { environment } from 'src/environments/environment';
+
 export const appConfig: ApplicationConfig = {
-  providers: [provideZoneChangeDetection({ eventCoalescing: true }), 
-  provideRouter(APP_ROUTES), 
-  provideAnimationsAsync(), 
-  provideFirebaseApp(() => initializeApp(environment.firebase)), 
-  provideAuth(() => getAuth()), provideFirestore(() => getFirestore()), 
-  provideFunctions(() => getFunctions()), 
-  provideStorage(() => getStorage())]
+  providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(APP_ROUTES),
+    provideAnimationsAsync(),
+    provideFirebaseApp(() => initializeApp(environment.firebase)),
+    provideFirestore(() => getFirestore()),
+  ]
 };

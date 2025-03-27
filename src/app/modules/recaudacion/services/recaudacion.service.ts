@@ -1,34 +1,29 @@
 import { Injectable } from '@angular/core';
-import { Firestore, collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc } from '@angular/fire/firestore';
+import { collectionData } from '@angular/fire/firestore';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 @Injectable({
   providedIn: 'root'
 })
 export class RecaudacionService {
-  private pagosRef = collection(this.firestore, 'pagos');
+  private pagosRef;
 
-  constructor(private firestore: Firestore) {}
-
-  // Registrar un nuevo pago
-  async registrarPago(pago: any) {
-    return await addDoc(this.pagosRef, pago);
+  constructor(private firestore: Firestore) {
+    this.pagosRef = collection(this.firestore, 'pagos');
   }
 
-  // Obtener todos los pagos
-  async obtenerPagos() {
-    const snapshot = await getDocs(this.pagosRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  async registrarPago(pago: any): Promise<void> {
+    try {
+      await addDoc(this.pagosRef, pago);
+      console.log('✅ Pago registrado con éxito');
+    } catch (error) {
+      console.error('❌ Error al registrar pago:', error);
+      throw error;
+    }
   }
 
-  // Actualizar un pago
-  async actualizarPago(id: string, data: any) {
-    const pagoRef = doc(this.firestore, 'pagos', id);
-    return await updateDoc(pagoRef, data);
-  }
-
-  // Eliminar un pago
-  async eliminarPago(id: string) {
-    const pagoRef = doc(this.firestore, 'pagos', id);
-    return await deleteDoc(pagoRef);
+  obtenerPagos() {
+    return collectionData(this.pagosRef, { idField: 'id' });
   }
 }

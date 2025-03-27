@@ -1,0 +1,19 @@
+<h2>📅 Reporte Diario</h2>
+<table  [border]="1" cellpadding="5">
+  <thead>
+    <tr>
+      <th>Conductor</th>
+      <th>Unidad</th>
+      <th>Monto</th>
+      <th>Fecha</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let pago of pagos">
+      <td>{{ pago.conductor }}</td>
+      <td>{{ pago.unidad }}</td>
+      <td>${{ pago.monto }}</td>
+      <td>{{ pago.fecha }}</td>
+    </tr>
+  </tbody>
+</table>
