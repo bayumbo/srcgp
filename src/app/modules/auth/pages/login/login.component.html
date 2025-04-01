@@ -1,0 +1,49 @@
+<div class="container">
+    <h2>Iniciar Sesión</h2>
+    <form [formGroup]="form" (ngSubmit)="logIn()">
+      <div class="form-group">
+        <label for="email">Usuario</label>
+        <input
+          type="email"
+          id="email"
+          formControlName="email"
+          placeholder="tucorreo@ejemplo.com"
+          required
+        >
+        <div *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
+          <small class="error" *ngIf="form.get('email')?.errors?.['required']">Este campo es obligatorio</small>
+          <small class="error" *ngIf="form.get('email')?.errors?.['email']">Correo inválido</small>
+        </div>
+      </div>
+  
+      <div class="form-group">
+        <label for="password">Contraseña</label>
+        <div class="password-wrapper">
+          <input
+            [type]="hidePassword ? 'password' : 'text'"
+            id="password"
+            formControlName="password"
+            placeholder="••••••••"
+            required
+          >
+          <button type="button" class="toggle-button toggle-login" (click)="hidePassword = !hidePassword">
+            {{ hidePassword ? '👁️' : '🚫' }}
+          </button>
+        </div>
+        <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
+          <small class="error">Este campo es obligatorio</small>
+        </div>
+      </div>
+  
+      <button type="submit" [disabled]="form.invalid">Ingresar</button>
+    </form>
+  
+    <p>
+      ¿No tienes cuenta?
+      <a (click)="goToRegister()" style="cursor: pointer;">Regístrate</a>
+    </p>
+    <p>
+      <a routerLink="/auth/reset-password">Olvidé mi contraseña</a>
+    </p>
+  </div>
+  
