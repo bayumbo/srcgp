@@ -1,9 +1,10 @@
+
 export const environment = {
     production: false,
     firebase:{
         apiKey: "AIzaSyA3CLcsQvDjlfaUYDxI1AFvXBXX19Oz-d4",
         authDomain: "srcgp1.firebaseapp.com",
-        databaseURL: "https://srcgp1.firebaseio.com",
+        databaseURL: "https://srcgp1-default-rtdb.firebaseio.com",
         projectId: "srcgp1",
         storageBucket: "srcgp1.firebasestorage.app",
         messagingSenderId: "204537824818",
