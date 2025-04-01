@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba Firebase PDF</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <h2>Generar PDF y guardar en Firebase</h2>
+  <button onclick="generarPDF()">Generar y guardar PDF</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
+    import { initializeFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA3CLcsQvDjlfaUYDxI1AFvXBXX19Oz-d4",
+      authDomain: "srcgp1.firebaseapp.com",
+      projectId: "srcgp1",
+      storageBucket: "srcgp1.firebasestorage.app",
+      appId: "1:204537824818:web:edbbae5d1fbd4475111e2b"
+    };
+
+    const app = initializeApp(firebaseConfig);
+
+    // IMPORTANTE: conectar a base personalizada "srcgp1"
+    const db = initializeFirestore(app, {}, "srcgp1");
+    const storage = getStorage(app);
+
+    // Exponer para usar desde ventana global
+    window.firebaseModules = {
+      db,
+      storage,
+      ref,
+      uploadBytes,
+      getDownloadURL,
+      collection,
+      addDoc,
+      serverTimestamp
+    };
+  </script>
+
+  <script>
+    async function generarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("Este es un PDF de prueba", 20, 20);
+
+      const pdfBlob = doc.output("blob");
+      const comprobanteId = "TEST-" + Date.now();
+
+      const {
+        db, storage, ref, uploadBytes, getDownloadURL,
+        collection, addDoc, serverTimestamp
+      } = window.firebaseModules;
+
+      try {
+        const pdfRef = ref(storage, `comprobantes/${comprobanteId}.pdf`);
+        await uploadBytes(pdfRef, pdfBlob);
+        const pdfURL = await getDownloadURL(pdfRef);
+
+        await addDoc(collection(db, "comprobantes"), {
+          comprobanteId,
+          fecha: new Date().toISOString(),
+          pdfURL,
+          creado: serverTimestamp()
+        });
+
+        alert("✅ PDF subido y datos guardados correctamente");
+        doc.save(`${comprobanteId}.pdf`);
+      } catch (error) {
+        console.error("🔥 Error al guardar comprobante:", error);
+        alert("❌ Error al guardar comprobante");
+        doc.save(`${comprobanteId}.pdf`);
+      }
+    }
+  </script>
+</body>
+</html>

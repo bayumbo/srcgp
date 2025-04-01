@@ -1,0 +1,191 @@
+
+/* NO TOCAR, AQUI CONFIGURACION BASICA DEL MENU -🔥📌*/
+/* Estilos generales */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #474646;
+}
+
+/* Estilo del header */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: black;
+  padding: 10px 30px;
+}
+
+/* Logo */
+.logo img {
+  height: 50px; /* Ajusta el tamaño según tu logo */
+}
+
+/* Menú principal */
+.menu {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+}
+
+.menu li {
+  position: relative;
+}
+
+.menu a {
+  text-decoration: none;
+  color: white;
+  font-size: 16px;
+  padding: 10px;
+  transition: color 0.3s ease;
+}
+
+.menu a:hover {
+  color: #1E90FF;
+  border-bottom: 2px solid #1E90FF;
+}
+
+/* Submenú */
+.submenu {
+  display: none;
+  position: absolute;
+  top: 40px; /* Ajusta la distancia del menú principal */
+  left: 0;
+  background-color: #333;
+  list-style: none;
+  padding: 10px 0;
+  border-radius: 5px;
+  width: 150px; /* Aumenta el ancho para que los elementos no estén tan juntos */
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3); /* Agrega sombra para mejor visualización */
+}
+.submenu li {
+    padding: 10px 15px; /* Aumenta el espaciado interno */
+}
+
+.submenu a {
+    color: white;
+    display: block;
+    font-size: 16px; /* Aumenta el tamaño del texto */
+    padding: 10px; /* Asegura buen espaciado */
+    text-align: left;
+}
+
+.submenu a:hover {
+    background-color: #1E90FF;
+    border-radius: 3px;
+}
+
+/* Asegura que el submenú no afecte el layout */
+.submenu-container {
+  position: relative;
+}
+
+
+#preloader {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background-color: #FFF;
+  z-index: 99999;
+}
+
+.preloader {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  -webkit-transform: translate(-50%, -50%);
+      -ms-transform: translate(-50%, -50%);
+          transform: translate(-50%, -50%);
+}
+.preloader span {
+  display: inline-block;
+  background-color: #6195FF;
+  width: 25px;
+  height: 25px;
+  -webkit-animation: 1s preload ease-in-out infinite;
+          animation: preload 1s ease-in-out infinite;
+  -webkit-transform: scale(0);
+      -ms-transform: scale(0);
+          transform: scale(0);
+  border-radius:50%;
+}
+
+.preloader span:nth-child(1) {
+  -webkit-animation-delay: 0s;
+          animation-delay: 0s;
+}
+
+.preloader span:nth-child(2) {
+  -webkit-animation-delay: 0.1s;
+          animation-delay: 0.1s;
+}
+
+.preloader span:nth-child(3) {
+  -webkit-animation-delay: 0.15s;
+          animation-delay: 0.15s;
+}
+
+.preloader span:nth-child(4) {
+  -webkit-animation-delay: 0.2s;
+          animation-delay: 0.2s;
+}
+
+@-webkit-keyframes preload {
+0% {
+   -webkit-transform:scale(0);
+           transform:scale(0);
+}
+50% {
+  -webkit-transform:scale(1);
+          transform:scale(1);
+}
+100% {
+  -webkit-transform:scale(0);
+          transform:scale(0);
+}
+}
+
+@keyframes preload {
+0% {
+   -webkit-transform:scale(0);
+           transform:scale(0);
+}
+50% {
+  -webkit-transform:scale(1);
+          transform:scale(1);
+}
+100% {
+  -webkit-transform:scale(0);
+          transform:scale(0);
+}
+}
+
+/* NO TOCAR, AQUI CONFIGURACION BASICA DEL MENU -🔥📌*/
+form {
+  background-color: #1f1f1f;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 800px;
+  margin: auto;
+  color: #fff;
+}
+.form-group {
+  margin-bottom: 15px;
+}
+.form-group input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 5px;
+  border: none;
+}
+.transaccion-item {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.transaccion-item input {
+  flex: 1;
+  padding: 6px;
+}

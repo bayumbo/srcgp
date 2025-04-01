@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menú con Submenú</title>
+    <link rel="stylesheet" href="stylesconta.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .lista-comprobantes {
+          margin-top: 20px;
+        }
+        .item-comprobante {
+          border: 1px solid #ccc;
+          padding: 15px;
+          margin-bottom: 10px;
+          border-radius: 8px;
+          background-color: #1e1e1e;
+          color: #f0f0f0;
+          display: flex;
+          justify-content: space-between;
+          flex-wrap: wrap;
+        }
+        .item-comprobante div {
+          margin: 5px 10px;
+        }
+        .item-comprobante button {
+          background-color: #e74c3c;
+          color: white;
+          border: none;
+          padding: 6px 10px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .item-comprobante a {
+          color: #3498db;
+          text-decoration: none;
+        }
+      </style>
+</head>
+<body>
+
+    <header>
+
+ 
+
+
+        <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
+        <div class="logo">
+            <img src="logo.png" alt="Logo">
+        </div>
+        <nav>
+            <ul class="menu">
+                <li><a href="cuentas.html">Cuentas por cobrar</a></li>
+                <li><a href="indexconta.html">Comprobante de Egresos</a></li>
+                <li class="submenu-container">
+                    <a href="#" id="libros-contables">Libros Contables</a>
+                    <ul class="submenu" id="submenu-libros">
+                        <li><a href="agregarcuenta.html">Cuentas</a></li>
+                        <li><a href="libdiario.html">Libro Diario</a></li>
+                        <li><a href="libmayor.html">Libro Mayor</a></li>
+                    </ul>
+                </li>
+                <li><a href="estados.html">Estados Financieros</a></li>
+                <li><a href="#">Balances de comprobación</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div id="preloader">
+		<div class="preloader">
+			<span></span>
+			<span></span>
+			<span></span>
+			<span></span>
+		</div>
+	</div>
+     <!-- NO TOCAR, HASTA AQUI CONFIGURACION BASICA DEL MENU 🔥📌-->
+     
+      
+     <div class="comprobante-container">
+
+     <div class="form-card">
+      <h2>Nuevo Comprobante de Egreso</h2>
+      <form id="egresoForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Beneficiario</label>
+            <input type="text" id="beneficiario" placeholder="Beneficiario" required>
+          </div>
+    
+          <div class="form-group">
+            <label>Cédula o RUC</label>
+            <input type="text" id="cedula" placeholder="Cédula o RUC" maxlength="13" pattern="\d*" required>
+          </div>
+    
+          <div class="form-group">
+            <label>Código de transacción</label>
+            <input type="text" id="codigo" placeholder="Código de transacción" required>
+          </div>
+    
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" id="fecha" required>
+          </div>
+    
+          <div class="form-group">
+            <label>Descripción</label>
+            <input type="text" id="descripcion" placeholder="Descripción" required>
+          </div>
+    
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="tipo">
+              <option value="Debe">Debe</option>
+              <option value="Haber">Haber</option>
+            </select>
+          </div>
+    
+          <div class="form-group">
+            <label>Monto</label>
+            <input type="text" id="monto"  required>
+          </div>
+    
+          <div class="form-group full-width">
+            <button type="submit">Agregar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+        <script>
+          const cedulaInput = document.getElementById("cedula");
+          cedulaInput.addEventListener("input", () => {
+            cedulaInput.value = cedulaInput.value.replace(/\D/g, "").slice(0, 13);
+          });
+        </script>     
+        
+        
+</script>
+
+
+
+<div class="tabla-wrapper">
+      <table id="tablaEgresos">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Código</th> <!-- nuevo -->
+            <th>Fecha</th>
+            <th>Descripción</th>
+            <th>Debe</th>
+            <th>Haber</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr>
+              <td></td> <!-- # -->
+              <td></td> <!-- Código -->
+              <td></td> <!-- Fecha -->
+              <td style="text-align: right; font-weight: bold;">Total:</td> <!-- Descripción -->
+              <td id="totalDebe" style="font-weight: bold;">0.00</td> <!-- Debe -->
+              <td id="totalHaber" style="font-weight: bold;">0.00</td> <!-- Haber -->
+              <td></td> <!-- Acción -->
+            </tr>
+          </tfoot>
+          
+      </table>
+      <div style="text-align: center; margin-top: 20px;">
+        <button onclick="generarPDF()">Generar PDF</button>
+      </div>
+    </div>
+  </div>
+  <div class="boton-comprobantes">
+    <button id="mostrarPDFs">📄 Ver comprobantes guardados</button>
+  </div>
+
+  <div id="listaPDFs"></div> 
+
+
+  <script>
+    const montoInput = document.getElementById("monto");
+  
+    // Convertir coma a punto en tiempo real
+    montoInput.addEventListener("input", () => {
+      montoInput.value = montoInput.value.replace(",", ".");
+    });
+  
+    // Validar al enviar el formulario
+    document.getElementById("egresoForm").addEventListener("submit", function (e) {
+      const valor = montoInput.value.trim();
+  
+      // Permite: 123 | 123.4 | 123.45 | 0.99
+      const decimalRegex = /^\d+(\.\d{1,2})?$/;
+  
+      if (!decimalRegex.test(valor)) {
+        e.preventDefault();
+        alert("❌ Por favor ingrese un monto válido con punto decimal (ej. 123.45)");
+        return;
+      }
+  
+      // Convertir a número por seguridad
+      montoInput.value = parseFloat(valor).toFixed(2);
+    });
+  </script>
+  
+
+
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+ 
+    <script src="scriptconta.js"></script>
+
+
+    
+
+    <script type="module">
+      // Importar funciones necesarias de los SDKs de Firebase
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
+      import {initializeFirestore, collection, getDocs, deleteDoc, addDoc, serverTimestamp,doc} from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
+    import {getStorage, ref, uploadBytes, getDownloadURL, deleteObject} from "https://www.gstatic.com/firebasejs/11.5.0/firebase-storage.js";
+    
+      // Configuración de tu proyecto Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyA3CLcsQvDjlfaUYDxI1AFvXBXX19Oz-d4",
+        authDomain: "srcgp1.firebaseapp.com",
+        projectId: "srcgp1",
+        storageBucket: "srcgp1.firebasestorage.app",
+        appId: "1:204537824818:web:edbbae5d1fbd4475111e2b",
+
+      };
+    
+      // Inicializar Firebase
+      const app = initializeApp(firebaseConfig);
+    
+      // Inicializar servicios: Firestore, Storage y Analytics
+      
+      const db = initializeFirestore(app, {}, "srcgp1");
+      const storage = getStorage(app);
+    
+  const mostrarBtn = document.getElementById("mostrarPDFs");
+  const listaContainer = document.getElementById("listaPDFs");
+
+
+
+  // Exponer funciones y objetos de Firebase para uso en otros scripts
+  window.firebaseModules = {
+        db,
+        storage,
+        ref,
+        uploadBytes,
+        getDownloadURL,
+        collection,
+        addDoc,
+        getDocs,
+        deleteDoc,
+        doc,
+        deleteObject,
+        deleteDoc,
+        serverTimestamp
+      };
+
+  mostrarBtn.addEventListener("click", async () => {
+    listaContainer.innerHTML = "<p>Cargando comprobantes...</p>";
+    
+    try {
+      const snapshot = await getDocs(collection(db, "comprobantes"));
+      if (snapshot.empty) {
+        listaContainer.innerHTML = "<p>No hay comprobantes disponibles.</p>";
+        return;
+      }
+
+      listaContainer.innerHTML = "";
+      snapshot.forEach(async (docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+
+        const item = document.createElement("div");
+        item.className = "item-comprobante";
+
+        const datos = `
+          <div><strong>No.:</strong> ${data.comprobanteId}</div>
+          <div><strong>Beneficiario:</strong> ${data.beneficiario}</div>
+          <div><strong>Fecha:</strong> ${data.fecha}</div>
+          <div><strong>Total Debe:</strong> $${data.totalDebe.toFixed(2)}</div>
+          <div><strong>Total Haber:</strong> $${data.totalHaber.toFixed(2)}</div>
+          <div class="acciones"></div>
+        `;
+
+        item.innerHTML = datos;
+
+        try {
+          const pdfRef = ref(storage, `comprobantes/${data.comprobanteId}.pdf`);
+          const url = await getDownloadURL(pdfRef);
+
+          const linkPDF = document.createElement("a");
+          linkPDF.href = url;
+          linkPDF.textContent = "📄 Ver PDF";
+          linkPDF.target = "_blank";
+
+          const botonEliminar = document.createElement("button");
+          botonEliminar.textContent = "🗑️ Eliminar";
+          botonEliminar.onclick = async () => {
+            if (confirm(`¿Eliminar comprobante ${data.comprobanteId}?`)) {
+              await deleteObject(pdfRef);
+              await deleteDoc(doc(db, "comprobantes", id));
+              item.remove();
+              alert("✅ Comprobante eliminado correctamente.");
+            }
+          };
+
+          item.querySelector(".acciones").appendChild(linkPDF);
+          item.querySelector(".acciones").appendChild(botonEliminar);
+          listaContainer.appendChild(item);
+
+        } catch (error) {
+          // PDF eliminado: borra también de Firestore
+          console.warn(`⚠️ PDF de ${data.comprobanteId} no encontrado. Eliminando de Firestore...`);
+          await deleteDoc(doc(db, "comprobantes", id));
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Error al listar comprobantes:", error);
+      listaContainer.innerHTML = "<p>Error al cargar comprobantes.</p>";
+    }
+  });
+    
+      
+    </script>
+        
+            
+</body>
+</html>
+
+
