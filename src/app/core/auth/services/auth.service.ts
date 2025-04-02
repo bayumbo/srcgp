@@ -16,7 +16,7 @@ import {
   where,
   getDocs
 } from '@angular/fire/firestore';
-
+import { sendPasswordResetEmail } from 'firebase/auth';
 export interface Credential {
   email: string;
   password: string;
@@ -29,6 +29,7 @@ export class AuthService {
  
 
   readonly authState$ = authState(this.auth);
+  
 
   // 🔐 Registro
   signUpWithEmailAndPassword(Credential: Credential): Promise<UserCredential> {
@@ -52,6 +53,18 @@ export class AuthService {
   logOut(): Promise<void> {
     return this.auth.signOut();
   }
+  // 🔐 Enviar enlace de recuperación
+  enviarCorreoRecuperacion(email: string): Promise<void> {
+    this.auth.languageCode='es-419';
+    return sendPasswordResetEmail(this.auth, email);
+  }
+    // 🔍 Verificar si un correo existe en Firestore
+    async correoExiste(email: string): Promise<boolean> {
+      const usuariosRef = collection(this.firestore, 'usuarios');
+      const q = query(usuariosRef, where('email', '==', email));
+      const resultado = await getDocs(q);
+      return !resultado.empty;
+    }
 
   // 📥 Guardar datos adicionales del usuario en Firestore
   async guardarUsuarioEnFirestore(

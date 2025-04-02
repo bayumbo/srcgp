@@ -43,6 +43,9 @@ export class LoginComponent {
       alert('Correo o contraseña incorrectos');
     }
   }
-
+  goToResetPassword(): void {
+    this.router.navigate(['/auth/reset-password']);
+  }
+  
  
 }

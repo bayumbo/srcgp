@@ -19,6 +19,7 @@ export const APP_ROUTES: Routes = [
         (m) => m.RegisterComponent
       ),
   },
+  
   {
     path: 'auth',
     canActivate: [publicGuard],

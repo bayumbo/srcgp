@@ -36,11 +36,12 @@
       </div>
   
       <button type="submit" [disabled]="form.invalid">Ingresar</button>
-    </form>
+    </form><br>
   
     
     <p>
-      <a routerLink="/auth/reset-password">Olvidé mi contraseña</a>
+      <button type="button" (click)="goToResetPassword()">Olvidé mi contraseña</button>
+
     </p>
   </div>
   
