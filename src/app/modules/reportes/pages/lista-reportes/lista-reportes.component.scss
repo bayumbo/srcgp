@@ -1,0 +1,166 @@
+.tabla-container {
+  padding: 1rem;
+  font-family: 'Roboto', sans-serif;
+
+  h2 {
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .acciones-globales {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+
+    button {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.4rem 0.8rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .filtro {
+      background-color: rgb(0, 0, 0);
+      color: #ffffff;
+      width: 50px;
+      &:hover {
+        background-color: #212521; // tono más oscuro
+      }
+    }
+
+    .nuevo-registro {
+      background-color: #4caf50;
+      color: white;
+      width: 200px;
+      &:hover {
+        background-color: #005800; // tono más oscuro
+      }
+    }
+
+    .material-icons {
+      font-size: 18px;
+    }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+
+    thead {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+
+    tbody tr:hover {
+      background-color: #f9f9f9;
+    }
+  }
+
+  td.acciones {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: none;
+
+    &::before {
+      content: "Acciones";
+      font-weight: bold;
+      color: #555;
+      display: none; // se muestra solo en mobile si quieres
+    }
+
+    .editar {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 0.3rem 0.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      gap: 0.3rem;
+    
+      .material-icons {
+        font-size: 18px;
+      }
+    
+      &:hover {
+        background-color: #45a049; // tono más oscuro
+      }
+    }
+
+    .pagar {
+      background-color: rgb(0, 0, 0);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 0.3rem 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+    
+      &:hover {
+        background-color: #333333; // gris oscuro
+      }
+    }
+  }
+}
+
+// 🔁 Responsive (modo tarjeta para mobile)
+@media (max-width: 768px) {
+  thead {
+    display: none;
+  }
+
+  tbody, tr, td {
+    display: block;
+    width: 100%;
+  }
+
+  tr {
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    padding: 0.5rem;
+  }
+
+  td {
+    text-align: left;
+    padding: 0.5rem;
+    border: none;
+    border-bottom: 1px solid #eee;
+    position: relative;
+
+    &::before {
+      content: attr(data-label);
+      font-weight: bold;
+      color: #555;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+  }
+
+  td.acciones {
+    flex-direction: row; // mantener botones en fila
+    justify-content: flex-start;
+
+    &::before {
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+  }
+}

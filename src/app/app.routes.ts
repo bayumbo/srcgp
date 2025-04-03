@@ -1,11 +1,40 @@
 import { Routes } from '@angular/router';
+import { AUTH_ROUTES } from './modules/auth/auth.routes';
+import { authGuard, publicGuard } from './core/auth/guards/auth.guard';
+import { REPORTES_ROUTES } from './modules/reportes/reportes.routes';
 
-export const routes: Routes = [
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-  { path: 'auth', loadChildren: () => import('./modules/auth/auth.routes').then(m => m.routes) },
-  { path: 'dashboard', loadChildren: () => import('./modules/dashboard/dashboard.routes').then(m => m.routes) },
-  { path: 'collection', loadChildren: () => import('./modules/collection/collection.routes').then(m => m.routes) },
-  { path: 'reports', loadChildren: () => import('./modules/reports/reports.routes').then(m => m.routes) },
-  { path: 'administration', loadChildren: () => import('./modules/administration/administration.routes').then(m => m.routes) },
-  { path: 'accounts-receivable', loadChildren: () => import('./modules/accounts-receivable/accounts-receivable.routes').then(m => m.routes) }
+export const APP_ROUTES: Routes = [
+  {
+    path: '',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./modules/auth/pages/menu/menu.component').then(
+        (m) => m.MenuComponent
+      ),
+  },
+  {
+    path: 'register',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./modules/auth/pages/register/register.component').then(
+        (m) => m.RegisterComponent
+      ),
+  },
+  {
+    path: 'auth',
+    canActivate: [publicGuard],
+    children: AUTH_ROUTES,
+  },
+  {
+    path: 'reportes',
+    canActivate: [authGuard],
+    children: REPORTES_ROUTES,
+  },
+
+  {
+    path: '**',
+    redirectTo: '',
+    pathMatch: 'full',
+  },
+  
 ];
