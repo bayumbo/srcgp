@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AUTH_ROUTES } from './modules/auth/auth.routes';
 import { authGuard, publicGuard } from './core/auth/guards/auth.guard';
+import { REPORTES_ROUTES } from './modules/reportes/reportes.routes';
 
 export const APP_ROUTES: Routes = [
   {
@@ -25,8 +26,15 @@ export const APP_ROUTES: Routes = [
     children: AUTH_ROUTES,
   },
   {
+    path: 'reportes',
+    canActivate: [authGuard],
+    children: REPORTES_ROUTES,
+  },
+
+  {
     path: '**',
     redirectTo: '',
     pathMatch: 'full',
   },
+  
 ];
