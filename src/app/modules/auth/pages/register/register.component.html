@@ -1,140 +1,154 @@
 <style>
-    body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        background-color: #f3f3f3;
-        font-family: Arial, sans-serif;
-    }
-    .container {
-        width: 100%;
-        max-width: 400px;
-        padding: 20px;
-        background: white;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-    }
-    h2 {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .form-group {
-        margin-bottom: 15px;
-    }
-    label {
-        display: block;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        font-size: 16px;
-    }
-    button {
-        width: 100%;
-        padding: 10px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        font-size: 16px;
-        cursor: pointer;
-    }
-    button:hover {
-        background: #0056b3;
-    }
-    p {
-        text-align: center;
-        margin-top: 10px;
-    }
-    a {
-        color: #007bff;
-        text-decoration: none;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f3f3f3;
+    font-family: Arial, sans-serif;
+  }
+  .container {
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+    background: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+  }
+  h2 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .form-group {
+    margin-bottom: 15px;
+  }
+  label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+  }
+  .password-wrapper {
+    position: relative;
+  }
+  .password-wrapper input {
+    width: 100%;
+    padding-right: 40px;
+  }
+  .toggle-button {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .error {
+    color: red;
+    font-size: 12px;
+  }
+  button[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  button[type="submit"]:hover {
+    background: #0056b3;
+  }
+  p {
+    text-align: center;
+    margin-top: 10px;
+  }
+  a {
+    color: #007bff;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
 </style>
 
 <div class="container">
-    <h2>Registro</h2>
-    <form [formGroup]="form" (ngSubmit)="signUp()">
-      
-      <!-- Cédula -->
-      <div class="form-group">
-        <label for="cedula">Cédula de Identidad</label>
-        <input
-          type="text"
-          id="cedula"
-          formControlName="cedula"
-          maxlength="10"
-          pattern="[0-9]*"
-          inputmode="numeric"
-          placeholder="0102030405"
-        >
-        <div *ngIf="form.get('cedula')?.touched && form.get('cedula')?.invalid">
-          <small class="error" *ngIf="form.get('cedula')?.errors?.['required']">Este campo es obligatorio</small>
-          <small class="error" *ngIf="form.get('cedula')?.errors?.['pattern']">Debe contener exactamente 10 dígitos</small>
-        </div>
+  <h2>Registro</h2>
+  <form [formGroup]="form" (ngSubmit)="signUp()">
+    
+    <!-- Cédula -->
+    <div class="form-group">
+      <label for="cedula">Cédula de Identidad</label>
+      <input type="text" id="cedula" formControlName="cedula" maxlength="10" pattern="[0-9]*" inputmode="numeric" placeholder="0102030405">
+      <div *ngIf="form.get('cedula')?.touched && form.get('cedula')?.invalid">
+        <small class="error" *ngIf="form.get('cedula')?.errors?.['required']">Este campo es obligatorio</small>
+        <small class="error" *ngIf="form.get('cedula')?.errors?.['pattern']">Debe contener exactamente 10 dígitos</small>
       </div>
-      
-  
-      <!-- Nombres -->
-      <div class="form-group">
-        <label for="nombres">Nombres</label>
-        <input type="text" id="nombres" formControlName="nombres" placeholder="Nombres">
-        <div *ngIf="form.get('nombres')?.touched && form.get('nombres')?.invalid">
-          <small class="error">Este campo es obligatorio</small>
-        </div>
-      </div>
-  
-      <!-- Apellidos -->
-      <div class="form-group">
-        <label for="apellidos">Apellidos</label>
-        <input type="text" id="apellidos" formControlName="apellidos" placeholder="Apellidos">
-        <div *ngIf="form.get('apellidos')?.touched && form.get('apellidos')?.invalid">
-          <small class="error">Este campo es obligatorio</small>
-        </div>
-      </div>
-  
-      <!-- Correo Electrónico -->
-      <div class="form-group">
-        <label for="email">Correo Electrónico</label>
-        <input type="email" id="email" formControlName="email" placeholder="tucorreo@ejemplo.com">
-        <div *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
-          <small class="error" *ngIf="form.get('email')?.errors?.['required']">Este campo es obligatorio</small>
-          <small class="error" *ngIf="form.get('email')?.errors?.['email']">Correo inválido</small>
-        </div>
-      </div>
-  
-      <!-- Contraseña -->
-      <div class="form-group">
-        <label for="password">Contraseña</label>
-        <div class="password-wrapper">
-          <input
-            [type]="hidePassword ? 'password' : 'text'"
-            id="password"
-            formControlName="password"
-            placeholder="••••••••"
-          >
-          <button type="button" class="toggle-button" (click)="hidePassword = !hidePassword">
-            {{ hidePassword ? '👁️' : '🚫' }}
-          </button>
-        </div>
-        <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
-          <small class="error" *ngIf="form.get('password')?.errors?.['required']">Este campo es obligatorio</small>
-          <small class="error" *ngIf="form.get('password')?.errors?.['minlength']">Mínimo 6 caracteres</small>
-        </div>
-      </div> <br> <br> <br>
-  
-     <button type="submit">Registrarse</button>
+    </div>
 
-    </form>
-  
-    <p>¿Ya tienes una cuenta? <a href="#">Inicia sesión</a></p>
-  </div>
-  
+    <!-- Nombres -->
+    <div class="form-group">
+      <label for="nombres">Nombres</label>
+      <input type="text" id="nombres" formControlName="nombres" placeholder="Nombres">
+      <div *ngIf="form.get('nombres')?.touched && form.get('nombres')?.invalid">
+        <small class="error">Este campo es obligatorio</small>
+      </div>
+    </div>
+
+    <!-- Apellidos -->
+    <div class="form-group">
+      <label for="apellidos">Apellidos</label>
+      <input type="text" id="apellidos" formControlName="apellidos" placeholder="Apellidos">
+      <div *ngIf="form.get('apellidos')?.touched && form.get('apellidos')?.invalid">
+        <small class="error">Este campo es obligatorio</small>
+      </div>
+    </div>
+
+    <!-- Correo -->
+    <div class="form-group">
+      <label for="email">Correo Electrónico</label>
+      <input type="email" id="email" formControlName="email" placeholder="tucorreo@ejemplo.com">
+      <div *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
+        <small class="error" *ngIf="form.get('email')?.errors?.['required']">Este campo es obligatorio</small>
+        <small class="error" *ngIf="form.get('email')?.errors?.['email']">Correo inválido</small>
+      </div>
+    </div>
+
+    <!-- Contraseña -->
+    <div class="form-group">
+      <label for="password">Contraseña</label>
+      <div class="password-wrapper">
+        <input
+          [type]="hidePassword ? 'password' : 'text'"
+          id="password"
+          formControlName="password"
+          placeholder="••••••••"
+        >
+        <button type="button" class="toggle-button" (click)="hidePassword = !hidePassword">
+          {{ hidePassword ? '👁️' : '🚫' }}
+        </button>
+      </div>
+      <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
+        <small class="error" *ngIf="form.get('password')?.errors?.['required']">Este campo es obligatorio</small>
+        <small class="error" *ngIf="form.get('password')?.errors?.['minlength']">Mínimo 6 caracteres</small>
+      </div>
+    </div>
+
+    <!-- Botón -->
+    <button type="submit">Registrar Nuevo Usuario</button>
+  </form>
+<!-- Mensaje de éxito -->
+<div *ngIf="mensajeExito" style="text-align: center; margin-bottom: 15px; color: green; font-weight: bold;">
+  {{ mensajeExito }}
+</div>
+  <p><a href="#">Volver al Menú</a></p>
+</div>
