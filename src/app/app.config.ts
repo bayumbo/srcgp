@@ -14,7 +14,8 @@
     provideRouter(APP_ROUTES), 
     provideAnimationsAsync(), 
     provideFirebaseApp(() => initializeApp(environment.firebase)), 
-    provideAuth(() => getAuth()), provideFirestore(() => getFirestore()), 
+    provideAuth(() => getAuth()), 
+    provideFirestore(() => getFirestore()), 
     provideFunctions(() => getFunctions()), 
     provideStorage(() => getStorage())]
     

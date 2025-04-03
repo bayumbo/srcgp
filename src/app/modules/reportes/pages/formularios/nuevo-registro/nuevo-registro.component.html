@@ -1,0 +1,26 @@
+<h2>Registro de Reporte Diario</h2>
+<form (ngSubmit)="enviar()" #form="ngForm">
+  <label>Nombre:
+    <input type="text" name="nombre" [(ngModel)]="reporte.nombre" required />
+  </label><br> 
+
+  <label>Unidad:
+    <input type="text" name="unidad" [(ngModel)]="reporte.unidad" required />
+  </label><br> 
+
+  <label>Administración:
+    <input type="number" name="administracion" [(ngModel)]="reporte.administracion" required />
+  </label><br>
+
+  <label>Minutos Base:
+    <input type="number" name="minutosBase" [(ngModel)]="reporte.minutosBase" required />
+  </label><br>
+
+  <label>Multas:
+    <input type="number" name="multas" [(ngModel)]="reporte.multas" required />
+  </label><br>
+
+  <button type="submit">Guardar</button>
+</form>
+
+<p *ngIf="resultado">✅ Reporte guardado con ID: {{ resultado }}</p>
