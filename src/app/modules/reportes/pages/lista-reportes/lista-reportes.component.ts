@@ -2,6 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Firestore, collection, getDocs } from '@angular/fire/firestore';
 import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-reporte-lista',
@@ -13,6 +14,7 @@ import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 export class ReporteListaComponent implements OnInit {
   reportes: NuevoRegistro[] = [];
   private firestore = inject(Firestore);
+  private router = inject(Router);
 
   async ngOnInit(): Promise<void> {
     const ref = collection(this.firestore, 'reportesDiarios');
@@ -22,5 +24,8 @@ export class ReporteListaComponent implements OnInit {
       id: doc.id
     }));
     console.log('✅ Reportes procesados:', this.reportes);
+  }
+  irANuevoRegistro(): void {
+    this.router.navigate(['/reportes/nuevo-registro']);
   }
 }

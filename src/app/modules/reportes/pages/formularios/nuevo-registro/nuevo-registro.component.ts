@@ -1,9 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 import { ReportesService } from '../../../services/reportes.service';
-
+import { Router } from '@angular/router';
 
 
  
@@ -29,8 +29,12 @@ export class NuevoRegistroComponent {
   };
 
   resultado: string | null = null;
-
+  private router = inject(Router);
   constructor(private reportesService: ReportesService) {}
+  
+  cancelar(): void {
+    this.router.navigate(['/reportes/lista-reportes']);
+  }
 
   async enviar() {
     try {
