@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
   standalone: true,
   selector: 'app-menu',
   templateUrl: './menu.component.html',
+  styleUrls: ['./menu.component.css'],
   imports: [CommonModule]
 })
 export class MenuComponent {
@@ -24,5 +25,9 @@ export class MenuComponent {
 
   goToRegister(): void {
     this.router.navigate(['/register']);
+  }
+
+  goTo(route: string): void {
+    this.router.navigate([route]);
   }
 }

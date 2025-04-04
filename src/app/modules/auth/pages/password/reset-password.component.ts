@@ -9,38 +9,8 @@ import { Router } from '@angular/router';
   standalone: true,
   selector: 'app-reset-password',
   imports: [CommonModule, FormsModule, MatSnackBarModule],
-  template: `
-    <div class="container">
-      <h2>Restablecer contraseña</h2>
-      <form (ngSubmit)="enviarEnlace()">
-        <label for="email">Correo electrónico</label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          [(ngModel)]="email"
-          placeholder="tucorreo@ejemplo.com"
-          required
-        />
-        <button type="submit">Enviar enlace</button>
-      </form>
+  templateUrl: './reset-password.component.html',
 
-      <button class="volver-btn" type="button" (click)="volverAlLogin()">← Volver al login</button>
-    </div>
-  `,
-  styles: [`
-    .volver-btn {
-      margin-top: 1rem;
-      background-color: transparent;
-      color: #1976d2;
-      border: none;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-    .volver-btn:hover {
-      text-decoration: none;
-    }
-  `]
 })
 export class ResetPasswordComponent {
   email: string = '';
@@ -68,7 +38,6 @@ export class ResetPasswordComponent {
         return;
       }
 
-      // Si el correo existe, enviamos el enlace de recuperación
       this.authService.enviarCorreoRecuperacion(this.email)
         .then(() => {
           this.snackBar.open('📩 Se envió el enlace para restablecer tu contraseña.', 'Cerrar', {

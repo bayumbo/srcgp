@@ -13,7 +13,7 @@ export const AUTH_ROUTES: Routes = [
   {
     path: 'confirmar-cambio',
     loadComponent: () =>
-      import('./pages/password/cambio-confirmado.component').then(m => m.ConfirmarCambioComponent)
+      import('./pages/password/cambio-confirmado.component').then(m => m.CambioConfirmadoComponent)
   },
   {
     path: 'password-confirmed',

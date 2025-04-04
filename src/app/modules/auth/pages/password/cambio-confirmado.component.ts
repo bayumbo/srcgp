@@ -6,26 +6,11 @@ import { confirmPasswordReset, getAuth } from '@angular/fire/auth';
 
 @Component({
   standalone: true,
-  selector: 'app-confirmar-cambio',
+  selector: 'app-cambio-confirmado',
   imports: [CommonModule, FormsModule],
-  template: `
-    <div class="container">
-      <h2>Nueva contraseña</h2>
-      <form (ngSubmit)="cambiarContrasena()">
-        <label for="password">Escribe tu nueva contraseña</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          [(ngModel)]="nuevaContrasena"
-          required
-        />
-        <button type="submit">Aceptar</button>
-      </form>
-    </div>
-  `
+  templateUrl: './cambio-confirmado.component.html'
 })
-export class ConfirmarCambioComponent implements OnInit {
+export class CambioConfirmadoComponent implements OnInit {
   oobCode: string = '';
   nuevaContrasena: string = '';
 

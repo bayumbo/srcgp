@@ -1,14 +1,15 @@
-<nav>
-  <ul>
-    <li><a routerLink="/reportes">Reportes</a></li>
-    <li><a routerLink="/usuarios">Contabilidad</a></li>
-    <li><a routerLink="/cargas">Administración</a></li>
-    <li><a routerLink="/cargas">Perfil</a></li>
-  </ul>
-</nav>
+<div class="menu-container">
+  <button class="menu-btn" (click)="goTo('/reportes')">📊 Reportes</button>
+  <button class="menu-btn" (click)="goTo('/usuarios')">📘 Contabilidad</button>
+  <button class="menu-btn" (click)="goTo('/cargas')">🛠 Administración</button>
+  <button class="menu-btn" (click)="goTo('/perfil')">👤 Perfil</button>
+</div>
 
-<button type="button" (click)="logOut()">Cerrar Sesión</button>
+<hr />
 
-<p> ¿Desea Registrar un Nuevo Usuario?
-  <a (click)="goToRegister()" style="cursor: pointer; text-decoration: underline;">Registro</a>
+<button class="logout-btn" (click)="logOut()">🔒 Cerrar Sesión</button>
+
+<p class="register-text">
+  ¿Desea registrar un nuevo usuario?
+  <a (click)="goToRegister()" class="register-link">Registro</a>
 </p>

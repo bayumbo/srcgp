@@ -127,4 +127,16 @@ body {
     justify-content: center;
   }
   
+  .volver-btn {
+    margin-top: 1rem;
+    background-color: transparent;
+    color: #1976d2;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  
+  .volver-btn:hover {
+    text-decoration: none;
+  }
   

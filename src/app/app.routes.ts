@@ -12,6 +12,11 @@ export const APP_ROUTES: Routes = [
       ),
   },
   {
+    path: 'perfil',
+    loadComponent: () => import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent)
+  },
+  
+  {
     path: 'register',
     canActivate: [authGuard],
     loadComponent: () =>
