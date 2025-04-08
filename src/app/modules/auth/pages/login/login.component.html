@@ -1,47 +1,50 @@
 <div class="container">
-    <h2>Iniciar Sesión</h2>
-    <form [formGroup]="form" (ngSubmit)="logIn()">
-      <div class="form-group">
-        <label for="email">Usuario</label>
+  <h2>Iniciar Sesión</h2>
+  <form [formGroup]="form" (ngSubmit)="logIn()">
+
+    <!-- Cédula -->
+    <div class="form-group">
+      <label for="cedula">Cédula de Identidad</label>
+      <input
+        type="text"
+        id="cedula"
+        formControlName="cedula"
+        maxlength="10"
+        pattern="[0-9]*"
+        inputmode="numeric"
+        placeholder="0102030405"
+        required
+      >
+      <div *ngIf="form.get('cedula')?.touched && form.get('cedula')?.invalid">
+        <small class="error" *ngIf="form.get('cedula')?.errors?.['required']">Este campo es obligatorio</small>
+        <small class="error" *ngIf="form.get('cedula')?.errors?.['pattern']">Debe contener exactamente 10 dígitos</small>
+      </div>
+    </div>
+
+    <!-- Contraseña -->
+    <div class="form-group">
+      <label for="password">Contraseña</label>
+      <div class="password-wrapper">
         <input
-          type="email"
-          id="email"
-          formControlName="email"
-          placeholder="tucorreo@ejemplo.com"
+          [type]="hidePassword ? 'password' : 'text'"
+          id="password"
+          formControlName="password"
+          placeholder="••••••••"
           required
         >
-        <div *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
-          <small class="error" *ngIf="form.get('email')?.errors?.['required']">Este campo es obligatorio</small>
-          <small class="error" *ngIf="form.get('email')?.errors?.['email']">Correo inválido</small>
-        </div>
+        <button type="button" class="toggle-button toggle-login" (click)="hidePassword = !hidePassword">
+          {{ hidePassword ? '👁️' : '🚫' }}
+        </button>
       </div>
-  
-      <div class="form-group">
-        <label for="password">Contraseña</label>
-        <div class="password-wrapper">
-          <input
-            [type]="hidePassword ? 'password' : 'text'"
-            id="password"
-            formControlName="password"
-            placeholder="••••••••"
-            required
-          >
-          <button type="button" class="toggle-button toggle-login" (click)="hidePassword = !hidePassword">
-            {{ hidePassword ? '👁️' : '🚫' }}
-          </button>
-        </div>
-        <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
-          <small class="error">Este campo es obligatorio</small>
-        </div>
+      <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
+        <small class="error">Este campo es obligatorio</small>
       </div>
-  
-      <button type="submit" [disabled]="form.invalid">Ingresar</button>
-    </form><br>
-  
-    
-    <p>
-      <button type="button" (click)="goToResetPassword()">Olvidé mi contraseña</button>
+    </div>
 
-    </p>
-  </div>
-  
+    <button type="submit" [disabled]="form.invalid">Ingresar</button>
+  </form><br>
+
+  <p>
+    <button type="button" (click)="goToResetPassword()">Olvidé mi contraseña</button>
+  </p>
+</div>

@@ -32,6 +32,7 @@ export class RegisterComponent {
     apellidos: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
+    rol: ['usuario', Validators.required] // ✅ 
   });
 
   async signUp(): Promise<void> {
@@ -41,7 +42,7 @@ export class RegisterComponent {
       return;
     }
 
-    const { cedula, nombres, apellidos, email, password } = this.form.value;
+    const { cedula, nombres, apellidos, email, password, rol } = this.form.value;
 
     try {
       const cedulaExiste = await this.authService.existeCedula(cedula);
@@ -62,7 +63,7 @@ export class RegisterComponent {
         nombres,
         apellidos,
         email,
-        rol: 'usuario',
+        rol, // ✅ guarda el rol como 'usuario' o 'admin'
         creadoEn: new Date()
       };
 

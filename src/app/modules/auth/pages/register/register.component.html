@@ -143,6 +143,19 @@
       </div>
     </div>
 
+    <!-- Rol -->
+<div class="form-group">
+  <label for="rol">Rol de Usuario</label>
+  <select id="rol" formControlName="rol">
+    <option value="usuario">Usuario</option>
+    <option value="admin">Administrador</option>
+  </select>
+  <div *ngIf="form.get('rol')?.touched && form.get('rol')?.invalid">
+    <small class="error">Este campo es obligatorio</small>
+  </div>
+</div>
+
+
     <!-- Botón -->
     <button type="submit">Registrar Nuevo Usuario</button>
   </form>

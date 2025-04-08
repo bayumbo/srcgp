@@ -1,15 +1,26 @@
-<div class="menu-container">
-  <button class="menu-btn" (click)="goTo('/reportes')">📊 Reportes</button>
-  <button class="menu-btn" (click)="goTo('/usuarios')">📘 Contabilidad</button>
-  <button class="menu-btn" (click)="goTo('/cargas')">🛠 Administración</button>
-  <button class="menu-btn" (click)="goTo('/perfil')">👤 Perfil</button>
+<!-- Mostrar solo cuando ya se cargó el rol -->
+<div *ngIf="!isLoading; else loading">
+  <div class="menu-container">
+    <button *ngIf="rol === 'admin'" class="menu-btn" (click)="goTo('/reportes')">📊 Reportes</button>
+    <button *ngIf="rol === 'admin'" class="menu-btn" (click)="goTo('/usuarios')">📘 Contabilidad</button>
+    <button *ngIf="rol === 'admin'" class="menu-btn" (click)="goTo('/cargas')">🛠 Administración</button>
+
+    <button class="menu-btn" (click)="goTo('/perfil')">👤 Perfil</button>
+  </div>
+
+  <hr />
+
+  <button class="logout-btn" (click)="logOut()">🔒 Cerrar Sesión</button>
+
+  <p *ngIf="rol === 'admin'" class="register-text">
+    ¿Desea registrar un nuevo usuario?
+    <a (click)="goToRegister()" class="register-link">Registro</a>
+  </p>
 </div>
 
-<hr />
-
-<button class="logout-btn" (click)="logOut()">🔒 Cerrar Sesión</button>
-
-<p class="register-text">
-  ¿Desea registrar un nuevo usuario?
-  <a (click)="goToRegister()" class="register-link">Registro</a>
-</p>
+<!-- Preloader mientras se obtiene el rol -->
+<ng-template #loading>
+  <div style="text-align: center; margin-top: 40px;">
+    <p>Cargando menú...</p>
+  </div>
+</ng-template>
