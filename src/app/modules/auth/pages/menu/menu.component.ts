@@ -2,14 +2,13 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from 'src/app/core/auth/services/auth.service';
 import { Router } from '@angular/router';
-import { HeaderComponent } from "../../../../shared/components/header/header.component";
 
 @Component({
   standalone: true,
   selector: 'app-menu',
   templateUrl: './menu.component.html',
   styleUrls: ['./menu.component.css'],
-  imports: [CommonModule, HeaderComponent]
+  imports: [CommonModule]
 })
 export class MenuComponent implements OnInit {
   private authService = inject(AuthService);
