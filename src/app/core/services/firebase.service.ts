@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { environment } from 'src/environments/environment';
+
 @Injectable({
   providedIn: 'root'
 })
