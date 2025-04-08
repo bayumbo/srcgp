@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 export const REPORTES_ROUTES: Routes = [
+
   {
     path: 'nuevo-registro',
     loadComponent: () =>
@@ -8,6 +9,11 @@ export const REPORTES_ROUTES: Routes = [
   },
   {
     path: 'lista-reportes',
+    loadComponent: () =>
+      import('./pages/lista-reportes/lista-reportes.component').then(m => m.ReporteListaComponent)
+  },
+  {
+    path: '',
     loadComponent: () =>
       import('./pages/lista-reportes/lista-reportes.component').then(m => m.ReporteListaComponent)
   },
