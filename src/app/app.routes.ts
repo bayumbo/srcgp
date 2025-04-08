@@ -27,7 +27,7 @@ export const APP_ROUTES: Routes = [
   },
   {
     path: 'reportes',
-    canActivate: [authGuard],
+    canActivate: [publicGuard],
     children: REPORTES_ROUTES,
   },
 
