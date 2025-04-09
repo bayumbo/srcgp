@@ -1,0 +1,148 @@
+<header>
+    <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
+    <div class="logo">
+      <img src="logo.png" alt="Logo">
+    </div>
+    <nav>
+      <ul class="menu">
+        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
+  </header>
+  
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+  
+  <div class="cuentas-container">
+    <h2>Catálogo de Cuentas</h2>
+  
+    <!-- Formulario de nueva cuenta -->
+    <form [formGroup]="formCuenta" (ngSubmit)="agregarCuenta()" class="form-cuenta">
+      <div class="form-group">
+        <label for="codigo">Código</label>
+        <input type="text" formControlName="codigo" id="codigo" placeholder="Ej. 110101.01" />
+      </div>
+  
+      <div class="form-group">
+        <label for="nombre">Nombre</label>
+        <input type="text" formControlName="nombre" id="nombre" placeholder="Ej. Caja General" />
+      </div>
+  
+      <div class="form-group">
+        <label for="tipo">Tipo</label>
+        <select formControlName="tipo" id="tipo">
+          <option value="Activo">Activo</option>
+          <option value="Pasivo">Pasivo</option>
+          <option value="Patrimonio">Patrimonio</option>
+          <option value="Ingreso">Ingreso</option>
+          <option value="Gasto">Gasto</option>
+        </select>
+      </div>
+  
+      <button type="submit" [disabled]="formCuenta.invalid">Agregar Cuenta</button>
+    </form>
+  
+    <!-- Botón para mostrar/ocultar tabla -->
+    <div class="acciones-catalogo">
+      <button (click)="verCuentasRegistradas()" class="btn-ver">
+        📁 {{ mostrarTabla ? 'Ocultar cuentas' : 'Ver cuentas registradas' }}
+      </button>
+    </div>
+  
+    <!-- Filtros y tabla -->
+    <div *ngIf="mostrarTabla">
+      <div class="cuentasfiltradas">
+        <input
+          type="text"
+          [(ngModel)]="busqueda"
+          name="busqueda"
+          placeholder="🔍 Buscar por nombre o código"
+          class="buscador"
+        />
+  
+        <select [(ngModel)]="filtroTipo" name="filtroTipo" class="filtro-select">
+          <option value="">Todos los tipos</option>
+          <option *ngFor="let tipo of tiposCuenta" [value]="tipo">{{ tipo }}</option>
+        </select>
+      </div>
+  
+      <div class="tabla-cuentas" *ngIf="cuentasFiltradas.length > 0">
+        <h3>Listado de Cuentas Registradas</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let cuenta of cuentasPaginadas">
+              <td>
+                <ng-container *ngIf="cuentaEnEdicion === cuenta.id; else soloCodigo">
+                  <input type="text" [(ngModel)]="cuentaEditada.codigo" name="codigoEditado" />
+                </ng-container>
+                <ng-template #soloCodigo>{{ cuenta.codigo }}</ng-template>
+              </td>
+  
+              <td>
+                <ng-container *ngIf="cuentaEnEdicion === cuenta.id; else soloNombre">
+                  <input type="text" [(ngModel)]="cuentaEditada.nombre" name="nombreEditado" />
+                </ng-container>
+                <ng-template #soloNombre>{{ cuenta.nombre }}</ng-template>
+              </td>
+  
+              <td>
+                <ng-container *ngIf="cuentaEnEdicion === cuenta.id; else soloTipo">
+                  <select [(ngModel)]="cuentaEditada.tipo" name="tipoEditado">
+                    <option value="Activo">Activo</option>
+                    <option value="Pasivo">Pasivo</option>
+                    <option value="Patrimonio">Patrimonio</option>
+                    <option value="Ingreso">Ingreso</option>
+                    <option value="Gasto">Gasto</option>
+                  </select>
+                </ng-container>
+                <ng-template #soloTipo>{{ cuenta.tipo }}</ng-template>
+              </td>
+  
+              <td>
+                <ng-container *ngIf="cuentaEnEdicion === cuenta.id; else accionesDefault">
+                  <button (click)="guardarEdicion(cuenta.id)" class="btn-guardar">Guardar</button>
+                  <button (click)="cancelarEdicion()" class="btn-cancelar">Cancelar</button>
+                </ng-container>
+                <ng-template #accionesDefault>
+                  <button (click)="editarCuenta(cuenta)" class="btn-editar">Editar</button>
+                  <button (click)="eliminarCuenta(cuenta.id)" class="btn-eliminar">Eliminar</button>
+                </ng-template>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <div class="paginacion-footer" *ngIf="totalPaginas > 1">
+                <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">⏮ Anterior</button>
+              
+                <span *ngFor="let i of [].constructor(totalPaginas); let idx = index">
+                  <button (click)="cambiarPagina(idx + 1)" [class.activo]="paginaActual === idx + 1">
+                    {{ idx + 1 }}
+                  </button>
+                </span>
+              
+                <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">Siguiente ⏭</button>
+              </div>
+            </tfoot>
+        </table>
+      </div>
+  
+      <p *ngIf="cuentasFiltradas.length === 0">🔍 No hay cuentas que coincidan con los filtros.</p>
+    </div>
+  </div>
+  

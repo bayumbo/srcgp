@@ -1,0 +1,141 @@
+
+<header>
+  <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
+  <div class="logo">
+    <img src="logo.png" alt="Logo">
+  </div>
+  <nav>
+    <ul class="menu">
+      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+          <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+    </ul>
+  </nav>
+</header>
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  </div>
+     <!-- NO TOCAR, HASTA AQUI CONFIGURACION BASICA DEL MENU 🔥📌-->
+     
+<!-- CONTENEDOR DE FORMULARIO Y TABLA -->
+<div class="comprobante-flex-container">
+ 
+  <div class="form-card">
+    <h2>Nuevo Comprobante de Egreso</h2>
+    <form [formGroup]="egresoForm" (ngSubmit)="agregarTransaccion()">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Beneficiario</label>
+          <input formControlName="beneficiario" placeholder="Beneficiario" required />
+        </div>
+        <div class="form-group">
+          <label>Cédula o RUC</label>
+          <input formControlName="cedula" maxlength="13" pattern="\d*" placeholder="Cédula o RUC" required />
+        </div>
+        <div class="form-group">
+          <label>Código de transacción</label>
+          <input formControlName="codigo" placeholder="Código de transacción" required />
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input formControlName="fecha" type="date" required />
+        </div>
+        <div class="form-group">
+          <label>Descripción</label>
+          <input formControlName="descripcion" placeholder="Descripción" required />
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select formControlName="tipo">
+            <option value="Debe">Debe</option>
+            <option value="Haber">Haber</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Monto</label>
+          <input formControlName="monto" placeholder="0.00$" type="text" required />
+        </div>
+        <div class="form-group">
+          <label for="numeroCheque">N° Cheque (opcional)</label>
+          <input type="text" formControlName="numeroCheque" placeholder="No.Cheque" />
+
+        </div>
+        
+        <div class="form-group full-width">
+          <button type="submit">Agregar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tabla -->
+  <div class="tabla-wrapper">
+    <table id="tablaEgresos">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Código</th>
+          <th>Fecha</th>
+          <th>Descripción</th>
+          <th>Debe</th>
+          <th>Haber</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr *ngFor="let t of transacciones; let i = index">
+          <td>{{ i + 1 }}</td>
+          <td>{{ t.codigo }}</td>
+          <td>{{ t.fecha }}</td>
+          <td>{{ t.descripcion }}</td>
+          <td>{{ t.tipo === 'Debe' ? t.monto.toFixed(2) : '-' }}</td>
+          <td>{{ t.tipo === 'Haber' ? t.monto.toFixed(2) : '-' }}</td>
+          <td><button (click)="eliminarTransaccion(i)">Eliminar</button></td>
+        </tr>
+     
+        <tr>
+          <td colspan="4" style="text-align: right; font-weight: bold;">Total:</td>
+          <td>{{ totalDebe | number:'1.2-2' }}</td>
+          <td>{{ totalHaber | number:'1.2-2' }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="text-align: center; margin-top: 20px;">
+      <button (click)="generarPDF()">Generar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTÓN Y LISTA DE COMPROBANTES GUARDADOS -->
+
+  <div class="boton-comprobantes">
+    <button (click)="mostrarPDFs()">📄 Ver comprobantes guardados</button>
+  </div>
+
+  <div id="listaPDFs" class="lista-comprobantes">
+    <div *ngFor="let comprobante of comprobantes" class="item-comprobante">
+      <div><strong>No.:</strong> {{ comprobante.comprobanteId }}</div>
+      <div><strong>Beneficiario:</strong> {{ comprobante.beneficiario }}</div>
+      <div><strong>Fecha:</strong> {{ comprobante.fecha }}</div>
+      <div><strong>Total Debe:</strong> ${{ comprobante.totalDebe.toFixed(2) }}</div>
+      <div><strong>Total Haber:</strong> ${{ comprobante.totalHaber.toFixed(2) }}</div>
+      <div>
+        <a [href]="comprobante.pdfURL" target="_blank">📄 Ver PDF</a>
+        <button (click)="eliminarComprobante(comprobante.id, comprobante.comprobanteId)">🗑️ Eliminar</button>
+      </div>
+    </div>
+  </div>
+

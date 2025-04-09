@@ -1,0 +1,142 @@
+.tabla-container {
+  padding: 1rem;
+  font-family: "Roboto", sans-serif;
+}
+.tabla-container h2 {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.tabla-container .acciones-globales {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.tabla-container .acciones-globales button {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.tabla-container .acciones-globales .filtro {
+  background-color: rgb(0, 0, 0);
+  color: #ffffff;
+  width: 50px;
+}
+.tabla-container .acciones-globales .filtro:hover {
+  background-color: #212521;
+}
+.tabla-container .acciones-globales .nuevo-registro {
+  background-color: #4caf50;
+  color: white;
+  width: 200px;
+}
+.tabla-container .acciones-globales .nuevo-registro:hover {
+  background-color: #005800;
+}
+.tabla-container .acciones-globales .material-icons {
+  font-size: 18px;
+}
+.tabla-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tabla-container table thead {
+  background-color: #4caf50;
+  color: white;
+}
+.tabla-container table th, .tabla-container table td {
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+.tabla-container table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+.tabla-container td.acciones {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: none;
+}
+.tabla-container td.acciones::before {
+  content: "Acciones";
+  font-weight: bold;
+  color: #555;
+  display: none;
+}
+.tabla-container td.acciones .editar {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  gap: 0.3rem;
+}
+.tabla-container td.acciones .editar .material-icons {
+  font-size: 18px;
+}
+.tabla-container td.acciones .editar:hover {
+  background-color: #45a049;
+}
+.tabla-container td.acciones .pagar {
+  background-color: rgb(0, 0, 0);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.tabla-container td.acciones .pagar:hover {
+  background-color: #333333;
+}
+
+@media (max-width: 768px) {
+  thead {
+    display: none;
+  }
+  tbody, tr, td {
+    display: block;
+    width: 100%;
+  }
+  tr {
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    padding: 0.5rem;
+  }
+  td {
+    text-align: left;
+    padding: 0.5rem;
+    border: none;
+    border-bottom: 1px solid #eee;
+    position: relative;
+  }
+  td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #555;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  td.acciones {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+  td.acciones::before {
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+}/*# sourceMappingURL=lista-reportes.component.css.map */

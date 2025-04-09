@@ -1,0 +1,118 @@
+
+<header>
+    <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
+    <div class="logo">
+      <img src="logo.png" alt="Logo">
+    </div>
+    <nav>
+      <ul class="menu">
+        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
+  </header>
+
+
+
+    <div id="preloader">
+		<div class="preloader">
+			<span></span>
+			<span></span>
+			<span></span>
+			<span></span>
+		</div>
+	</div>
+ <!-- NO TOCAR, HASTA AQUI CONFIGURACION BASICA DEL MENU 🔥📌-->
+
+
+ <div class="libro-mayor-container">
+    <h2>Libro Mayor</h2>
+  
+    <!-- FORMULARIO DE FILTRO -->
+    <form [formGroup]="formFiltro" (ngSubmit)="filtrarLibros()">
+      <div class="filtros">
+        <div class="form-group">
+          <label>📅 Fecha de inicio:</label>
+          <input type="date" formControlName="fechaInicio" />
+          <div *ngIf="formFiltro.get('fechaInicio')?.invalid && formFiltro.get('fechaInicio')?.touched" class="alerta-campo">
+            ⚠️ Fecha de inicio requerida.
+          </div>
+          
+        </div>
+  
+        <div class="form-group">
+          <label>📅 Fecha de finalización:</label>
+          <input type="date" formControlName="fechaFin" />
+        </div>
+        <div *ngIf="formFiltro.get('fechaFin')?.invalid && formFiltro.get('fechaFin')?.touched" class="alerta-campo">
+            ⚠️ Fecha de finalizaciónrequerida.
+          </div>
+  
+        <div class="form-group">
+          <label>📂 Cuenta contable:</label>
+          <select formControlName="cuenta">
+            <option value="">Todas</option>
+            <option *ngFor="let cuenta of cuentasUnicas" [value]="cuenta">{{ cuenta }}</option>
+          </select>
+        </div>
+  <div *ngIf="formFiltro.get('fechaInicio')?.invalid && formFiltro.get('fechaInicio')?.touched" class="alerta-campo">
+  ⚠️ Fecha de inicio requerida.
+</div>
+
+        <button type="submit" [disabled]="formFiltro.invalid">Filtrar</button>
+      </div>
+    </form>
+  
+    <!-- BOTÓN GENERAR PDF -->
+    <div class="acciones">
+      <button (click)="generarPDF()" [disabled]="librosMayoresGenerados.length === 0">
+        📄 Generar PDF
+      </button>
+    </div>
+  
+    <!-- TABLA DE RESULTADOS -->
+    <div class="tabla-libro">
+      <table *ngIf="librosMayoresGenerados.length > 0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>N° Documento</th>
+            <th>N° Cheque</th>
+            <th>Cuenta</th>
+            <th>Concepto</th>
+            <th>Débito</th>
+            <th>Crédito</th>
+            <th>Saldo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of librosMayoresGenerados">
+            <td>{{ item.fecha }}</td>
+            <td>{{ item.numero }}</td>
+            <td>{{ item.cheque || '-' }}</td>
+            <td>{{ item.cuenta }}</td>
+            <td>{{ item.concepto }}</td>
+            <td>{{ item.debe | number: '1.2-2' }}</td>
+            <td>{{ item.haber | number: '1.2-2' }}</td>
+            <td>{{ item.saldo | number: '1.2-2' }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+            <tr>
+              <td colspan="7" style="text-align: right; font-weight: bold;">Total Saldo:</td>
+              <td style="font-weight: bold;">{{ librosMayoresGenerados[librosMayoresGenerados.length - 1]?.saldo | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+          
+      </table>
+  
+      <p *ngIf="librosMayoresGenerados.length === 0" class="mensaje">
+        🔍 No hay resultados para los filtros seleccionados.
+      </p>
+    </div>
+  </div>
+  

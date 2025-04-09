@@ -1,0 +1,136 @@
+
+
+<header>
+  <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
+  <div class="logo">
+    <img src="logo.png" alt="Logo">
+  </div>
+  <nav>
+    <ul class="menu">
+      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+          <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+    </ul>
+  </nav>
+</header>
+
+
+
+
+    <div id="preloader">
+		<div class="preloader">
+			<span></span>
+			<span></span>
+			<span></span>
+			<span></span>
+		</div>
+	</div>
+ <!-- NO TOCAR, HASTA AQUI CONFIGURACION BASICA DEL MENU 🔥📌-->
+
+
+
+<!-- CONTENEDOR EN GRID PARA DOS COLUMNAS -->
+<div class="libro-diario-wrapper-grid">
+
+    <!-- FORMULARIO LIBRO DIARIO -->
+    <div class="libro-diario-container">
+      <form [formGroup]="formAsiento" (ngSubmit)="guardarAsiento()" class="form-card">
+        <h2>Generar Libro Diario</h2>
+  
+        <div class="form-group form-cabecera">
+          <label>Número:</label>
+          <input type="text" [value]="formAsiento.get('numero')?.value" disabled />
+        </div>
+  
+        <div class="form-group form-cabecera">
+            <label>Fecha:</label>
+            <input type="date" formControlName="fecha" />
+          </div>
+  
+        <div class="form-group">
+          <label>Concepto:</label>
+          <input type="text" formControlName="concepto" />
+        </div>
+  
+        <h3>Detalles</h3>
+  
+        <div formArrayName="detalles">
+            <div
+              *ngFor="let detalle of detalles.controls; let i = index"
+              [formGroupName]="i"
+              class="cuenta-row"
+            >
+              <div class="form-group form-cabecera">
+                <input type="text" formControlName="cuenta" placeholder="Código" />
+              </div>
+          
+              <div class="form-group">
+                <input type="text" formControlName="descripcion" placeholder="Descripción" />
+              </div>
+          
+              <div class="form-group form-cabecera">
+                <input type="text" formControlName="centroCostos" placeholder="Centro de Costos" />
+              </div>
+          
+              <div class="form-group form-cabecera">
+                <input type="number" formControlName="debe" placeholder="Débito" />
+              </div>
+          
+              <div class="form-group form-cabecera">
+                <input type="number" formControlName="haber" placeholder="Crédito" />
+              </div>
+          
+              <div class="form-group">
+                <button type="button" class="btn-rojo" (click)="eliminarDetalle(i)">Eliminar</button>
+              </div>
+            </div>
+          </div>
+  
+        <div class="acciones">
+          <button type="button" (click)="agregarDetalle()">Agregar Cuenta</button>
+          <button type="submit" [disabled]="formAsiento.invalid || detalles.length === 0">
+            Guardar PDF
+          </button>
+         
+          <div *ngIf="formAsiento.invalid && formAsiento.touched" class="alerta">
+            
+            ⚠️ Completa todos los campos requeridos para guardar el PDF.
+            
+          </div>
+        </div>
+      </form>
+    </div>
+  
+    <!-- LISTADO DE LIBROS DIARIOS -->
+    <div class="libros-generados-panel">
+      <h2>Libros Diario Generados</h2>
+  
+      <div class="filtros-fechas">
+        <div class="form-group form-cabecera">
+          <label for="fInicio">📅 Fecha de inicio:</label>
+          <input type="date" id="fInicio" [(ngModel)]="filtroInicio" (change)="filtrarPorFechas()" />
+        </div>
+  
+        <div class="form-group form-cabecera">
+          <label for="fFin">📅 Fecha de finalización:</label>
+          <input type="date" id="fFin" [(ngModel)]="filtroFin" (change)="filtrarPorFechas()" />
+        </div>
+      </div>
+  
+      <div class="grid-libros">
+        <div *ngFor="let asiento of asientosFiltrados" class="card-libro">
+          <p><strong>No:</strong> {{ asiento.numero }}</p>
+          <p><strong>Fecha:</strong> {{ asiento.fecha }}</p>
+          <p><strong>Concepto:</strong> {{ asiento.concepto }}</p>
+          <div class="acciones">
+            <a [href]="asiento.pdfUrl" target="_blank">📄 Ver PDF</a>
+            <button (click)="eliminarAsiento(asiento.id, asiento.numero)">🗑 Eliminar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+  </div>
