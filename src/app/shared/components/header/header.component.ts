@@ -8,7 +8,7 @@ import { Router } from '@angular/router';
   selector: 'app-header',
   imports: [CommonModule],
   templateUrl: './header.component.html',
-  styleUrls: ['./header.component.css']
+  styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent implements OnInit {
   private authService = inject(AuthService);
