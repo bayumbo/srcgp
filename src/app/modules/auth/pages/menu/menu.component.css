@@ -1,0 +1,63 @@
+/* Asegura que el contenido no quede debajo del header fijo */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Contenedor principal del menú */
+.menu-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 250px;
+  margin: 80px auto 2rem auto; /* arriba 80px por el header */
+  margin-top: 90px;
+}
+
+/* Botones del menú */
+.menu-btn {
+  padding: 12px;
+  font-size: 16px;
+  border: none;
+  background-color: #1976d2;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.menu-btn:hover {
+  background-color: #1565c0;
+}
+
+/* Botón de cerrar sesión */
+.logout-btn {
+  margin: 2rem auto;
+  display: block;
+  padding: 10px 20px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background-color: #c62828;
+}
+
+/* Texto de registro */
+.register-text {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.register-link {
+  color: #1976d2;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.register-link:hover {
+  text-decoration: none;
+}
