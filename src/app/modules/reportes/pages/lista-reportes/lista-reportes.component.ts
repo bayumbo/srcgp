@@ -92,4 +92,7 @@ export class ReporteListaComponent implements OnInit {
       id: doc.id
     }));
   }
+  irAPagar(id: string): void {
+    this.router.navigate(['/reportes/realizar-pago', id]);
+  }
 }

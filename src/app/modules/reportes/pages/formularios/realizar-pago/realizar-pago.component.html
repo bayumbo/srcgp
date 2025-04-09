@@ -1,1 +1,67 @@
-<p>realizar-pago works!</p>
+<div class="pago-container" *ngIf="reporte">
+    <h2>Gestión de Pago</h2>
+  
+    <div class="info-registro">
+      <p><strong>Nombre:</strong> {{ reporte.nombre }}</p>
+      <p><strong>Unidad:</strong> {{ reporte.unidad }}</p>
+    </div>
+  
+    <!-- Sección por cada módulo de pago -->
+    <div class="modulo" *ngFor="let campo of campos">
+      <h3>{{ campo | titlecase }}</h3>
+  
+      <table *ngIf="pagos[campo].length > 0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Cantidad pagada</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let pago of pagos[campo]">
+            <td>{{ pago.fecha.toDate() | date:'shortDate' }}</td>
+            <td>{{ pago.cantidad }}</td>
+          </tr>
+          <tr>
+            <td><strong>Total pagado:</strong></td>
+            <td><strong>{{ totales[campo] }}</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Total adeudado:</strong></td>
+            <td>
+                <strong>
+                    {{
+                      reporte[campo] - totales[campo] >= 0
+                        ? reporte[campo] - totales[campo]
+                        : 0
+                    }}
+                  </strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+  
+      <!-- ⚠️ Aquí el cambio para evitar el error -->
+      <p *ngIf="(pagos[campo] ?? []).length === 0">No hay pagos registrados para este módulo.</p>
+    </div>
+  
+    <!-- Total General -->
+    <div class="resumen-final">
+      <h3>Total General Adeudado:</h3>
+      <p>
+        {{
+          (reporte.minutosAtraso ) - totales['minutosAtraso'] +
+          (reporte.administracion) - totales['administracion'] +
+          (reporte.minutosBase ) - totales['minutosBase'] +
+          (reporte.multas ) - totales['multas']
+        }}
+      </p>
+    </div>
+  
+    <!-- Acciones -->
+    <div class="acciones">
+      <button class="volver" (click)="volver()">⬅️ Volver</button>
+      <button class="pagar">💰 Realizar pago</button>
+    </div>
+  </div>
+  

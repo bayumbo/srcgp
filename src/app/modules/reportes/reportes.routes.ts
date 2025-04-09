@@ -16,6 +16,11 @@ export const REPORTES_ROUTES: Routes = [
     loadComponent: () =>
       import('./pages/lista-reportes/lista-reportes.component').then(m => m.ReporteListaComponent)
   },
+  {
+    path: 'realizar-pago/:id',
+    loadComponent: () =>
+      import('./pages/formularios/realizar-pago/realizar-pago.component').then(m => m.RealizarPagoComponent),
+  },
   { 
     path: 'fecha',
     loadComponent: () =>
