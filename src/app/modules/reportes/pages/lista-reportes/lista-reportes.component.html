@@ -1,67 +1,79 @@
 <div class="tabla-container">
   <h2>NÓMINA DE RECAUDACIÓN</h2>
 
+  <!-- Acciones -->
   <div class="acciones-globales">
     <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
       <span class="material-icons">filter_alt</span>
     </button>
-
-    <div class="panel-filtros" *ngIf="mostrarFiltros">
-      <button (click)="filtrarPor('hoy')">📅 Hoy</button>
-      <button (click)="filtrarPor('semana')">🕰️ Esta Semana</button>
-      <button (click)="filtrarPor('mes')">📈 Este Mes</button>
-      <div class="filtro-personalizado">
-      <input type="date" [(ngModel)]="fechaPersonalizada" />
-      <button (click)="filtrarPorFechaPersonalizada()">🔍 Buscar</button>
-      </div>
-      <button class="limpiar" (click)="cargarTodosLosReportes()">🧹 Limpiar Filtros</button>
-      </div>
-
     <button class="nuevo-registro" (click)="irANuevoRegistro()">
       <span class="material-icons">add</span>
       Nuevo Registro
     </button>
   </div>
-<table *ngIf="reportes.length > 0; else cargando">
-  <thead>
-    <tr>
-      <th>Nombre</th>
-      <th>Unidad</th>
-      <th>Min. Atraso</th>
-      <th>Min. Pagados</th>
-      <th>Administración</th>
-      <th>Admin Pagada</th>
-      <th>Min. Base</th>      
-      <th>Min. Base Pagados</th>      
-      <th>Multas</th>
-      <th>Multas Pagadas</th>
-      <th>Acciones</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr *ngFor="let r of reportes">
-      <td data-label="Nombre">{{ r.nombre }}</td>
-      <td data-label="Unidad">{{ r.unidad }}</td>
-      <td data-label="Minutos por Atraso">{{ r.minutosAtraso }}</td>
-      <td data-label="Minutos Pagados">{{ r.minutosPagados }}</td>
-      <td data-label="Administración">{{ r.administracion }}</td>
-      <td data-label="Administración Pagada">{{ r.adminPagada }}</td>
-      <td data-label="Minutos Base">{{ r.minutosBase }}</td>
-      <td data-label="Minutos Base Pagados">{{ r.minBasePagados }}</td>           
-      <td data-label="Multas">{{ r.multas }}</td>
-      <td data-label="Minutos por Atraso">{{ r.multasPagadas }}</td>
-      <td class="acciones" data-label="Acciones">
-        <button class="editar" title="Editar" (click)="irAEditar(r.id!)">
-          <span class="material-icons">edit</span>
-        </button>
-        <button class="pagar" title="Pagar" (click)="irAPagar(r.id)">
-          Pagar
-        </button>
-      </td>
-    </tr>
-  </tbody>
-</table>
 
-<ng-template #cargando>
-  <p>Cargando reportes...</p>
-</ng-template>
+  <!-- Panel de filtros -->
+  <div class="panel-filtros" *ngIf="mostrarFiltros">
+    <button (click)="filtrarPor('hoy')">Hoy</button>
+    <button (click)="filtrarPor('semana')">Esta semana</button>
+    <button (click)="filtrarPor('mes')">Este mes</button>
+
+    <div class="filtro-personalizado">
+      <label for="fecha">Fecha personalizada:</label>
+      <input type="date" [(ngModel)]="fechaPersonalizada" id="fecha" />
+      <button (click)="filtrarPorFechaPersonalizada()">Buscar</button>
+    </div>
+
+    <button class="limpiar" (click)="cargarTodosLosReportes()">Limpiar filtros</button>
+  </div>
+
+  <!-- Tabla -->
+  <table *ngIf="reportes.length > 0; else cargando">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Unidad</th>
+        <th>Min. Atraso</th>
+        <th>Min. Pagados</th>
+        <th>Administración</th>
+        <th>Admin Pagada</th>
+        <th>Min. Base</th>
+        <th>Min. Base Pagados</th>
+        <th>Multas</th>
+        <th>Multas Pagadas</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let r of reportes">
+        <td data-label="Nombre">{{ r.nombre }}</td>
+        <td data-label="Unidad">{{ r.unidad }}</td>
+
+        <td data-label="Min. Atraso">{{ r.minutosAtraso }}</td>
+        <td data-label="Min. Pagados">{{ r.minutosPagados }}</td>
+
+        <td data-label="Administración">{{ r.administracion }}</td>
+        <td data-label="Admin Pagada">{{ r.adminPagada }}</td>
+
+        <td data-label="Min. Base">{{ r.minutosBase }}</td>
+        <td data-label="Min. Base Pagados">{{ r.minBasePagados }}</td>
+
+        <td data-label="Multas">{{ r.multas }}</td>
+        <td data-label="Multas Pagadas">{{ r.multasPagadas }}</td>
+
+        <td class="acciones" data-label="Acciones">
+          <button class="editar" title="Editar" (click)="irAEditar(r.id)">
+            <span class="material-icons">edit</span>
+          </button>
+          <button class="pagar" title="Pagar" (click)="irAPagar(r.id)">
+            Pagar
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <ng-template #cargando>
+    <p>Cargando reportes...</p>
+  </ng-template>
+</div>
