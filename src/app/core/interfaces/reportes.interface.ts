@@ -1,3 +1,4 @@
+import { Timestamp } from "firebase/firestore";
 
 export interface NuevoRegistro {
     adminPagada: number;
@@ -10,4 +11,6 @@ export interface NuevoRegistro {
     multasPagadas: number;
     nombre: string;
     unidad: string;
+    uid?: string;
+    fechaModificacion?: Timestamp;
   }
