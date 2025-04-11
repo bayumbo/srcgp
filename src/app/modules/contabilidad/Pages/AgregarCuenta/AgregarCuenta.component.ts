@@ -16,12 +16,16 @@ export class AgregarCuentaComponent implements OnInit {
   formCuenta!: FormGroup;
   cuentasOriginal: any[] = [];
   cuentasFiltradas: any[] = [];
+  cuentasPaginadas: any[] = [];
   cuentaEnEdicion: string | null = null;
   cuentaEditada: any = {};
   busqueda: string = '';
   filtroTipo: string = '';
   tiposCuenta: string[] = ['Activo', 'Pasivo', 'Patrimonio', 'Ingreso', 'Gasto'];
   mostrarTabla: boolean = false;
+  paginaActual: number = 1;
+  registrosPorPagina: number = 10;
+  totalPaginas: number = 1;
 
   constructor(private fb: FormBuilder, private catalogoService: CatalogoService) {}
 
@@ -33,9 +37,6 @@ export class AgregarCuentaComponent implements OnInit {
     });
 
     this.obtenerCuentas();
-
-    // Escuchamos cambios en filtros cada cierto tiempo
-    setInterval(() => this.aplicarFiltros(), 300);
   }
 
   async agregarCuenta(): Promise<void> {
@@ -55,7 +56,6 @@ export class AgregarCuentaComponent implements OnInit {
     this.cuentasOriginal = await this.catalogoService.obtenerCuentas();
     this.aplicarFiltros();
 
-    // Ocultar preloader
     setTimeout(() => {
       const preloader = document.getElementById('preloader');
       if (preloader) preloader.style.display = 'none';
@@ -63,15 +63,30 @@ export class AgregarCuentaComponent implements OnInit {
   }
 
   aplicarFiltros(): void {
-    this.cuentasFiltradas = this.cuentasOriginal.filter(cuenta => {
+    const filtradas = this.cuentasOriginal.filter(cuenta => {
       const coincideTexto = cuenta.codigo.toLowerCase().includes(this.busqueda.toLowerCase()) ||
                             cuenta.nombre.toLowerCase().includes(this.busqueda.toLowerCase());
       const coincideTipo = this.filtroTipo ? cuenta.tipo === this.filtroTipo : true;
       return coincideTexto && coincideTipo;
     });
-    this.paginaActual = 1; // Reinicia paginación
+
+    this.totalPaginas = Math.ceil(filtradas.length / this.registrosPorPagina);
+    if (this.paginaActual > this.totalPaginas) {
+      this.paginaActual = this.totalPaginas || 1;
+    }
+
+    const inicio = (this.paginaActual - 1) * this.registrosPorPagina;
+    const fin = inicio + this.registrosPorPagina;
+    this.cuentasFiltradas = filtradas;
+    this.cuentasPaginadas = filtradas.slice(inicio, fin);
   }
 
+  cambiarPagina(pagina: number): void {
+    if (pagina >= 1 && pagina <= this.totalPaginas) {
+      this.paginaActual = pagina;
+      this.aplicarFiltros();
+    }
+  }
 
   editarCuenta(cuenta: any): void {
     this.cuentaEnEdicion = cuenta.id;
@@ -114,30 +129,4 @@ export class AgregarCuentaComponent implements OnInit {
       this.obtenerCuentas();
     }
   }
-  
-// Paginación
-paginaActual: number = 1;
-registrosPorPagina: number = 10;
-
-get totalPaginas(): number {
-  return Math.ceil(this.cuentasFiltradas.length / this.registrosPorPagina);
-}
-
-get cuentasPaginadas(): any[] {
-  const inicio = (this.paginaActual - 1) * this.registrosPorPagina;
-  return this.cuentasFiltradas.slice(inicio, inicio + this.registrosPorPagina);
-}
-
-cambiarPagina(pagina: number): void {
-  if (pagina >= 1 && pagina <= this.totalPaginas) {
-    this.paginaActual = pagina;
-  }
-}
-
-
-
-
-
-
-
 }

@@ -221,18 +221,7 @@ header {
         color: #ddd;
       }
   
-      button {
-        background-color: #e74c3c;
-        color: white;
-        padding: 6px 12px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-  
-        &:hover {
-          background-color: #c0392b;
-        }
-      }
+      
     }
   }
   
@@ -251,6 +240,38 @@ header {
       }
     }
   }
+
+  /* Estilos para la zona de filtros debajo del botón "Ver/Ocultar cuentas" */
+.cuentasfiltradas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+
+/* Estilo específico para el input del buscador */
+.cuentasfiltradas .buscador {
+  flex: 1 1 300px; // Se adapta pero mínimo 300px
+  padding: 10px;
+  width: 50%;
+  border-radius: 6px;
+  border: none;
+  font-size: 1rem;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Estilo para el select de filtro por tipo */
+.cuentasfiltradas .filtro-select {
+  padding: 10px;
+  border-radius: 6px;
+ 
+  border: none;
+  background-color: #f0f0f0;
+}
+
   .paginacion-footer {
     margin-top: 10px;
     display: flex;
@@ -275,3 +296,45 @@ header {
       }
     }
   }
+
+  /* Botón Editar (verde) */
+.btn-editar {
+  background-color: #28a745; // verde
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  cursor: pointer;
+}
+
+.btn-editar:hover {
+  background-color: #218838;
+}
+
+/* Botón Eliminar (rojo) */
+.btn-eliminar {
+  background-color: #dc3545; // rojo
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-eliminar:hover {
+  background-color: #c82333;
+}
+
+.form-cuenta button,
+.acciones-catalogo button {
+  width: 250px;
+  margin: 0 auto;
+  display: block;
+  padding: 10px 15px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 8px;
+  border: none;
+  transition: all 0.3s ease;
+}

@@ -63,9 +63,38 @@
   ⚠️ Fecha de inicio requerida.
 </div>
 
-        <button type="submit" [disabled]="formFiltro.invalid">Filtrar</button>
+        <button type="submit" [disabled]="formFiltro.invalid" class="btn-filtrar">Filtrar</button>
       </div>
     </form>
+
+    <!-- Botón para abrir el modal -->
+<div class="contenedor-btn-libros">
+  <button class="btn-ver-libros" (click)="abrirModalLibros()">📚 Ver Libros Guardados</button>
+</div>
+<div class="modal-libros-mayores" *ngIf="mostrarModalLibros">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Libros Mayores</h3>
+      <button class="cerrar-modal" (click)="cerrarModalLibros()">✖</button>
+    </div>
+
+    <div class="filtro-fechas-modal">
+      <input type="date" [(ngModel)]="filtroInicioModal" (change)="filtrarLibrosModal()" placeholder="Desde" />
+      <input type="date" [(ngModel)]="filtroFinModal" (change)="filtrarLibrosModal()" placeholder="Hasta" />
+    </div>
+
+    <div class="libros-lista">
+      <div class="libro-card" *ngFor="let libro of librosFiltrados">
+        <strong>{{ libro.nombre }}</strong>
+        <div class="acciones-modal">
+          <a [href]="libro.url" target="_blank" class="btn-ver">📄 Ver PDF</a>
+          <button (click)="eliminarLibroMayor(libro)" class="btn-eliminar">🗑 Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
   
     <!-- BOTÓN GENERAR PDF -->
     <div class="acciones">

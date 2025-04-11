@@ -107,6 +107,7 @@ export class LibroMayorService {
     private db: Firestore,
   ) {}
 
+  
   async obtenerDatosPorFechas(inicio: string, fin: string): Promise<any[]> {
     const librosRef = collection(this.db, 'libros-diarios');
     const q = query(librosRef, where('fecha', '>=', inicio), where('fecha', '<=', fin));
@@ -114,6 +115,11 @@ export class LibroMayorService {
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
+    async eliminarLibroMayor(libro: any): Promise<void> {
+    const pdfRef = ref(this.storage, `libros-mayor/${libro.nombre}`);
+    await deleteObject(pdfRef);
+    await deleteDoc(doc(this.firestore, 'libros-mayor', libro.id));
+  }
   async guardarLibroMayor(pdfBlob: Blob, metadata: { fechaInicio: string; fechaFin: string }): Promise<string> {
     const fileName = `LibroMayor_${metadata.fechaInicio}_al_${metadata.fechaFin}.pdf`;
     const pdfRef = ref(this.storage, `libros-mayor/${fileName}`);
@@ -218,4 +224,7 @@ export class CatalogoService {
   actualizarCuenta(id: string, datos: any): Promise<void> {
     return updateDoc(doc(this.firestore, 'catalogo-cuentas', id), datos);
   }
+
+
+  
 }

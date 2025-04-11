@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { jsPDF } from 'jspdf';
-import { LibroMayorService } from '../../Services/comprobante.service'; // Crea este servicio
+import { LibroMayorService } from '../../Services/comprobante.service';
 import { RouterModule } from '@angular/router';
+import { Storage } from '@angular/fire/storage';
+
 @Component({
   selector: 'app-libmayor',
   standalone: true,
@@ -17,9 +19,17 @@ export class LibroMayorComponent implements OnInit {
   librosMayoresGenerados: any[] = [];
   cuentasUnicas: string[] = [];
 
+  // MODAL
+  mostrarModalLibros = false;
+  librosMayores: any[] = [];
+  librosFiltrados: any[] = [];
+  filtroInicioModal: string = '';
+  filtroFinModal: string = '';
+
   constructor(
     private fb: FormBuilder,
-    private libroMayorService: LibroMayorService
+    private libroMayorService: LibroMayorService,
+    private storage: Storage
   ) {}
 
   ngOnInit(): void {
@@ -29,6 +39,7 @@ export class LibroMayorComponent implements OnInit {
       cuenta: ['']
     });
     this.obtenerLibrosGuardados();
+
     setTimeout(() => {
       const preloader = document.getElementById('preloader');
       if (preloader) {
@@ -110,5 +121,59 @@ export class LibroMayorComponent implements OnInit {
 
   async obtenerLibrosGuardados(): Promise<void> {
     this.librosMayoresGenerados = await this.libroMayorService.obtenerLibrosGuardados();
+  }
+
+  async abrirModalLibros(): Promise<void> {
+    this.librosMayores = await this.libroMayorService.obtenerLibrosGuardados();
+    this.librosFiltrados = []; // ⛔ no mostrar hasta que filtre
+    this.filtroInicioModal = '';
+    this.filtroFinModal = '';
+    this.mostrarModalLibros = true;
+  }
+
+  cerrarModalLibros(): void {
+    this.mostrarModalLibros = false;
+  }
+
+  async eliminarLibroMayor(libro: any): Promise<void> {
+    const confirmacion = confirm(`¿Estás seguro de eliminar el libro "${libro.nombre}"?`);
+    if (confirmacion) {
+      try {
+        await this.libroMayorService.eliminarLibroMayor(libro);
+        this.librosMayores = this.librosMayores.filter(l => l.id !== libro.id);
+        this.librosFiltrados = this.librosFiltrados.filter(l => l.id !== libro.id);
+        alert('✅ Libro eliminado correctamente.');
+      } catch (error) {
+        alert('❌ Error al eliminar el libro.');
+        console.error(error);
+      }
+    }
+  }
+
+  filtrarLibrosModal(): void {
+    if (!this.filtroInicioModal || !this.filtroFinModal) {
+      this.librosFiltrados = [];
+      return;
+    }
+
+    const inicio = new Date(this.filtroInicioModal);
+    const fin = new Date(this.filtroFinModal);
+
+    this.librosFiltrados = this.librosMayores.filter(libro => {
+      const fecha = this.obtenerFechaDesdeNombre(libro.nombre);
+      return fecha >= inicio && fecha <= fin;
+    });
+  }
+
+  obtenerFechaDesdeNombre(nombre: string): Date {
+    const regex = /LibroMayor_(\d{4})-(\d{2})-(\d{2})/;
+    const match = nombre.match(regex);
+
+    if (match) {
+      const [_, year, month, day] = match;
+      return new Date(`${year}-${month}-${day}`);
+    }
+
+    return new Date('2000-01-01');
   }
 }

@@ -39,6 +39,7 @@
       <div class="form-group">
         <label for="tipo">Tipo</label>
         <select formControlName="tipo" id="tipo">
+          <option value="">Seleccione</option>
           <option value="Activo">Activo</option>
           <option value="Pasivo">Pasivo</option>
           <option value="Patrimonio">Patrimonio</option>
@@ -126,20 +127,18 @@
               </td>
             </tr>
           </tbody>
-          <tfoot>
-            <div class="paginacion-footer" *ngIf="totalPaginas > 1">
-                <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">⏮ Anterior</button>
-              
-                <span *ngFor="let i of [].constructor(totalPaginas); let idx = index">
-                  <button (click)="cambiarPagina(idx + 1)" [class.activo]="paginaActual === idx + 1">
-                    {{ idx + 1 }}
-                  </button>
-                </span>
-              
-                <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">Siguiente ⏭</button>
-              </div>
-            </tfoot>
         </table>
+        <div class="paginacion-footer" *ngIf="totalPaginas > 1">
+          <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">⏮ Anterior</button>
+        
+          <span *ngFor="let i of [].constructor(totalPaginas); let idx = index">
+            <button (click)="cambiarPagina(idx + 1)" [class.activo]="paginaActual === idx + 1">
+              {{ idx + 1 }}
+            </button>
+          </span>
+        
+          <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">Siguiente ⏭</button>
+        </div>
       </div>
   
       <p *ngIf="cuentasFiltradas.length === 0">🔍 No hay cuentas que coincidan con los filtros.</p>
