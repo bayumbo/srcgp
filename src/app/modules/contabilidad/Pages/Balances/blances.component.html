@@ -1,0 +1,93 @@
+
+
+<header>
+  <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
+  <div class="logo">
+    <img src="logo.png" alt="Logo">
+  </div>
+  <nav>
+    <ul class="menu">
+      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+          <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+    </ul>
+  </nav>
+</header>
+
+    <div id="preloader">
+		<div class="preloader">
+			<span></span>
+			<span></span>
+			<span></span>
+			<span></span>
+		</div>
+	</div>
+ <!-- NO TOCAR, HASTA AQUI CONFIGURACION BASICA DEL MENU 🔥📌-->
+
+
+ <div class="balance-container">
+  <h2>Balance de Comprobación</h2>
+
+  <form [formGroup]="formFiltro" (ngSubmit)="generarBalance()">
+
+    <div class="filtros">
+      <div class="form-group">
+        <label>Fecha inicio:</label>
+        <input type="date" formControlName="inicio">
+      </div>
+      <div class="form-group">
+        <label>Fecha fin:</label>
+        <input type="date" formControlName="fin">
+      </div>
+      <button type="submit" [disabled]="formFiltro.invalid">Filtrar</button>
+
+    </div>
+  </form>
+
+  <div class="acciones">
+    <button (click)="exportarPDF()" [disabled]="datosBalance.length === 0">
+
+      📄 Generar PDF
+    </button>
+  </div>
+
+  <div class="tabla-balance">
+    <table *ngIf="datosBalance.length > 0">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nombre</th>
+          <th>Debe</th>
+          <th>Haber</th>
+          <th>Saldo Deudor</th>
+          <th>Saldo Acreedor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of datosBalance">
+          <td>{{ item.cuenta }}</td>
+          <td>{{ item.nombre }}</td>
+          <td>{{ item.debe | number:'1.2-2' }}</td>
+          <td>{{ item.haber | number:'1.2-2' }}</td>
+          <td>{{ item.saldoDebe | number:'1.2-2' }}</td>
+          <td>{{ item.saldoHaber | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2">TOTAL</th>
+          <th>{{ totalDebe | number:'1.2-2' }}</th>
+          <th>{{ totalHaber | number:'1.2-2' }}</th>
+          <th>{{ totalDeudor | number:'1.2-2' }}</th>
+          <th>{{ totalAcreedor | number:'1.2-2' }}</th>
+        </tr>
+      </tfoot>
+    </table>
+    <p *ngIf="datosBalance.length === 0">
+      🔍 No hay datos para mostrar.
+    </p>
+  </div>
+</div>

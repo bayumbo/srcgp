@@ -1,0 +1,340 @@
+/* NO TOCAR, AQUI CONFIGURACION BASICA DEL MENU -🔥📌 */
+html,body {
+  margin: 0;
+  padding: 0;
+  height: 100vw;
+  width: 140vw;
+  font-family: Arial, sans-serif, 12px;
+  background-color: #474646;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 97vw; // Ocupa todo el ancho de la pantalla
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: black;
+  padding: 10px 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); // sombra sutil
+  .logo {
+    img {
+      height: 50px;
+    }
+  }
+}
+
+.menu {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+
+  li {
+    position: relative;
+  }
+
+  a {
+    text-decoration: none;
+    color: white;
+    font-size: 16px;
+    padding: 10px;
+    transition: color 0.3s ease;
+
+    &:hover {
+      color: #1E90FF;
+      border-bottom: 2px solid #1E90FF;
+    }
+  }
+}
+/* Submenú */
+.submenu {
+  display: none;
+  position: absolute;
+  top: 40px; /* Ajusta la distancia del menú principal */
+  left: 0;
+  background-color: #333;
+  list-style: none;
+  padding: 10px 0;
+  border-radius: 5px;
+  width: 150px; /* Aumenta el ancho para que los elementos no estén tan juntos */
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3); /* Agrega sombra para mejor visualización */
+}
+.submenu li {
+    padding: 10px 15px; /* Aumenta el espaciado interno */
+}
+
+.submenu a {
+    color: white;
+    display: block;
+    font-size: 16px; /* Aumenta el tamaño del texto */
+    padding: 10px; /* Asegura buen espaciado */
+    text-align: left;
+}
+
+.submenu a:hover {
+    background-color: #1E90FF;
+    border-radius: 3px;
+}
+
+/* Asegura que el submenú no afecte el layout */
+.submenu-container {
+  position: relative;
+}
+
+
+#preloader {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background-color: #FFF;
+  z-index: 99999;
+
+  .preloader {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+
+    span {
+      display: inline-block;
+      background-color: #6195FF;
+      width: 25px;
+      height: 25px;
+      animation: preload 1s ease-in-out infinite;
+      transform: scale(0);
+      border-radius: 50%;
+
+      &:nth-child(1) { animation-delay: 0s; }
+      &:nth-child(2) { animation-delay: 0.1s; }
+      &:nth-child(3) { animation-delay: 0.15s; }
+      &:nth-child(4) { animation-delay: 0.2s; }
+    }
+  }
+}
+
+@keyframes preload {
+  0% { transform: scale(0); }
+  50% { transform: scale(1); }
+  100% { transform: scale(0); }
+}
+
+/* =======================
+   CATÁLOGO DE CUENTAS
+   ======================= */
+
+   .cuentas-container {
+    background-color: #1f1f1f;
+    color: white;
+    border-radius: 10px;
+    padding: 30px;
+    margin: 120px auto 40px auto;
+    max-width: 1000px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+  
+    h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      font-size: 24px;
+    }
+  }
+  
+  .form-cuenta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 30px;
+  
+    .form-group {
+      flex: 1 1 30%;
+      display: flex;
+      flex-direction: column;
+  
+      label {
+        margin-bottom: 6px;
+        color: #ccc;
+        font-size: 14px;
+      }
+  
+      input,
+      select {
+        background-color: #f0f0f0;
+        padding: 8px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+    }
+  
+    button {
+      align-self: flex-end;
+      margin-top: 22px;
+      padding: 10px 20px;
+      background-color: #28a745;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+  
+      &:hover {
+        background-color: #218838;
+      }
+    }
+  }
+  
+  .tabla-cuentas {
+    h3 {
+      margin-bottom: 15px;
+      font-size: 20px;
+      color: #fff;
+    }
+  
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #2c2c2c;
+      border-radius: 8px;
+      overflow: hidden;
+  
+      th,
+      td {
+        padding: 12px;
+        border: 1px solid #444;
+        text-align: center;
+        font-size: 14px;
+      }
+  
+      th {
+        background-color: #007bff;
+        color: white;
+      }
+  
+      td {
+        color: #ddd;
+      }
+  
+      
+    }
+  }
+  
+  p {
+    text-align: center;
+    color: #aaa;
+    margin-top: 20px;
+  }
+  
+  @media (max-width: 768px) {
+    .form-cuenta {
+      flex-direction: column;
+  
+      .form-group {
+        flex: 1 1 100%;
+      }
+    }
+  }
+
+  /* Estilos para la zona de filtros debajo del botón "Ver/Ocultar cuentas" */
+.cuentasfiltradas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+
+/* Estilo específico para el input del buscador */
+.cuentasfiltradas .buscador {
+  flex: 1 1 300px; // Se adapta pero mínimo 300px
+  padding: 10px;
+  width: 50%;
+  border-radius: 6px;
+  border: none;
+  font-size: 1rem;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Estilo para el select de filtro por tipo */
+.cuentasfiltradas .filtro-select {
+  padding: 10px;
+  border-radius: 6px;
+ 
+  border: none;
+  background-color: #f0f0f0;
+}
+
+  .paginacion-footer {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  
+    button {
+      padding: 6px 12px;
+      border: none;
+      background-color: #2e86de;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+  
+      &.activo {
+        background-color: #1abc9c;
+      }
+  
+      &:disabled {
+        background-color: #ccc;
+        cursor: default;
+      }
+    }
+  }
+
+  /* Botón Editar (verde) */
+.btn-editar {
+  background-color: #28a745; // verde
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  cursor: pointer;
+}
+
+.btn-editar:hover {
+  background-color: #218838;
+}
+
+/* Botón Eliminar (rojo) */
+.btn-eliminar {
+  background-color: #dc3545; // rojo
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-eliminar:hover {
+  background-color: #c82333;
+}
+
+.form-cuenta button,
+.acciones-catalogo button {
+  width: 250px;
+  margin: 0 auto;
+  display: block;
+  padding: 10px 15px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 8px;
+  border: none;
+  transition: all 0.3s ease;
+}

@@ -163,29 +163,173 @@ header {
 }
 
 /* NO TOCAR, AQUI CONFIGURACION BASICA DEL MENU -🔥📌*/
-form {
-  background-color: #1f1f1f;
+
+
+.comprobante-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 30px;
+  flex-wrap: wrap; /* para que en pantallas pequeñas se apilen */
   padding: 20px;
+}
+
+.tabla-wrapper {
+  flex: 1;
+  min-width: 500px;
+  background-color: #1f1f1f;
+  padding: 15px;
   border-radius: 10px;
-  max-width: 800px;
-  margin: auto;
-  color: #fff;
+  box-shadow: 0 0 15px rgba(0,0,0,0.4);
 }
-.form-group {
-  margin-bottom: 15px;
+
+
+h1 {
+  color: #333;
 }
-.form-group input {
+
+.form-container {
+  margin-bottom: 20px;
+}
+
+input, select, button {
+  margin: 5px;
+  padding: 8px;
+}
+
+table {
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: white;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 10px;
+  text-align: center;
+  color: #000; /* asegúrate que el texto sea visible */
+  font-size: 14px;
+}
+
+th {
+  background-color: #007BFF;
+  color: white;
+}
+
+
+tfoot td {
+  font-weight: bold;
+  background-color: #f2f2f2;
+}
+table button {
+  padding: 5px 10px;
+  background-color: #28a745;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+}
+
+table button:hover {
+  background-color: #218838;
+}
+
+button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #218838;
+}
+
+.form-card {
+  flex: 1;
+  max-width: 500px;
+  background-color: #1f1f1f;
+  padding: 20px 30px;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.4);
+}
+.form-card h2 {
+  margin-bottom: 20px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group.full-width {
+  grid-column: span 2;
+  text-align: center;
+}
+
+label {
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: #ccc;
+}
+
+input, select, button {
   padding: 8px;
   border-radius: 5px;
   border: none;
+  font-size: 14px;
 }
-.transaccion-item {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+
+input, select {
+  background-color: #f0f0f0;
 }
-.transaccion-item input {
-  flex: 1;
-  padding: 6px;
+
+button {
+  background-color: #28a745;
+  color: white;
+  font-weight: bold;
+  padding: 10px 20px;
 }
+
+button:hover {
+  background-color: #218838;
+  cursor: pointer;
+}
+
+
+
+
+.boton-comprobantes {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin-top: 20px !important;
+}
+
+#mostrarPDFs {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background-color: #28a745;
+  color: white;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+#mostrarPDFs:hover {
+  background-color: #218838;
+}
+

@@ -1,0 +1,179 @@
+<!-- ENCABEZADO DEL MENÚ -->
+<header>
+  <div class="logo">
+    <img src="logo.png" alt="Logo" />
+  </div>
+  <nav>
+    <ul class="menu">
+      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+      <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- PRELOADER -->
+<div id="preloader">
+  <div class="preloader">
+    <span></span><span></span><span></span><span></span>
+  </div>
+</div>
+
+<!-- FORMULARIO + TABLA -->
+<div class="comprobante-flex-container">
+  <!-- FORMULARIO -->
+  <div class="form-card">
+    <h2>Nuevo Comprobante de Egreso</h2>
+    <form [formGroup]="egresoForm" (ngSubmit)="agregarTransaccion()">
+      <div class="form-grid">
+        <div class="form-group"><label>Beneficiario</label><input formControlName="beneficiario" /></div>
+        <div class="form-group"><label>Cédula o RUC</label><input formControlName="cedula" maxlength="13" /></div>
+        <div class="form-group"><label>Código</label><input formControlName="codigo" (focus)="abrirSelectorCuentas()" readonly />
+        </div>
+        <div class="form-group"><label>Fecha</label><input type="date" formControlName="fecha" /></div>
+        <div class="form-group"><label>Descripción</label><input formControlName="descripcion" /></div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select formControlName="tipo">
+            <option value="Debe">Debe</option>
+            <option value="Haber">Haber</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Monto</label><input formControlName="monto" type="text" /></div>
+        <div class="form-group"><label>N° Cheque (opcional)</label><input formControlName="numeroCheque" /></div>
+        <div class="form-group full-width"><button type="submit">Agregar</button></div>
+      </div>
+    </form>
+  </div>
+
+<!-- Modal de selección de cuenta -->
+<div class="modal-cuentas" *ngIf="mostrarSelectorCuentas">
+  <div class="modal-contenido">
+    <input type="text" placeholder="🔍 Buscar cuenta" [(ngModel)]="busquedaCuenta" class="buscador-cuenta" />
+
+    <div class="lista-cuentas">
+      <div
+        *ngFor="let cuenta of cuentasFiltradasModal"
+        (dblclick)="seleccionarCuenta(cuenta)"
+        class="item-cuenta"
+      >
+        <strong>{{ cuenta.codigo }}</strong> - {{ cuenta.nombre }}
+      </div>
+    </div>
+
+    <button (click)="cerrarSelectorCuentas()">Cerrar</button>
+  </div>
+</div>
+
+
+
+
+
+  <!-- TABLA DE TRANSACCIONES -->
+  <div class="tabla-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Código</th><th>Fecha</th><th>Descripción</th><th>Debe</th><th>Haber</th><th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of transacciones; let i = index">
+          <td>{{ i + 1 }}</td>
+          <td>{{ t.codigo }}</td>
+          <td>{{ t.fecha }}</td>
+          <td>{{ t.descripcion }}</td>
+          <td>{{ t.tipo === 'Debe' ? t.monto.toFixed(2) : '-' }}</td>
+          <td>{{ t.tipo === 'Haber' ? t.monto.toFixed(2) : '-' }}</td>
+          <td><button type="button" (click)="eliminarTransaccion(i)">Eliminar</button></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" style="text-align: right; font-weight: bold;">Total:</td>
+          <td>{{ totalDebe | number:'1.2-2' }}</td>
+          <td>{{ totalHaber | number:'1.2-2' }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="boton-generar">
+      <button type="button" (click)="generarPDF()">Generar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTÓN MOSTRAR COMPROBANTES -->
+<div class="boton-comprobantes">
+  <button type="button" (click)="toggleListaComprobantes()">
+    {{ mostrarLista ? '📁 Ocultar comprobantes' : '📁 Ver comprobantes guardados' }}
+  </button>
+</div>
+
+<!-- CONTENEDOR DE COMPROBANTES -->
+<div class="contenedor-comprobantes" *ngIf="mostrarLista">
+  <!-- FILTROS -->
+  <div class="filtros-fecha">
+    <label for="filtroInicio">Desde:</label>
+    <input type="date" [(ngModel)]="filtroInicio" name="filtroInicio" (change)="aplicarFiltros()" />
+    <label for="filtroFin">Hasta:</label>
+    <input type="date" [(ngModel)]="filtroFin" name="filtroFin" (change)="aplicarFiltros()" />
+  </div>
+
+  <h3>📄 Comprobantes Guardados</h3>
+  <table class="tabla-cuentas">
+    <thead>
+      <tr>
+        <th>No.</th>
+        <th>Beneficiario</th>
+        <th>Fecha</th>
+        <th>Total Debe</th>
+        <th>Total Haber</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let comprobante of comprobantesPaginados">
+        <td>{{ comprobante.comprobanteId }}</td>
+        <td>{{ comprobante.beneficiario }}</td>
+        <td>{{ comprobante.fecha }}</td>
+        <td>${{ comprobante.totalDebe.toFixed(2) }}</td>
+        <td>${{ comprobante.totalHaber.toFixed(2) }}</td>
+        <td>
+          <a [href]="comprobante.pdfURL" target="_blank" class="btn-ver">📄 Ver PDF</a>
+          <button type="button" (click)="eliminarComprobante(comprobante.id, comprobante.comprobanteId)" class="btn-eliminar">🗑️</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- PAGINACIÓN -->
+  <div class="paginacion-footer" *ngIf="totalPaginas > 1">
+    <button class="btn-paginador" (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">
+      ⏮ Anterior
+    </button>
+
+   <ng-container *ngFor="let pagina of paginasVisibles">
+  <ng-container *ngIf="pagina !== '...'; else ellipsis">
+    <button
+      class="btn-numero"
+      [class.activo]="pagina === paginaActual"
+      (click)="cambiarPagina(+pagina)">
+      {{ pagina }}
+    </button>
+  </ng-container>
+
+  <ng-template #ellipsis>
+    <span class="ellipsis">...</span>
+  </ng-template>
+</ng-container>
+
+
+    <button class="btn-paginador" (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">
+      Siguiente ⏭
+    </button>
+  </div>
+</div>
