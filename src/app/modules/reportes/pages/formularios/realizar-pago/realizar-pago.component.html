@@ -1,1 +1,58 @@
-<p>realizar-pago works!</p>
+<div class="pago-container" *ngIf="reporte">
+  <h2>REALIZAR PAGO TOTAL</h2>
+
+  <div class="info-registro">
+    <p><strong>Nombre:</strong> {{ reporte.nombre }}</p>
+    <p><strong>Unidad:</strong> {{ reporte.unidad }}</p>
+  </div>
+
+  <!-- Tabla de resumen -->
+  <table>
+    <thead>
+      <tr>
+        <th>Módulo</th>
+        <th>Total</th>
+        <th>Pagado</th>
+        <th>Saldo</th>
+        <th>Pago actual</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let campo of campos">
+        <td>{{ campo | titlecase }}</td>
+        <td>{{ reporte[campo] }}</td>
+        <td>{{ totales[campo] }}</td>
+        <td><strong>{{ calcularDeuda(campo) }}</strong></td>
+        <td>
+          <input
+            type="number"
+            [(ngModel)]="pagoActual[campo]"
+            min="0"
+            [max]="calcularDeuda(campo)"
+            placeholder="0"
+          />
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Botón único -->
+  <div class="acciones">
+    <button class="volver" (click)="volver()">← Volver</button>
+    <button class="pagar" (click)="registrarPagoTotal()">💰 Registrar Pago Total</button>
+  </div>
+
+  <!-- Pagos anteriores -->
+  <div class="resumen-final" *ngIf="pagosTotales.length > 0">
+    <h3>Pagos Realizados:</h3>
+    <ul>
+      <li *ngFor="let pago of pagosTotales">
+        <strong>{{ pago.fecha.toDate() | date: 'short' }}</strong> →
+        Atraso: {{ pago.minutosAtraso }},
+        Administración: {{ pago.administracion }},
+        Base: {{ pago.minutosBase }},
+        Multas: {{ pago.multas }}
+      </li>
+    </ul>
+  </div>
+</div>

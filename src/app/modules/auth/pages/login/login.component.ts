@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { AuthService, Credential } from 'src/app/core/auth/services/auth.service';
+import { AuthService } from 'src/app/core/auth/services/auth.service';
 
 @Component({
   standalone: true,
@@ -17,7 +17,7 @@ export class LoginComponent {
   private router = inject(Router);
 
   form: FormGroup = this.fb.group({
-    email: ['', [Validators.required, Validators.email]],
+    cedula: ['', [Validators.required, Validators.pattern(/^\d{10}$/)]],
     password: ['', [Validators.required]]
   });
 
@@ -30,19 +30,26 @@ export class LoginComponent {
       return;
     }
 
-    const credential: Credential = {
-      email: this.form.value.email,
-      password: this.form.value.password
-    };
+    const cedula = this.form.value.cedula;
+    const password = this.form.value.password;
 
     try {
-      await this.authService.loginWithEmailAndPassword(credential);
-      this.router.navigate(['/auth/menu']);
+      const email = await this.authService.obtenerCorreoPorCedula(cedula);
+
+      if (!email) {
+        alert('No se encontró un usuario con esa cédula.');
+        return;
+      }
+
+      await this.authService.logIn(email, password);
+      this.router.navigate(['/']);
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
-      alert('Correo o contraseña incorrectos');
+      alert('Cédula o contraseña incorrectos');
     }
   }
 
- 
+  goToResetPassword(): void {
+    this.router.navigate(['/auth/reset-password']);
+  }
 }

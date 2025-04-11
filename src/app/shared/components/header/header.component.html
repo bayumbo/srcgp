@@ -1,1 +1,19 @@
-<p>header works!</p>
+<header class="header">
+    <div class="left">
+      <h1 class="logo">🚌 Sistema de la Cooperativa</h1>
+    </div>
+  
+    <div class="right">
+      <!-- Avatar con referencia -->
+      <div #avatarRef class="avatar" (click)="toggleMenu()">
+        {{ getIniciales() }}
+      </div>
+  
+      <!-- Menú con referencia -->
+      <div #menuRef class="dropdown" *ngIf="isMenuOpen">
+        <button (click)="irPerfil()">👤 Perfil</button>
+        <button (click)="logOut()">🔒 Cerrar Sesión</button>
+      </div>
+    </div>
+  </header>
+  

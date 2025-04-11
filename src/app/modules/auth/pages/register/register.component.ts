@@ -7,13 +7,14 @@ import {
   ReactiveFormsModule
 } from '@angular/forms';
 
-import { AuthService, Credential } from 'src/app/core/auth/services/auth.service';
+import { AuthService} from 'src/app/core/auth/services/auth.service';
 import { Router } from '@angular/router';
 
 @Component({
   standalone: true,
   selector: 'app-register',
   templateUrl: './register.component.html',
+  styleUrl: '../register/register.component.scss',
   imports: [CommonModule, ReactiveFormsModule]
 })
 export class RegisterComponent {
@@ -32,6 +33,7 @@ export class RegisterComponent {
     apellidos: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
+    rol: ['usuario', Validators.required] // ✅ 
   });
 
   async signUp(): Promise<void> {
@@ -41,7 +43,7 @@ export class RegisterComponent {
       return;
     }
 
-    const { cedula, nombres, apellidos, email, password } = this.form.value;
+    const { cedula, nombres, apellidos, email, password, rol } = this.form.value;
 
     try {
       const cedulaExiste = await this.authService.existeCedula(cedula);
@@ -62,7 +64,7 @@ export class RegisterComponent {
         nombres,
         apellidos,
         email,
-        rol: 'usuario',
+        rol, // ✅ guarda el rol como 'usuario' o 'admin'
         creadoEn: new Date()
       };
 
