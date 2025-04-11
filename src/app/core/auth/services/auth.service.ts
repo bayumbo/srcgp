@@ -19,21 +19,10 @@ import {
   getDocs,
   getDoc
 } from '@angular/fire/firestore';
+import { Usuario } from '../../interfaces/user.interface';
+import { Credential } from '../../interfaces/user.interface';
 
-export interface Credential {
-  email: string;
-  password: string;
-}
 
-export interface Usuario {
-  uid: string;
-  cedula: string;
-  nombres: string;
-  apellidos: string;
-  email: string;
-  rol: string;
-  creadoEn?: any;
-}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
