@@ -25,7 +25,7 @@ export class NuevoRegistroComponent {
     multasPagadas: 0,
     nombre: '',
     unidad: '',
-    uid: ''
+    uid: '',
   };
 
   usuarios: { uid: string, nombre: string, unidad: string }[] = [];

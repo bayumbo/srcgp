@@ -27,14 +27,6 @@ export const REPORTES_ROUTES: Routes = [
     loadComponent: () =>
       import('./pages/formularios/realizar-pago/realizar-pago.component').then(m => m.RealizarPagoComponent),
   },
-  { 
-    path: 'fecha',
-    loadComponent: () =>
-      import('./pages/reporte-fecha/reporte-fecha.component').then(m => m.ReporteFechaComponent)
-  },
-  {
-    path: 'mensual',
-    loadComponent: () =>
-      import('./pages/reporte-mensual/reporte-mensual.component').then(m => m.ReporteMensualComponent)
-  }
+
+ 
 ];

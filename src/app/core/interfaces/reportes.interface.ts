@@ -1,6 +1,7 @@
 import { Timestamp } from "firebase/firestore";
 
 export interface NuevoRegistro {
+    id?: string;
     adminPagada: number;
     administracion: number;
     minBasePagados: number;
