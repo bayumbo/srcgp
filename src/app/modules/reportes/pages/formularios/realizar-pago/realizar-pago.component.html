@@ -24,9 +24,28 @@
           </thead>
           <tbody>
             <tr *ngFor="let pago of filtrarPagosPorRegistro(campo, registro.id!)">
-              <td>{{ pago.fecha['toDate']() | date:'shortDate' }}</td>
-              <td>{{ pago.cantidad }}</td>
+              <td>{{ pago.fecha.toDate() | date:'shortDate' }}</td>
+            
+              <td *ngIf="!pagoEnEdicion || pagoEnEdicion.id !== pago.id || pagoEnEdicion.campo !== campo">
+                {{ pago.cantidad }}
+              </td>
+            
+              <td *ngIf="pagoEnEdicion?.id === pago.id && pagoEnEdicion?.campo === campo">
+                <input type="number" [(ngModel)]="nuevoMonto" min="0" />
+              </td>
+            
+              <td>
+                <!-- Mostrar botón ✏️ si no está en edición -->
+                <button *ngIf="!esPagoEnEdicion(pago, campo)" (click)="iniciarEdicion(pago, campo)">✏️</button>
+              
+                <!-- Mostrar botones 💾 y ❌ si está en edición -->
+                <ng-container *ngIf="esPagoEnEdicion(pago, campo)">
+                  <button (click)="guardarEdicion()">💾</button>
+                  <button (click)="cancelarEdicion()">❌</button>
+                </ng-container>
+              </td>
             </tr>
+            
             <tr *ngIf="filtrarPagosPorRegistro(campo, registro.id!).length === 0">
               <td colspan="2">Sin pagos registrados</td>
             </tr>

@@ -8,13 +8,15 @@ import {
   getDocs,
   Timestamp,
   addDoc,
-  collection as fsCollection
+  collection as fsCollection,
+  updateDoc
 } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 import { PagoPorModulo } from 'src/app/core/interfaces/pagoPorModulo.interface';
+import { DocumentoPago } from 'src/app/core/interfaces/documentoPago.interface';
 
 type CampoClave = 'minutosAtraso' | 'administracion' | 'minutosBase' | 'multas';
 
@@ -43,6 +45,8 @@ export class RealizarPagoComponent implements OnInit {
 
   pagosActuales: Record<string, Partial<Record<CampoClave, number>>> = {};
   campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
+  pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
+  nuevoMonto: number | null = null;
 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
@@ -85,27 +89,40 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   async cargarPagosTotales() {
+    // Limpia el estado de pagos anteriores
+    for (const campo of this.campos) {
+      this.pagosTotales[campo] = [];
+    }
+  
     for (const registro of this.registros) {
       const reporteId = registro.id!;
-      const ref = fsCollection(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`);
+      const ref = fsCollection(
+        this.firestore,
+        `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`
+      );
+  
       const snap = await getDocs(ref);
-      const pagos = snap.docs.map(doc => doc.data()) as any[];
+  
+      const pagos: DocumentoPago[] = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<DocumentoPago, 'id'>)
+      }));
   
       for (const campo of this.campos) {
         const nuevosPagos = pagos
           .flatMap(p => {
             const cantidad = p.detalles?.[campo] ?? 0;
             return cantidad > 0
-              ? [{ cantidad, fecha: p.fecha, reporteId }]
+              ? [{ id: p.id, cantidad, fecha: p.fecha, reporteId }]
               : [];
           });
   
         this.pagosTotales[campo].push(...nuevosPagos);
       }
     }
+  
+    console.log('💰 Pagos cargados:', this.pagosTotales);
   }
-  
-  
 
   async guardarPagosGenerales() {
     const fecha = Timestamp.fromDate(new Date());
@@ -174,6 +191,65 @@ export class RealizarPagoComponent implements OnInit {
     }
   }
 
+  async editarPago(pago: PagoPorModulo, campo: CampoClave) {
+    const nuevoValor = prompt(`Editar monto de ${campo}`, pago.cantidad.toString());
+  
+    if (nuevoValor === null) return; // cancelado
+    const cantidad = Number(nuevoValor);
+  
+    if (isNaN(cantidad) || cantidad < 0) {
+      alert('⚠️ Valor inválido');
+      return;
+    }
+  
+    const ref = doc(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${pago.reporteId}/pagosTotales/${pago.id}`);
+  
+    try {
+      await updateDoc(ref, {
+        [`detalles.${campo}`]: cantidad
+      });
+  
+      alert('✅ Pago actualizado');
+      await this.cargarPagosTotales(); // actualiza la vista
+    } catch (error) {
+      console.error('❌ Error al actualizar pago:', error);
+      alert('Error al actualizar el pago.');
+    }
+  }
+
+  iniciarEdicion(pago: PagoPorModulo, campo: CampoClave) {
+    this.pagoEnEdicion = { id: pago.id, campo };
+    this.nuevoMonto = pago.cantidad;
+  }
+  async guardarEdicion() {
+    if (this.pagoEnEdicion && this.nuevoMonto != null && this.nuevoMonto >= 0) {
+      const { id, campo } = this.pagoEnEdicion;
+      const pago = this.campos
+        .flatMap(c => this.pagosTotales[c])
+        .find(p => p.id === id);
+  
+      if (!pago) return;
+  
+      const ref = doc(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${pago.reporteId}/pagosTotales/${pago.id}`);
+      await updateDoc(ref, {
+        [`detalles.${campo}`]: this.nuevoMonto
+      });
+  
+      alert('✅ Pago actualizado');
+      await this.cargarPagosTotales();
+  
+      // Limpieza
+      this.pagoEnEdicion = null;
+      this.nuevoMonto = null;
+    }
+  }
+  esPagoEnEdicion(pago: PagoPorModulo, campo: CampoClave): boolean {
+    return this.pagoEnEdicion?.id === pago.id && this.pagoEnEdicion?.campo === campo;
+  }
+  cancelarEdicion() {
+    this.pagoEnEdicion = null;
+    this.nuevoMonto = null;
+  }
   volver() {
     this.router.navigate(['/reportes/lista-reportes']);
   }
