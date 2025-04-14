@@ -23,28 +23,35 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let pago of filtrarPagosPorRegistro(campo, registro.id!)">
+            <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registro.id!)">
               <td>{{ pago.fecha.toDate() | date:'shortDate' }}</td>
             
-              <td *ngIf="!pagoEnEdicion || pagoEnEdicion.id !== pago.id || pagoEnEdicion.campo !== campo">
-                {{ pago.cantidad }}
-              </td>
+              <td class="celda-pago-editable">
+                <!-- Contenedor fijo -->
+                <div class="pago-campo">
+                  <!-- Valor o input -->
+                  <span *ngIf="!esPagoEnEdicion(pago, campo)">{{ pago.cantidad }}</span>
+                  <input *ngIf="esPagoEnEdicion(pago, campo)" type="number" [(ngModel)]="nuevoMonto" />
+                </div>
             
-              <td *ngIf="pagoEnEdicion?.id === pago.id && pagoEnEdicion?.campo === campo">
-                <input type="number" [(ngModel)]="nuevoMonto" min="0" />
-              </td>
+                <!-- Botones superpuestos -->
+                <div class="acciones-edicion" *ngIf="esPagoEnEdicion(pago, campo)">
+                  <button (click)="guardarEdicion()">
+                    <span class="material-icons">save</span>
+                  </button>
+                  <button (click)="cancelarEdicion()">
+                    <span class="material-icons">cancel</span>
+                  </button>
+                </div>
             
-              <td>
-                <!-- Mostrar botón ✏️ si no está en edición -->
-                <button *ngIf="!esPagoEnEdicion(pago, campo)" (click)="iniciarEdicion(pago, campo)">✏️</button>
-              
-                <!-- Mostrar botones 💾 y ❌ si está en edición -->
-                <ng-container *ngIf="esPagoEnEdicion(pago, campo)">
-                  <button (click)="guardarEdicion()">💾</button>
-                  <button (click)="cancelarEdicion()">❌</button>
-                </ng-container>
+                <div class="accion-editar" *ngIf="!esPagoEnEdicion(pago, campo)">
+                  <button (click)="iniciarEdicion(pago, campo)">
+                    <span class="material-icons">edit</span>
+                  </button>
+                </div>
               </td>
             </tr>
+            
             
             <tr *ngIf="filtrarPagosPorRegistro(campo, registro.id!).length === 0">
               <td colspan="2">Sin pagos registrados</td>
