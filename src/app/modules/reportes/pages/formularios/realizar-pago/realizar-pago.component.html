@@ -27,6 +27,9 @@
               <td>{{ pago.fecha['toDate']() | date:'shortDate' }}</td>
               <td>{{ pago.cantidad }}</td>
             </tr>
+            <tr *ngIf="filtrarPagosPorRegistro(campo, registro.id!).length === 0">
+              <td colspan="2">Sin pagos registrados</td>
+            </tr>
             <tr>
               <td><strong>Total pagado:</strong></td>
               <td><strong>{{ calcularTotalPagado(campo, registro.id!) }}</strong></td>

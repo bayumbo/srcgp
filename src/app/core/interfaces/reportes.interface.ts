@@ -15,3 +15,11 @@ export interface NuevoRegistro {
     uid?: string;
     fechaModificacion?: Timestamp;
   }
+  export interface ReporteConPagos extends NuevoRegistro {
+    id: string;
+    uid: string;
+    minutosPagados: number;
+    adminPagada: number;
+    minBasePagados: number;
+    multasPagadas: number;
+  }

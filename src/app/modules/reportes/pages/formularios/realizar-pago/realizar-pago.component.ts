@@ -31,86 +31,110 @@ export class RealizarPagoComponent implements OnInit {
   private firestore = inject(Firestore);
 
   uidUsuario: string = '';
+  reporteId: string = '';
   registros: NuevoRegistro[] = [];
+
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
     administracion: [],
     minutosBase: [],
     multas: []
   };
+
   pagosActuales: Record<string, Partial<Record<CampoClave, number>>> = {};
   campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
-    if (!id) {
+    const uid = this.route.snapshot.paramMap.get('uid');
+    if (!id || !uid) {
       this.router.navigate(['/reportes/lista-reportes']);
       return;
     }
 
-    const ref = doc(this.firestore, 'reportesDiarios', id);
+    this.uidUsuario = uid;
+    this.reporteId = id;
+
+    const ref = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${id}`);
     const snap = await getDoc(ref);
+
     if (!snap.exists()) {
       alert('Registro no encontrado');
       return;
     }
 
     const data = snap.data() as NuevoRegistro;
-    this.uidUsuario = data.uid ?? '';
-    await this.cargarRegistrosDelUsuario(this.uidUsuario);
-    await this.cargarPagosTotales(id); // solo del usuario actual
+
+    await this.cargarRegistrosDelUsuario(uid);
+    await this.cargarPagosTotales();;
   }
 
   async cargarRegistrosDelUsuario(uid: string) {
-    const ref = collection(this.firestore, 'reportesDiarios');
+    const ref = collection(this.firestore, `usuarios/${uid}/reportesDiarios`);
     const snap = await getDocs(ref);
-    this.registros = snap.docs
-      .map(d => ({ ...(d.data() as NuevoRegistro), id: d.id }))
-      .filter(r => r.uid === uid);
+    this.registros = snap.docs.map(d => ({
+      ...(d.data() as NuevoRegistro),
+      id: d.id
+    }));
 
     for (const r of this.registros) {
       this.pagosActuales[r.id!] = {};
     }
+
+    console.log('📄 registros:', this.registros);
   }
 
-  async cargarPagosTotales(reporteId: string) {
-    for (const campo of this.campos) {
-      const ref = collection(this.firestore, `reportesDiarios/${reporteId}/pagosTotales`);
+  async cargarPagosTotales() {
+    for (const registro of this.registros) {
+      const reporteId = registro.id!;
+      const ref = fsCollection(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`);
       const snap = await getDocs(ref);
       const pagos = snap.docs.map(doc => doc.data()) as any[];
-
-      this.pagosTotales[campo] = pagos
-        .flatMap(p => p[campo] ? [{ cantidad: p[campo], fecha: p.fecha, reporteId }] : []);
+  
+      for (const campo of this.campos) {
+        const nuevosPagos = pagos
+          .flatMap(p => {
+            const cantidad = p.detalles?.[campo] ?? 0;
+            return cantidad > 0
+              ? [{ cantidad, fecha: p.fecha, reporteId }]
+              : [];
+          });
+  
+        this.pagosTotales[campo].push(...nuevosPagos);
+      }
     }
   }
+  
+  
 
   async guardarPagosGenerales() {
     const fecha = Timestamp.fromDate(new Date());
-
+  
     for (const registro of this.registros) {
-      const pagosPorModulo: Partial<Record<CampoClave, number>> = {};
+      const detalles: Partial<Record<CampoClave, number>> = {};
       let tienePago = false;
-
+  
       for (const campo of this.campos) {
         const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
         if (monto > 0) {
-          pagosPorModulo[campo] = monto;
+          detalles[campo] = monto;
           tienePago = true;
         }
       }
-
+  
       if (!tienePago) continue;
-
-      const ref = collection(this.firestore, `reportesDiarios/${registro.id}/pagosTotales`);
+  
+      const ref = collection(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`);
       await addDoc(ref, {
-        ...pagosPorModulo,
-        fecha
+        fecha,
+        detalles
       });
     }
-
+  
     alert('✅ Pago registrado correctamente.');
     this.router.navigate(['/reportes/lista-reportes']);
   }
+  
 
   calcularDeuda(registro: NuevoRegistro, campo: CampoClave): number {
     const total = registro[campo as keyof NuevoRegistro] as number;
@@ -123,12 +147,12 @@ export class RealizarPagoComponent implements OnInit {
   filtrarPagosPorRegistro(campo: CampoClave, registroId: string): PagoPorModulo[] {
     return this.pagosTotales[campo]?.filter(p => p.reporteId === registroId) || [];
   }
-  
+
   calcularTotalPagado(campo: CampoClave, registroId: string): number {
     return this.filtrarPagosPorRegistro(campo, registroId)
       .reduce((acc, p) => acc + p.cantidad, 0);
   }
-  
+
   calcularTotalGeneral(): number {
     let total = 0;
     for (const registro of this.registros) {
@@ -142,9 +166,8 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   validarPago(reporteId: string, campo: CampoClave) {
-    const deuda = this.registros.find(r => r.id === reporteId)
-      ? this.calcularDeuda(this.registros.find(r => r.id === reporteId)!, campo)
-      : 0;
+    const registro = this.registros.find(r => r.id === reporteId);
+    const deuda = registro ? this.calcularDeuda(registro, campo) : 0;
     const actual = this.pagosActuales[reporteId]?.[campo] ?? 0;
     if (actual > deuda) {
       this.pagosActuales[reporteId][campo] = deuda;

@@ -15,22 +15,19 @@ import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 export class ReportesService {
   constructor(private firestore: Firestore) {}
 
-  async guardarReporteDiario(data: NuevoRegistro) {
-    if (!data.uid) {
-      throw new Error('UID del usuario requerido para guardar el reporte');
-    }
-    const ref = collection(this.firestore, `usuarios/${data.uid}/reportesDiarios`);
-    return await addDoc(ref, {
-      ...data,
-      fechaModificacion: serverTimestamp()
+  guardarReporteDiario(uid: string, reporte: NuevoRegistro) {
+    const ref = collection(this.firestore, `usuarios/${uid}/reportesDiarios`);
+    return addDoc(ref, {
+      ...reporte,
+      fechaModificacion: new Date()
     });
   }
-
-  async actualizarReporteDiario(uid: string, reporteId: string, data: NuevoRegistro) {
-    const ref = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}`);
-    return await updateDoc(ref, {
-      ...data,
-      fechaModificacion: serverTimestamp()
+  
+  actualizarReporteDiario(uid: string, id: string, reporte: NuevoRegistro) {
+    const ref = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${id}`);
+    return updateDoc(ref, {
+      ...reporte,
+      fechaModificacion: new Date()
     });
   }
 

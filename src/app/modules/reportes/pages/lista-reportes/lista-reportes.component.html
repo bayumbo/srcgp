@@ -45,28 +45,28 @@
       </tr>
     </thead>
     <tbody>
-      <tr *ngFor="let r of reportes">
-        <td data-label="Nombre">{{ r.nombre }}</td>
-        <td data-label="Unidad">{{ r.unidad }}</td>
+      <tr *ngFor="let reporte of reportes">
+        <td data-label="Nombre">{{ reporte.nombre }}</td>
+        <td data-label="Unidad">{{ reporte.unidad }}</td>
 
-        <td data-label="Min. Atraso">{{ r.minutosAtraso }}</td>
-        <td data-label="Min. Pagados">{{ r.minutosPagados }}</td>
+        <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
+        <td data-label="Min. Pagados">{{ reporte.minutosPagados }}</td>
 
-        <td data-label="Administración">{{ r.administracion }}</td>
-        <td data-label="Admin Pagada">{{ r.adminPagada }}</td>
+        <td data-label="Administración">{{ reporte.administracion }}</td>
+        <td data-label="Admin Pagada">{{ reporte.adminPagada }}</td>
 
-        <td data-label="Min. Base">{{ r.minutosBase }}</td>
-        <td data-label="Min. Base Pagados">{{ r.minBasePagados }}</td>
+        <td data-label="Min. Base">{{ reporte.minutosBase }}</td>
+        <td data-label="Min. Base Pagados">{{ reporte.minBasePagados }}</td>
 
-        <td data-label="Multas">{{ r.multas }}</td>
-        <td data-label="Multas Pagadas">{{ r.multasPagadas }}</td>
+        <td data-label="Multas">{{ reporte.multas }}</td>
+        <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
 
         <td class="acciones" data-label="Acciones">
-          <button class="editar" title="Editar" (click)="irAEditar(r.id)">
+          <button (click)="irAEditar(reporte.uid, reporte.id)">
             <span class="material-icons">edit</span>
           </button>
-          <button class="pagar" title="Pagar" (click)="irAPagar(r.id)">
-            Pagar
+          <button (click)="irAPagar(reporte.uid, reporte.id)">
+            <span class="material-icons">payments</span>
           </button>
         </td>
       </tr>

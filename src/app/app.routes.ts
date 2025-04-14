@@ -29,15 +29,7 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/auth/pages/register/register.component').then(m => m.RegisterComponent),
       },
-      //{
-        //path: 'reportes',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/reportes/pages/reporte-diario/reporte-diario.component').then(
-            //m => m.ReporteDiarioComponent
-          //),
-     // },
+      
       //{
         //path: 'usuarios',
         //canActivate: [roleGuard],
