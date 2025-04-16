@@ -15,13 +15,13 @@ header {
   position: fixed;
   top: 0;
   left: 0;
-  width: 97vw; // Ocupa todo el ancho de la pantalla
+  width: 100vw; // Ocupa todo el ancho de la pantalla
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background-color: black;
-  padding: 10px 30px;
+  padding: 3px 30px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); // sombra sutil
   .logo {
     img {
@@ -247,4 +247,193 @@ header {
   color: #ff4d4f;
   font-size: 13px;
   margin-top: 4px;
+}
+
+.modal-balances {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #1f1f1f;
+  padding: 20px;
+  border-radius: 10px;
+  z-index: 9999;
+  width: 90%;
+  max-width: 600px;
+  color: white;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+  animation: fadeIn 0.3s ease-in-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+
+  h3 {
+    margin: 0;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    &::before {
+      content: "📊";
+      font-size: 22px;
+    }
+  }
+
+  .cerrar-modal {
+    background-color: #dc3545;
+    border: none;
+    color: white;
+    font-size: 18px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+    &:hover {
+      background-color: #c82333;
+    }
+  }
+}
+
+.filtro-fechas-modal {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  justify-content: space-between;
+
+  input[type="date"] {
+    width: 100%;
+    max-width: 200px;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: none;
+    background-color: #f1f1f1;
+    color: #000;
+  }
+}
+
+.lista-balances {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-balance {
+  background-color: #2c2c2c;
+  padding: 15px;
+  border-radius: 10px;
+
+  p {
+    margin: 0 0 10px 0;
+    font-weight: bold;
+  }
+
+  .acciones-modal {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+
+    .btn-ver {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 14px;
+
+      &:hover {
+        background-color: #0056b3;
+      }
+    }
+
+    .btn-eliminar {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+
+      &:hover {
+        background-color: #b02a37;
+      }
+    }
+  }
+}
+
+.paginacion-modal {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 15px;
+
+  button {
+    padding: 6px 12px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+
+    &.activo {
+      background-color: #21618c;
+    }
+
+    &:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+  }
+
+  .ellipsis {
+    padding: 6px 12px;
+    color: #ccc;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (max-width: 600px) {
+  .filtro-fechas-modal {
+    flex-direction: column;
+    input[type="date"] {
+      max-width: 100%;
+    }
+  }
+
+  .acciones-modal {
+    flex-direction: column;
+
+    .btn-ver, .btn-eliminar {
+      width: 100%;
+    }
+  }
 }

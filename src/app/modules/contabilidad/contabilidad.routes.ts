@@ -17,15 +17,16 @@ export const CONTABILIDAD_ROUTES: Routes = [
     loadComponent: () =>
       import('./Pages/ComprobanteEgresos/indexconta.component').then(m => m.IndexContaComponent)
   },
-  {
-    path: 'cuentas',
-    loadComponent: () =>
-      import('./Pages/Cuentas/cuentas.component').then(m => m.CuentasComponent)
-  },
+
   {
     path: 'estados',
     loadComponent: () =>
       import('./Pages/Estados/estados.component').then(m => m.EstadosComponent)
+  },
+  {
+    path: 'estado-resultados',
+    loadComponent: () =>
+      import('./Pages/EstadosResultados/estadosresultados.component').then(m => m.EstadosResultadosComponent)
   },
 
   {
