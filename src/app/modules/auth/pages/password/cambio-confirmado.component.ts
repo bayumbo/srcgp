@@ -8,7 +8,8 @@ import { confirmPasswordReset, getAuth } from '@angular/fire/auth';
   standalone: true,
   selector: 'app-cambio-confirmado',
   imports: [CommonModule, FormsModule],
-  templateUrl: './cambio-confirmado.component.html'
+  templateUrl: './cambio-confirmado.component.html',
+  styleUrl: './cambio-confirmado.component.scss'
 })
 export class CambioConfirmadoComponent implements OnInit {
   oobCode: string = '';

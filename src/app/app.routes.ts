@@ -18,8 +18,20 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: 'perfil',
-        loadComponent: () =>
-          import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
+        children:[
+          {
+            path:'',
+            loadComponent: () =>
+              import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
+          },
+          {
+            path: ':uid',
+      loadComponent: () =>
+        import('./modules/administracion/pages/users/users.component').then(
+          m => m.PerfilComponent
+        ),
+          },
+        ]  
       },
       {
         path: 'register',
@@ -27,6 +39,13 @@ export const APP_ROUTES: Routes = [
         data: { roles: ['admin'] },
         loadComponent: () =>
           import('./modules/auth/pages/register/register.component').then(m => m.RegisterComponent),
+      },
+      {
+        path: 'gestionroles',
+        canActivate: [roleGuard],
+        data: { roles: ['admin'] },
+        loadComponent: () =>
+          import('./modules/administracion/pages/GestionRoles/gestionroles.component').then(m => m.GestionRolesComponent),
       },
       //{
         //path: 'reportes',

@@ -1,19 +1,44 @@
+<!-- HEADER -->
 <header class="header">
-    <div class="left">
-      <h1 class="logo">🚌 Sistema de la Cooperativa</h1>
+  <div class="left-section">
+    <button class="menu-btn" (click)="toggleMenuLateral()">☰</button>
+    <span class="empresa-text">{{ nombreEmpresa }}</span>
+  </div>
+
+  <div class="right-section">
+    <div #avatarRef class="avatar" (click)="toggleMenu()">
+      {{ getIniciales() }}
     </div>
-  
-    <div class="right">
-      <!-- Avatar con referencia -->
-      <div #avatarRef class="avatar" (click)="toggleMenu()">
-        {{ getIniciales() }}
-      </div>
-  
-      <!-- Menú con referencia -->
-      <div #menuRef class="dropdown" *ngIf="isMenuOpen">
-        <button (click)="irPerfil()">👤 Perfil</button>
-        <button (click)="logOut()">🔒 Cerrar Sesión</button>
-      </div>
+
+    <div #menuRef class="dropdown" *ngIf="isMenuOpen">
+      <button (click)="irPerfil()">👤 Perfil</button>
+      <button (click)="logOut()">🔒 Cerrar Sesión</button>
     </div>
-  </header>
+  </div>
+</header>
+
+
+<!-- MENÚ LATERAL DESPLEGABLE -->
+<nav
+  #menuLateralRef
+  class="menu-lateral"
+  [ngClass]="{ abierto: menuLateralAbierto, cerrado: !menuLateralAbierto }"
+>
+  <ul>
+    <li (click)="navegar('/contabilidad')">💰 Contabilidad</li>
+    <li (click)="navegar('/reportes')">📊 Reportes</li>
+    <li (click)="navegar('/gestionroles')">⚙️ Administración</li>
+  </ul>
+</nav>
+<label for="btn-nav" class="btn-nav"><i cl
+  ass="fas fa-bars"></i></label>
+  <input type="checkbox" id="btn-nav">
   
+  <nav>
+    <ul class="navigation">
+      <li><a href="">Home</a></li>
+      <li><a href="">Servicios</a></li>
+      <li><a href="">Nosotros</a></li>
+      <li><a href="">Contacto</a></li>
+    </ul>
+  </nav>

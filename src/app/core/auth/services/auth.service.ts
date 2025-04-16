@@ -19,6 +19,9 @@ import {
   getDocs,
   getDoc
 } from '@angular/fire/firestore';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth as getAuthStandalone } from 'firebase/auth';
+import { environment } from 'src/environments/environment'; 
 
 export interface Credential {
   email: string;
@@ -32,6 +35,8 @@ export interface Usuario {
   apellidos: string;
   email: string;
   rol: string;
+  empresa:string;
+  unidad: string;
   creadoEn?: any;
 }
 
@@ -45,12 +50,23 @@ export class AuthService {
   currentUserRole: string | null = null;
 
   // 🔐 Registro
-  signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
-    return createUserWithEmailAndPassword(
-      this.auth,
-      credential.email,
-      credential.password
-    );
+  async signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
+    // Crear instancia secundaria de Firebase para evitar cerrar sesión actual
+    const secondaryApp = initializeApp(environment.firebase, 'SecondaryApp');
+    const secondaryAuth = getAuthStandalone(secondaryApp);
+  
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        credential.email,
+        credential.password
+      );
+      return userCredential;
+    } finally {
+      // Limpieza: cerrar sesión y eliminar app secundaria
+      await secondaryAuth.signOut();
+      await deleteApp(secondaryApp);
+    }
   }
 
   // 🔐 Login con carga de rol
@@ -72,9 +88,6 @@ export class AuthService {
   
     return userCredential;
   }
-  
-  
-
 
   // 🔓 Logout
   async logOut(): Promise<void> {

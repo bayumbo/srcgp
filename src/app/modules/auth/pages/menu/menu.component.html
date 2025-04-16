@@ -1,11 +1,19 @@
-<!-- Mostrar solo cuando ya se cargó el rol -->
-<div *ngIf="!isLoading; else loading">
-  <div class="menu-container">
-    <button *ngIf="rol === 'admin'" class="menu-btn" (click)="goTo('/reportes')">📊 Reportes</button>
-    <button *ngIf="rol === 'admin'" class="menu-btn" (click)="goTo('/usuarios')">📘 Contabilidad</button>
-    <button *ngIf="rol === 'admin'" class="menu-btn" (click)="goTo('/cargas')">🛠 Administración</button>
+<div class="menu-container">
+  <div class="circle-menu">
+    <button *ngIf="rol === 'admin'" class="menu-circle" (click)="goTo('/reportes')">
+      📊
+      <span>Reportes</span>
+    </button>
 
-    <button class="menu-btn" (click)="goTo('/perfil')">👤 Perfil</button>
+    <button *ngIf="rol === 'admin'" class="menu-circle" (click)="goTo('/usuarios')">
+      📘
+      <span>Contabilidad</span>
+    </button>
+
+    <button *ngIf="rol === 'admin'" class="menu-circle" (click)="goTo('/gestionroles')">
+      🛠
+      <span>Administración</span>
+    </button>
   </div>
 
   <hr />
@@ -17,6 +25,7 @@
     <a (click)="goToRegister()" class="register-link">Registro</a>
   </p>
 </div>
+
 
 <!-- Preloader mientras se obtiene el rol -->
 <ng-template #loading>

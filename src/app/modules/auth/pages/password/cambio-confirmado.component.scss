@@ -1,0 +1,88 @@
+/* Fondo blanco y centrado */
+body, :host {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    background-color: #ffffff;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* Contenedor del formulario */
+  .container {
+    background-color: #f9f9f9;
+    padding: 2.5rem 2rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    animation: fadeIn 0.4s ease-in-out;
+  }
+  
+  /* Título */
+  h2 {
+    color: #1976d2;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Etiqueta */
+  label {
+    display: block;
+    text-align: left;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #444;
+    font-size: 14px;
+  }
+  
+  /* Input de contraseña */
+  input[type='password'] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 1.5rem;
+    transition: border-color 0.3s ease;
+  
+    &:focus {
+      border-color: #1976d2;
+      outline: none;
+    }
+  }
+  
+  /* Botón aceptar */
+  button[type='submit'] {
+    width: 100%;
+    padding: 12px;
+    background-color: #1976d2;
+    color: white;
+    font-weight: bold;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  
+    &:hover {
+      background-color: #125ea3;
+    }
+  }
+  
+  /* Animación de entrada */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  

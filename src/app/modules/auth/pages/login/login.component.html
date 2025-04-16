@@ -1,7 +1,7 @@
-<div class="container">
+<div class="login-wrapper">
+ <div class="container">
   <h2>Iniciar Sesión</h2>
   <form [formGroup]="form" (ngSubmit)="logIn()">
-
     <!-- Cédula -->
     <div class="form-group">
       <label for="cedula">Cédula de Identidad</label>
@@ -14,6 +14,7 @@
         inputmode="numeric"
         placeholder="0102030405"
         required
+        autofocus
       >
       <div *ngIf="form.get('cedula')?.touched && form.get('cedula')?.invalid">
         <small class="error" *ngIf="form.get('cedula')?.errors?.['required']">Este campo es obligatorio</small>
@@ -31,12 +32,13 @@
           formControlName="password"
           required
         >
-         </div>
+      </div>
       <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
         <small class="error">Este campo es obligatorio</small>
       </div>
     </div>
 
+    <!-- Botón de ingreso -->
     <button type="submit" [disabled]="form.invalid">Ingresar</button>
   </form><br>
 
@@ -44,3 +46,4 @@
     <button type="button" (click)="goToResetPassword()">Olvidé mi contraseña</button>
   </p>
 </div>
+</div> 

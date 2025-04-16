@@ -1,78 +1,118 @@
 .header {
-    position: fixed;
-    top: 0;
-    left: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 70px;
+  width: 100%;
+  background-color: #e0f7ff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.left-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.menu-btn {
+  font-size: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1976d2;
+}
+
+.empresa-text {
+  font-size: 17px;
+  font-weight: bold;
+  color: #1976d2;
+}
+
+.right-section {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+  border-radius: 50%;
+  background-color: #1976d2;
+  color: #fff;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.dropdown {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  min-width: 150px;
+  z-index: 1100;
+
+  button {
     width: 100%;
-    height: 70px;
-    background-color: #a5ddf2;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 24px;
-    z-index: 1000;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
-  }
-  
-  .logo {
-    font-size: 20px;
-    font-weight: bold;
-    color: #111;
-  }
-  
-  .right {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-  
-  .avatar {
-    background-color: #1976d2;
-    color: white;
-    font-weight: bold;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    user-select: none;
-    font-size: 16px;
-    transition: background-color 0.3s;
-  }
-  
-  .avatar:hover {
-    background-color: #125ea3;
-  }
-  
-  .dropdown {
-    position: absolute;
-    top: 60px;
-    right: 0;
-    background: rgb(96, 196, 219);
-    border-radius: 8px;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
-    display: flex;
-    flex-direction: column;
-    min-width: 150px;
-    padding: 10px 0;
-    z-index: 999;
-  }
-  
-  .dropdown button {
-    background: none;
-    border: none;
     padding: 10px 16px;
-    text-align: left;
-    width: 100%;
-    font-size: 14px;
+    border: none;
+    background: none;
     cursor: pointer;
-    transition: background 0.2s;
+    text-align: left;
+    font-size: 14px;
+
+    &:hover {
+      background-color: #f0f0f0;
+    }
   }
-  
-  .dropdown button:hover {
-    background-color: #f0f0f0;
+}
+
+.menu-lateral {
+  position: absolute;
+  top: 70px; /* justo debajo del header */
+  left: 0;
+  width: 100%;
+  background-color: #ffffff;
+  border-bottom: 1px solid #ddd;
+  overflow: hidden;
+  padding: 0 1rem;
+  max-height: 0;
+  opacity: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  z-index: 999;
+
+  ul {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+    padding: 1rem 0;
+    margin: 0;
+    flex-wrap: wrap; // ✅ en pantallas pequeñas se acomoda
+
+    li {
+      font-size: 16px;
+      cursor: pointer;
+      transition: color 0.2s;
+      white-space: nowrap;
+
+      &:hover {
+        color: #1976d2;
+      }
+    }
   }
-  
+}
+
+
