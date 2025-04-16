@@ -97,28 +97,62 @@ export class LibroDiarioComponent implements OnInit {
 
     const doc = new jsPDF();
     let y = 20;
+
+    // Estilo tipo imagen proporcionada
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('LIBRO DIARIO 2024', 15, y);
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
     doc.text(`Numero: ${asiento.numero}`, 15, y);
-    y += 10;
-    doc.text(`Fecha: ${asiento.fecha}`, 15, y);
-    y += 10;
+    doc.text(`Fecha: ${asiento.fecha}`, 160, y, { align: 'right' });
+    y += 8;
     doc.text(`Concepto: ${asiento.concepto}`, 15, y);
     y += 10;
-    doc.setFont('Helvetica', 'bold');
-    doc.text('CUENTA     DESCRIPCION     C. COSTOS     DEBITO     CREDITO', 15, y);
+
+  // Títulos de columna con sombreado
+doc.setFillColor(200,200,200); // gris claro
+doc.rect(20, y, 170, 10, 'F'); // fondo para encabezado
+doc.setTextColor(0);
+doc.setFont('Helvetica', 'bold');
+doc.text('CUENTA', 30, y + 7, { align: 'center' });
+doc.text('DESCRIPCIÓN', 75, y + 7, { align: 'center' });
+doc.text('C. COSTOS', 110, y + 7, { align: 'center' });
+doc.text('DEBITO', 150, y + 7, { align: 'center' });
+doc.text('CREDITO', 185, y + 7, { align: 'center' });
+
+y += 12;
     doc.setFont('Helvetica', 'normal');
-    y += 10;
+    let totalDebe = 0;
+    let totalHaber = 0;
 
     asiento.detalles.forEach((item: any) => {
-      doc.text(
-        `${item.cuenta}  ${item.descripcion}  ${item.centroCostos || '-'}  ${item.debe.toFixed(2)}  ${item.haber.toFixed(2)}`,
-        15, y
-      );
+      doc.text(item.cuenta, 30, y, { align: 'center' });
+      doc.text(item.descripcion, 75, y, { align: 'center' });
+      doc.text(item.centroCostos, 110, y, { align: 'center' });
+      doc.text(item.debe.toFixed(2), 150, y, { align: 'center' });
+      doc.text(item.haber.toFixed(2), 185, y, { align: 'center' });
+      totalDebe += item.debe;
+      totalHaber += item.haber;
       y += 8;
+
+      if (y >= 270) {
+        doc.addPage();
+        y = 20;
+      }
     });
 
-    const blob = doc.output('blob');
-    doc.save(`${asiento.numero}.pdf`);
-    await this.diarioService.guardarAsientoConPDF(asiento, blob);
+    // Totales
+    doc.setFont('Helvetica', 'bold');
+    doc.text('TOTAL:', 130, y);
+    doc.text(totalDebe.toFixed(2), 150, y, { align: 'right' });
+    doc.text(totalHaber.toFixed(2), 180, y, { align: 'right' });
+
+    const nombreArchivo = `${asiento.numero}.pdf`;
+    const pdfBlob = doc.output('blob');
+    doc.save(nombreArchivo);
+    await this.diarioService.guardarAsientoConPDF(asiento, pdfBlob);
 
     alert('✅ Asiento guardado y PDF generado.');
     this.formAsiento.reset();

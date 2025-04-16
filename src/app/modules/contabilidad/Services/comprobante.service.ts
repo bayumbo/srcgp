@@ -226,5 +226,161 @@ export class CatalogoService {
   }
 
 
+
+
+
+
+
+
+
   
+  
+}
+@Injectable({ providedIn: 'root' })
+export class EstadoFinancieroService {
+  constructor(
+    private firestore: Firestore,
+    private catalogoService: CatalogoService
+  ) {}
+
+  async generarBalanceGeneralJerarquico(fechaInicio: string, fechaFin: string) {
+    const movimientos: any[] = [];
+
+    const cuentas = await this.catalogoService.obtenerCuentas();
+    const cuentaPorCodigo = cuentas.reduce((acc: any, cuenta: any) => {
+      acc[cuenta.codigo] = cuenta;
+      return acc;
+    }, {});
+
+    const librosRef = collection(this.firestore, 'libros-diarios');
+    const q = query(librosRef, where('fecha', '>=', fechaInicio), where('fecha', '<=', fechaFin));
+    const snap = await getDocs(q);
+
+    snap.forEach(doc => {
+      const data = doc.data();
+      const { detalles } = data;
+      detalles.forEach((detalle: any) => {
+        movimientos.push({
+          cuenta: detalle.cuenta,
+          debe: detalle.debe || 0,
+          haber: detalle.haber || 0,
+        });
+      });
+    });
+
+    const agrupado: {
+      [tipo: string]: { codigo: string; nombre: string; valor: number }[];
+    } = {
+      activo: [],
+      pasivo: [],
+      patrimonio: [],
+    };
+
+    movimientos.forEach(mov => {
+      const cuentaInfo = cuentaPorCodigo[mov.cuenta];
+      if (!cuentaInfo || !cuentaInfo.tipo) return;
+    
+      const tipo = cuentaInfo.tipo.toLowerCase();
+      if (!agrupado[tipo]) return; // <-- evita el error
+    
+      const saldo = (mov.debe || 0) - (mov.haber || 0);
+    
+      const lista = agrupado[tipo];
+      const existente = lista.find(c => c.codigo === mov.cuenta);
+    
+      if (existente) {
+        existente.valor += saldo;
+      } else {
+        lista.push({
+          codigo: mov.cuenta,
+          nombre: cuentaInfo.nombre,
+          valor: saldo,
+        });
+      }
+    });
+    
+
+    // Ordenar por código
+    Object.values(agrupado).forEach(grupo => {
+      grupo.sort((a, b) => a.codigo.localeCompare(b.codigo));
+    });
+
+    return [
+      { grupo: 'ACTIVO', cuentas: agrupado['activo'] },
+      { grupo: 'PASIVO', cuentas: agrupado['pasivo'] },
+      { grupo: 'PATRIMONIO', cuentas: agrupado['patrimonio'] },
+    ];
+  }
+
+
+  
+}
+@Injectable({ providedIn: 'root' })
+export class EstadoResultadosService {
+  constructor(private firestore: Firestore) {}
+
+  async generarEstadoResultados(
+    fechaInicio: string,
+    fechaFin: string
+  ): Promise<{
+    grupo: string;
+    cuentas: { codigo: string; nombre: string; valor: number }[];
+  }[]> {
+    const movimientos: any[] = [];
+
+    // Obtener el Catálogo de cuentas
+    const catalogoRef = collection(this.firestore, 'catalogo-cuentas');
+    const catalogoSnap = await getDocs(catalogoRef);
+    const catalogo = catalogoSnap.docs.map(doc => doc.data());
+    const tipoPorCodigo: Record<string, string> = {};
+    const nombrePorCodigo: Record<string, string> = {};
+    catalogo.forEach(c => {
+      tipoPorCodigo[c['codigo']] = c['tipo'];
+      nombrePorCodigo[c['codigo']] = c['nombre'];
+    });
+
+    // Obtener libros diarios
+    const ref = collection(this.firestore, 'libros-diarios');
+    const q = query(ref, where('fecha', '>=', fechaInicio), where('fecha', '<=', fechaFin));
+    const snapshot = await getDocs(q);
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      (data['detalles'] as any[]).forEach((detalle: any) => {
+        movimientos.push({
+          codigo: detalle.cuenta,
+          nombre: detalle.descripcion,
+          debe: detalle.debe || 0,
+          haber: detalle.haber || 0
+        });
+      });
+    });
+
+    const ingresos: any[] = [];
+    const gastos: any[] = [];
+
+    movimientos.forEach(mov => {
+      const tipo = tipoPorCodigo[mov.codigo];
+      const nombreFinal = nombrePorCodigo[mov.codigo] || mov.nombre || 'Desconocido';
+
+      if (tipo?.toLowerCase() === 'ingreso') {
+        ingresos.push({
+          codigo: mov.codigo,
+          nombre: nombreFinal,
+          valor: mov.haber - mov.debe
+        });
+      } else if (tipo?.toLowerCase() === 'gasto') {
+        gastos.push({
+          codigo: mov.codigo,
+          nombre: nombreFinal,
+          valor: mov.debe - mov.haber
+        });
+      }
+    });
+
+    return [
+      { grupo: 'INGRESOS', cuentas: ingresos },
+      { grupo: 'GASTOS', cuentas: gastos }
+    ];
+  }
 }

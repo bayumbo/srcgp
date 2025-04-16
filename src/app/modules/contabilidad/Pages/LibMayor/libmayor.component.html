@@ -1,21 +1,21 @@
-
 <header>
-    <!-- NO TOCAR, CONFIGURACION BASICA DEL MENU 🔥📌-->
-    <div class="logo">
-      <img src="logo.png" alt="Logo">
-    </div>
-    <nav>
-      <ul class="menu">
-        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
-        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
-        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
-      </ul>
-    </nav>
-  </header>
-
+  <div class="logo">
+    <img src="logo.png" alt="Logo" />
+  </div>
+  <nav>
+    <ul class="menu">
+     
+      <li><a routerLink="/auth/"> ↩️</a></li>
+      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+      <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+      <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+    </ul>
+  </nav>
+</header>
 
 
     <div id="preloader">
@@ -104,44 +104,47 @@
     </div>
   
     <!-- TABLA DE RESULTADOS -->
-    <div class="tabla-libro">
-      <table *ngIf="librosMayoresGenerados.length > 0">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>N° Documento</th>
-            <th>N° Cheque</th>
-            <th>Cuenta</th>
-            <th>Concepto</th>
-            <th>Débito</th>
-            <th>Crédito</th>
-            <th>Saldo</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let item of librosMayoresGenerados">
-            <td>{{ item.fecha }}</td>
-            <td>{{ item.numero }}</td>
-            <td>{{ item.cheque || '-' }}</td>
-            <td>{{ item.cuenta }}</td>
-            <td>{{ item.concepto }}</td>
-            <td>{{ item.debe | number: '1.2-2' }}</td>
-            <td>{{ item.haber | number: '1.2-2' }}</td>
-            <td>{{ item.saldo | number: '1.2-2' }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-            <tr>
-              <td colspan="7" style="text-align: right; font-weight: bold;">Total Saldo:</td>
-              <td style="font-weight: bold;">{{ librosMayoresGenerados[librosMayoresGenerados.length - 1]?.saldo | number:'1.2-2' }}</td>
-            </tr>
-          </tfoot>
-          
-      </table>
-  
-      <p *ngIf="librosMayoresGenerados.length === 0" class="mensaje">
-        🔍 No hay resultados para los filtros seleccionados.
-      </p>
-    </div>
+    
+    <!-- TABLA DE RESULTADOS -->
+<div class="tabla-libro">
+  <table *ngIf="librosMayoresGenerados.length > 0">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>N° Documento</th>
+        <th>N° Cheque</th>
+        <th>Cuenta</th>
+        <th>Concepto</th>
+        <th>Débito</th>
+        <th>Crédito</th>
+        <th>Saldo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of librosMayoresGenerados">
+        <td>{{ item.fecha }}</td>
+        <td>{{ item.numero }}</td>
+        <td>{{ item.cheque || '-' }}</td>
+        <td>{{ item.cuenta }}</td>
+        <td>{{ item.concepto }}</td>
+        <td>{{ item.debe | number: '1.2-2' }}</td>
+        <td>{{ item.haber | number: '1.2-2' }}</td>
+        <td>{{ item.saldo | number: '1.2-2' }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: bold;">
+        <td colspan="5" style="text-align: right;">Totales:</td>
+        <td>{{ totalDebe | number: '1.2-2' }}</td>
+        <td>{{ totalHaber | number: '1.2-2' }}</td>
+        <td>{{ totalSaldo | number: '1.2-2' }}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <p *ngIf="librosMayoresGenerados.length === 0" class="mensaje">
+    🔍 No hay resultados para los filtros seleccionados.
+  </p>
+</div>
+
   </div>
-  

@@ -81,7 +81,11 @@ export class IndexContaComponent implements OnInit {
     this.actualizarTotales();
     this.egresoForm.patchValue({ descripcion: '', monto: '' });
   }
-
+  convertirNumeroALetras(num: number): string {
+    // Aquí puedes usar una librería como numero-a-letras si deseas algo más complejo
+    return `*** ${num.toFixed(2)} dólares americanos ***`;
+  }
+  
   eliminarTransaccion(index: number): void {
     this.transacciones.splice(index, 1);
     this.actualizarTotales();
@@ -96,36 +100,83 @@ export class IndexContaComponent implements OnInit {
     const doc = new jsPDF();
     const id = 'CE-' + String(Date.now()).slice(-6);
     const { beneficiario, cedula, fecha, numeroCheque } = this.egresoForm.value;
-
+  
+    const totalHaber = this.totalHaber.toFixed(2);
+    const totalDebe = this.totalDebe.toFixed(2);
+  
     let y = 20;
-    doc.text('Comprobante de Egreso', 105, y, { align: 'center' });
+  
+    // 🧾 ENCABEZADO
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('CONSORCIO PINTAG EXPRESS', 15, y);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('PINTAG, ANTISANA S2-138', 15, y + 5);
+    doc.text('consorciopintagexpress@hotmail.com', 15, y + 10);
+  
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('COMPROBANTE DE EGRESO', 195, y, { align: 'right' });
+    doc.setTextColor(200, 0, 0);
+    doc.text(`No. ${id}`, 195, y + 7, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+  
+    y += 25;
+  
+    // 📄 DATOS GENERALES
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Fecha: ${fecha}`, 15, y);
+    doc.text(`Pagado a: ${beneficiario}`, 75, y);
+    doc.text(`Cédula/RUC: ${cedula}`, 150, y);
     y += 10;
-    doc.text(`No: ${id}`, 15, y);
-    doc.text(`Fecha: ${fecha}`, 140, y);
-    y += 10;
-    doc.text(`Beneficiario: ${beneficiario}`, 15, y);
-    y += 10;
-    doc.text(`Cédula/RUC: ${cedula}`, 15, y);
-    if (numeroCheque) {
-      y += 10;
-      doc.text(`Cheque: ${numeroCheque}`, 15, y);
-    }
-    y += 10;
-    doc.text('Descripción', 15, y);
-    doc.text('Debe', 120, y);
-    doc.text('Haber', 160, y);
-    y += 10;
+    doc.text(`Cheque: ${numeroCheque || '-'}`, 15, y);
+  
+    // 📋 TABLA
+    y += 15;
+    doc.setFont('helvetica', 'bold');
+    doc.text('DESCRIPCIÓN', 15, y);
+    doc.text('VALOR', 195, y, { align: 'right' });
+  
+    doc.setLineWidth(0.1);
+    doc.line(15, y + 2, 195, y + 2);
+    y += 8;
+  
+    doc.setFont('helvetica', 'normal');
     this.transacciones.forEach((item) => {
       doc.text(item.descripcion, 15, y);
-      doc.text(item.debe.toFixed(2), 120, y);
-      doc.text(item.haber.toFixed(2), 160, y);
-      y += 8;
+      const valor = (item.haber || item.debe).toFixed(2);
+      doc.text(`$${valor}`, 195, y, { align: 'right' });
+      y += 7;
     });
+  
+    // 🔢 TOTALES
     y += 10;
-    doc.text(`Total Debe: $${this.totalDebe.toFixed(2)}`, 120, y);
-    y += 6;
-    doc.text(`Total Haber: $${this.totalHaber.toFixed(2)}`, 120, y);
-
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL', 15, y);
+    doc.text(`$${totalHaber}`, 195, y, { align: 'right' });
+  
+    // 🔠 VALOR EN LETRAS
+    y += 10;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.text('VALOR (en letras):', 15, y);
+    doc.text(this.convertirNumeroALetras(Number(this.totalHaber)), 60, y);
+  
+    // ✍️ FIRMAS
+    y += 25;
+    doc.setFont('helvetica', 'normal');
+    doc.line(20, y, 70, y);
+    doc.text('APROBADO', 30, y + 5);
+  
+    doc.line(80, y, 130, y);
+    doc.text('CONTABILIZADO', 90, y + 5);
+  
+    doc.line(140, y, 190, y);
+    doc.text('REVISADO', 155, y + 5);
+  
+    // 💾 GUARDAR Y SUBIR
     const pdfBlob = doc.output('blob');
     await this.firebaseService.guardarComprobante({
       comprobanteId: id,
@@ -137,7 +188,6 @@ export class IndexContaComponent implements OnInit {
       numeroCheque,
       transacciones: this.transacciones
     }, pdfBlob);
-
     doc.save(`${id}.pdf`);
     alert('✅ Comprobante guardado y PDF generado.');
     this.transacciones = [];
