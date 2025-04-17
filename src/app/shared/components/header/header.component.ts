@@ -1,97 +1,81 @@
 import {
   Component,
-  inject,
-  OnInit,
-  ChangeDetectorRef,
-  ViewChild,
+  ElementRef,
   HostListener,
-  ElementRef
+  inject,
+  OnInit
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule, Router } from '@angular/router';
 import { AuthService } from 'src/app/core/auth/services/auth.service';
-import { Router } from '@angular/router';
+import { doc, getDoc, Firestore } from '@angular/fire/firestore';
 
 @Component({
   standalone: true,
   selector: 'app-header',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss']
 })
-
 export class HeaderComponent implements OnInit {
-  private authService = inject(AuthService);
+  menuLateralAbierto = false;
+  menuUsuarioAbierto = false;
+  iniciales: string = '';
+
+  private elementRef = inject(ElementRef);
   private router = inject(Router);
-  private cdr = inject(ChangeDetectorRef);
+  private authService = inject(AuthService);
+  private firestore = inject(Firestore);
 
-  @ViewChild('menuRef') menuRef!: ElementRef;
-  @ViewChild('avatarRef') avatarRef!: ElementRef;
-  @ViewChild('menuLateralRef') menuLateralRef!: ElementRef;
-
-  nombreCompleto: string = '';
-  rol: string = '';
-  nombreEmpresa: string = '...';
-  isMenuOpen: boolean = false;
-  menuLateralAbierto: boolean = false;
-
-  async ngOnInit(): Promise<void> {
-    console.log('Componente iniciado 🚀');
-    const usuario = await this.authService.obtenerDatosUsuarioActual();
-    if (usuario) {
-      this.nombreCompleto = `${usuario.nombres} ${usuario.apellidos}`;
-      this.rol = usuario.rol;
-      this.nombreEmpresa = usuario.empresa ?? 'Empresa no registrada';
-      this.cdr.detectChanges();
-    } else {
-      console.warn('⚠ No se encontró un usuario logueado o no tiene datos.');
+  async ngOnInit() {
+    try {
+      const user = await this.authService.getUser();
+      if (user?.uid) {
+        const ref = doc(this.firestore, `usuarios/${user.uid}`);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          const nombres = data['nombres'] || '';
+          const apellidos = data['apellidos'] || '';
+          this.iniciales =
+            (nombres[0] || '').toUpperCase() + (apellidos[0] || '').toUpperCase();
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener las iniciales del usuario:', error);
     }
   }
 
   @HostListener('document:click', ['$event'])
-  onClickOutside(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    const clickedAvatar = this.avatarRef?.nativeElement.contains(target);
-    const clickedInsideMenu = this.menuRef?.nativeElement.contains(target);
-    const clickedInsideLateral = this.menuLateralRef?.nativeElement.contains(target);
-
-    if (!clickedInsideMenu && !clickedAvatar) {
-      this.isMenuOpen = false;
-    }
-
-    if (!clickedInsideLateral && this.menuLateralAbierto) {
+  handleClickOutside(event: MouseEvent) {
+    if (!this.elementRef.nativeElement.contains(event.target)) {
       this.menuLateralAbierto = false;
+      this.menuUsuarioAbierto = false;
     }
   }
 
-  getIniciales(): string {
-    return this.nombreCompleto
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase();
-  }
-
-  toggleMenu(): void {
-    this.isMenuOpen = !this.isMenuOpen;
-  }
-
-  toggleMenuLateral(): void {
+  toggleMenuLateral() {
     this.menuLateralAbierto = !this.menuLateralAbierto;
-    console.log('Toggle ejecutado ✅ Estado del menú lateral:', this.menuLateralAbierto);
+    this.menuUsuarioAbierto = false;
   }
 
-  navegar(ruta: string): void {
+  toggleMenuUsuario() {
+    this.menuUsuarioAbierto = !this.menuUsuarioAbierto;
     this.menuLateralAbierto = false;
+  } 
+
+  goTo(ruta: string) {
     this.router.navigate([ruta]);
+    this.menuLateralAbierto = false;
+    this.menuUsuarioAbierto = false;
   }
 
-  irPerfil(): void {
-    this.router.navigate(['/perfil']);
-    this.isMenuOpen = false;
-  }
-
-  async logOut(): Promise<void> {
-    await this.authService.logOut();
-    this.router.navigate(['/auth/login']);
+  async salir() {
+    try {
+      await this.authService.logOut();
+      this.router.navigate(['/auth/login']);
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
   }
 }

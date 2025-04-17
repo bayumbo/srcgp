@@ -1,118 +1,91 @@
-.header {
+.header-container {
   position: fixed;
   top: 0;
   left: 0;
-  height: 70px;
   width: 100%;
-  background-color: #e0f7ff;
+  height: 60px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #ddd;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 1rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   z-index: 1000;
 }
 
-.left-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+.titulo-app {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1976d2;
+  margin: 0;
 }
 
-.menu-btn {
-  font-size: 22px;
+/* Menú izquierdo y derecho con posición relativa para dropdowns */
+.menu-izquierdo,
+.menu-derecho {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 12px;
+}
+
+/* Botones para abrir menús */
+.menu-btn,
+.avatar-btn {
   background: none;
   border: none;
+  font-size: 20px;
   cursor: pointer;
-  color: #1976d2;
+  color: #444;
+  margin-right: 8px;
 }
 
-.empresa-text {
-  font-size: 17px;
-  font-weight: bold;
-  color: #1976d2;
-}
-
-.right-section {
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  font-size: 14px;
-  border-radius: 50%;
-  background-color: #1976d2;
-  color: #fff;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
+/* Dropdown oculto por defecto */
 .dropdown {
   position: absolute;
-  top: 48px;
-  right: 0;
+  top: 100%;
   background: white;
   border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  min-width: 150px;
-  z-index: 1100;
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 2000;
+  min-width: 160px;
 
-  button {
-    width: 100%;
-    padding: 10px 16px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    text-align: left;
-    font-size: 14px;
-
-    &:hover {
-      background-color: #f0f0f0;
-    }
-  }
-}
-
-.menu-lateral {
-  position: absolute;
-  top: 70px; /* justo debajo del header */
-  left: 0;
-  width: 100%;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ddd;
-  overflow: hidden;
-  padding: 0 1rem;
-  max-height: 0;
+  transform: translateY(-10px);
   opacity: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: max-height 0.3s ease, opacity 0.3s ease;
-  z-index: 999;
-
-  ul {
-    list-style: none;
-    display: flex;
-    gap: 2rem;
-    padding: 1rem 0;
-    margin: 0;
-    flex-wrap: wrap; // ✅ en pantallas pequeñas se acomoda
-
-    li {
-      font-size: 16px;
-      cursor: pointer;
-      transition: color 0.2s;
-      white-space: nowrap;
-
-      &:hover {
-        color: #1976d2;
-      }
-    }
-  }
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.25s ease, opacity 0.25s ease, visibility 0.25s;
 }
 
+/* Mostrar dropdown con animación */
+.dropdown.visible {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
 
+/* Posicionamiento del menú */
+.menu-derecho .dropdown {
+  right: 0;
+  left: auto;
+}
+
+.menu-izquierdo .dropdown {
+  left: 0;
+  right: auto;
+}
+
+.dropdown li {
+  padding: 10px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.dropdown li:hover {
+  background-color: #f0f0f0;
+}

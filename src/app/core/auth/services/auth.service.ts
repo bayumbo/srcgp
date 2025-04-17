@@ -37,18 +37,26 @@ export interface Usuario {
   rol: string;
   empresa:string;
   unidad: string;
-  creadoEn?: any;
+  
 }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  
+    
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
 
   readonly authState$ = authState(this.auth);
   currentUserRole: string | null = null;
-
+  
+  getUser(): Promise<import('@angular/fire/auth').User | null> {
+    return new Promise(resolve => {
+      const unsubscribe = this.auth.onAuthStateChanged(user => {
+        resolve(user);
+        unsubscribe(); // evita llamadas múltiples
+      });
+    });
+  }
   // 🔐 Registro
   async signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
     // Crear instancia secundaria de Firebase para evitar cerrar sesión actual

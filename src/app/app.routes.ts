@@ -9,7 +9,7 @@ export const APP_ROUTES: Routes = [
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./shared/layouts/main-layout/main-layout.component').then(m => m.LayoutComponent),
+      import('./shared/layouts/main-layout/main-layout.component').then(m => m.MainLayoutComponent),
     children: [
       {
         path: '',
@@ -47,33 +47,6 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/administracion/pages/GestionRoles/gestionroles.component').then(m => m.GestionRolesComponent),
       },
-      //{
-        //path: 'reportes',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/reportes/pages/reporte-diario/reporte-diario.component').then(
-            //m => m.ReporteDiarioComponent
-          //),
-     // },
-      //{
-        //path: 'usuarios',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/contabilidad/pages/indexconta/indexconta.component').then(
-           // m => m.IndexContaComponent
-         // ),
-      //},
-      //{
-        //path: 'cargas',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/administracion/pages/data-carga/data-carga.component').then(
-            //m => m.DataCargaComponent
-          //),
-     // }
     ]
   },
   {

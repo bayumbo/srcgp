@@ -1,44 +1,26 @@
-<!-- HEADER -->
-<header class="header">
-  <div class="left-section">
-    <button class="menu-btn" (click)="toggleMenuLateral()">☰</button>
-    <span class="empresa-text">{{ nombreEmpresa }}</span>
+<header class="header-container">
+  <!-- Menú izquierdo -->
+  <div class="menu-izquierdo">
+    <button class="menu-btn" (click)="toggleMenuLateral()">☰ Menú</button>
+    <ul class="dropdown" [class.visible]="menuLateralAbierto">
+      <li (click)="goTo('/reportes')">📊 Reportes</li>
+      <li (click)="goTo('/usuarios')">📘 Contabilidad</li>
+      <li (click)="goTo('/gestionroles')">🛠 Administración</li>
+    </ul>
   </div>
 
-  <div class="right-section">
-    <div #avatarRef class="avatar" (click)="toggleMenu()">
-      {{ getIniciales() }}
-    </div>
+  <!-- Título o nombre empresa -->
+  <h1 class="titulo-app">Sistema Contable</h1>
 
-    <div #menuRef class="dropdown" *ngIf="isMenuOpen">
-      <button (click)="irPerfil()">👤 Perfil</button>
-      <button (click)="logOut()">🔒 Cerrar Sesión</button>
-    </div>
+  <!-- Menú derecho -->
+  <div class="menu-derecho">
+    <button class="avatar-btn avatar-circle" (click)="toggleMenuUsuario()">
+      {{ iniciales }}
+    </button>    
+    <ul class="dropdown" [class.visible]="menuUsuarioAbierto">
+      <li (click)="goTo('/perfil')">👥 Ir al Perfil</li>
+      <li (click)="salir()">🔒 Cerrar sesión</li>
+      
+    </ul>
   </div>
 </header>
-
-
-<!-- MENÚ LATERAL DESPLEGABLE -->
-<nav
-  #menuLateralRef
-  class="menu-lateral"
-  [ngClass]="{ abierto: menuLateralAbierto, cerrado: !menuLateralAbierto }"
->
-  <ul>
-    <li (click)="navegar('/contabilidad')">💰 Contabilidad</li>
-    <li (click)="navegar('/reportes')">📊 Reportes</li>
-    <li (click)="navegar('/gestionroles')">⚙️ Administración</li>
-  </ul>
-</nav>
-<label for="btn-nav" class="btn-nav"><i cl
-  ass="fas fa-bars"></i></label>
-  <input type="checkbox" id="btn-nav">
-  
-  <nav>
-    <ul class="navigation">
-      <li><a href="">Home</a></li>
-      <li><a href="">Servicios</a></li>
-      <li><a href="">Nosotros</a></li>
-      <li><a href="">Contacto</a></li>
-    </ul>
-  </nav>
