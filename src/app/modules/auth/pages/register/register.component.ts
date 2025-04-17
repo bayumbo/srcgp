@@ -7,7 +7,7 @@ import {
   ReactiveFormsModule
 } from '@angular/forms';
 
-import { AuthService, Credential } from 'src/app/core/auth/services/auth.service';
+import { AuthService} from 'src/app/core/auth/services/auth.service';
 import { Router } from '@angular/router';
 
 @Component({

@@ -1,0 +1,106 @@
+<header>
+  <div class="logo">
+    <img src="logo.png" alt="Logo" />
+  </div>
+  <nav>
+    <ul class="menu">
+     
+      <li><a routerLink="/auth/"> ↩️</a></li>
+      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+      <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+      <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+    </ul>
+  </nav>
+</header>
+<div id="preloader">
+  <div class="preloader">
+    <span></span><span></span><span></span><span></span>
+  </div>
+</div>
+<div class="estado-wrapper">
+  <div class="estado-card">
+    <h2>Estado de Situación Financiera</h2>
+
+    <div class="filtros">
+      <label for="fechaInicio">Desde:</label>
+      <input type="date" id="fechaInicio" [(ngModel)]="fechaInicio" />
+
+      <label for="fechaFin">Hasta:</label>
+      <input type="date" id="fechaFin" [(ngModel)]="fechaFin" />
+
+      <button class="btn-generar" (click)="generarEstado()">Generar</button>
+    </div>
+
+    <div *ngIf="estadoJerarquico.length > 0" class="estado-listado">
+      <div *ngFor="let grupo of estadoJerarquico" class="grupo">
+        <h3>{{ grupo.grupo }}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Cuenta</th>
+              <th class="valor">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let cuenta of grupo.cuentas">
+              <td>{{ cuenta.codigo }}</td>
+              <td>{{ cuenta.nombre }}</td>
+              <td class="valor">{{ cuenta.valor | number: '1.2-2' }}</td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="2"><strong>TOTAL {{ grupo.grupo }}</strong></td>
+              <td class="valor"><strong>{{ obtenerSubtotal(grupo.cuentas) | number: '1.2-2' }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <button class="btn-pdf" (click)="generarPDF()">📄 Descargar y Guardar PDF</button>
+    </div>
+
+    <button class="btn-generar" (click)="abrirModal()">📂 Ver Balances Generados</button>
+
+    <!-- Modal -->
+    <div class="modal-overlay" *ngIf="modalAbierto">
+      <div class="modal-contenido">
+        <button class="cerrar" (click)="cerrarModal()">&times;</button>
+
+        <h3>📁 Balances Generados</h3>
+
+        <div class="filtros-modal">
+          <label>Desde:</label>
+          <input type="date" [(ngModel)]="filtroInicio">
+
+          <label>Hasta:</label>
+          <input type="date" [(ngModel)]="filtroFin">
+
+          <button (click)="filtrarBalances()">Filtrar</button>
+        </div>
+
+        <div class="lista-balances">
+          <div *ngFor="let balance of paginaActual" class="balance-card">
+            <strong>📄 {{ balance.nombreArchivo }}</strong>
+            <div>{{ balance.fechaInicio }} a {{ balance.fechaFin }}</div>
+            <div style="margin-top: 5px;">
+              <a [href]="balance.url" target="_blank">🔽 Descargar</a>
+              <button (click)="eliminarBalance(balance)">🗑️ Eliminar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="paginacion" *ngIf="totalPaginas > 1">
+          <button (click)="cambiarPagina(pagina - 1)">⭠</button>
+          <span *ngFor="let p of [].constructor(totalPaginas); let i = index">
+            <button [disabled]="pagina === i + 1" (click)="cambiarPagina(i + 1)">{{ i + 1 }}</button>
+          </span>
+          <button (click)="cambiarPagina(pagina + 1)">⭢</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

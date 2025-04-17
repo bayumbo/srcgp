@@ -1,1 +1,96 @@
-<p>realizar-pago works!</p>
+<div class="pago-container">
+  <div class="pago-header">
+    <span class="material-icons icono-pago">payments</span>
+    <h2>Gestión de Pago</h2>
+  </div>
+
+  <div class="info-usuario" *ngIf="registros.length > 0">
+    <p><strong>Nombre:</strong> {{ registros[0].nombre }}</p>
+    <p><strong>Unidad:</strong> {{ registros[0].unidad }}</p>
+  </div>
+
+  <!-- Contenedor de los módulos -->
+  <div class="contenedor-modulos">
+    <div class="modulo" *ngFor="let campo of campos">
+      <h3>{{ campo | titlecase }}</h3>
+
+      <div class="tabla-pagos" *ngFor="let registro of registros">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Pagado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registro.id!)">
+              <td>{{ pago.fecha.toDate() | date:'shortDate' }}</td>
+            
+              <td class="celda-pago-editable">
+                <!-- Contenedor fijo -->
+                <div class="pago-campo">
+                  <!-- Valor o input -->
+                  <span *ngIf="!esPagoEnEdicion(pago, campo)">{{ pago.cantidad }}</span>
+                  <input *ngIf="esPagoEnEdicion(pago, campo)" type="number" [(ngModel)]="nuevoMonto" />
+                </div>
+            
+                <!-- Botones superpuestos -->
+                <div class="acciones-edicion" *ngIf="esPagoEnEdicion(pago, campo)">
+                  <button (click)="guardarEdicion()">
+                    <span class="material-icons">save</span>
+                  </button>
+                  <button (click)="cancelarEdicion()">
+                    <span class="material-icons">cancel</span>
+                  </button>
+                </div>
+            
+                <div class="accion-editar" *ngIf="!esPagoEnEdicion(pago, campo)">
+                  <button (click)="iniciarEdicion(pago, campo)">
+                    <span class="material-icons">edit</span>
+                  </button>
+                  
+                </div>
+              </td>
+            </tr>
+            
+            
+            <tr *ngIf="filtrarPagosPorRegistro(campo, registro.id!).length === 0">
+              <td colspan="2">Sin pagos registrados</td>
+            </tr>
+            <tr>
+              <td><strong>Total pagado:</strong></td>
+              <td><strong>{{ calcularTotalPagado(campo, registro.id!) }}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Deuda:</strong></td>
+              <td><strong>{{ calcularDeuda(registro, campo) }}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Pago actual:</strong></td>
+              <td>
+                <input
+                  type="number"
+                  min="0"
+                  [max]="calcularDeuda(registro, campo)"
+                  [(ngModel)]="pagosActuales[registro.id!][campo]"
+                  (ngModelChange)="validarPago(registro.id!, campo)"
+                  placeholder="Ingrese pago"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="resumen-total">
+    <h3>Total a pagar:</h3>
+    <p class="total-pagar">${{ calcularTotalGeneral() }}</p>
+  </div>
+
+  <div class="acciones-finales">
+    <button class="volver" (click)="volver()">⬅️ Volver</button>
+    <button class="guardar" (click)="guardarPagosGenerales()">💾 Guardar pagos</button>
+  </div>
+</div>
