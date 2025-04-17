@@ -28,7 +28,11 @@ export const REPORTES_ROUTES: Routes = [
     path: 'realizar-pago/:uid/:id',
     loadComponent: () =>
       import('./pages/formularios/realizar-pago/realizar-pago.component').then(m => m.RealizarPagoComponent)
+  },
+  {
+    path: 'cuentas-por-cobrar',
+    loadComponent: () =>
+      import('./pages/cuentas-por-cobrar/cuentas-por-cobrar.component')
+        .then(m => m.CuentasPorCobrarComponent)
   }
-
- 
-];
+ ];

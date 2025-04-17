@@ -203,4 +203,25 @@
       background-color: #999;
     }
   }
+  .acciones-superiores {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+  }
+  
+  .btn-cuentas {
+    background-color: #66bb6a;
+    color: #1b5e20;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  
+    &:hover {
+      background-color: #81c784;
+    }
+  }
+  
 }

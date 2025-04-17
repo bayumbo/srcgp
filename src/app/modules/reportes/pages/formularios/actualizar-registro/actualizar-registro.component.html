@@ -3,8 +3,9 @@
 
 <form (ngSubmit)="guardar()" *ngIf="registro">
   <p><strong>Nombre:</strong> {{ registro.nombre }}</p>
+  <p><strong>Apellido:</strong> {{ registro.apellido }}</p>
   <p><strong>Unidad:</strong> {{ registro.unidad }}</p>
-
+  
   <label>
     Administración:
     <input type="number" [(ngModel)]="registro.administracion" name="administracion" required />

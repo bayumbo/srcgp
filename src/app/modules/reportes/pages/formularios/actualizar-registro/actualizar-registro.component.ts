@@ -20,7 +20,7 @@ export class ActualizarRegistroComponent implements OnInit {
   uid: string = '';
   id: string = '';
 
-  registro: NuevoRegistro & { nombre?: string; unidad?: string } = {
+  registro: NuevoRegistro & { nombre?: string; apellido?: string; unidad?: string } = {
     administracion: 0,
     minutosAtraso: 0,
     minutosBase: 0,
@@ -30,6 +30,7 @@ export class ActualizarRegistroComponent implements OnInit {
     minutosPagados: 0,
     multasPagadas: 0,
     nombre: '',
+    apellido: '',
     unidad: ''
   };
 

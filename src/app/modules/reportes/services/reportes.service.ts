@@ -9,7 +9,7 @@ import {
   doc,
   serverTimestamp
 } from '@angular/fire/firestore';
-import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
+import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 
 @Injectable({ providedIn: 'root' })
 export class ReportesService {
@@ -44,4 +44,48 @@ export class ReportesService {
       pagado: true
     });
   }
+  async obtenerReportePorUnidad(unidadBuscada: string): Promise<ReporteConPagos | null> {
+    const usuariosSnap = await getDocs(collection(this.firestore, 'usuarios'));
+  
+    for (const usuario of usuariosSnap.docs) {
+      const uid = usuario.id;
+      const reportesSnap = await getDocs(collection(this.firestore, `usuarios/${uid}/reportesDiarios`));
+  
+      for (const reporte of reportesSnap.docs) {
+        const data = reporte.data() as ReporteConPagos;
+        if (data.unidad.toLowerCase() === unidadBuscada.toLowerCase()) {
+          return {
+            ...data,
+            uid,
+            id: reporte.id
+          };
+        }
+      }
+    }
+  
+    return null;
+  }
+
+  async obtenerTodasLasUnidadesConNombre(): Promise<{ unidad: string; nombre: string }[]> {
+    const unidadesMap = new Map<string, string>();
+    const usuariosSnap = await getDocs(collection(this.firestore, 'usuarios'));
+  
+    for (const usuario of usuariosSnap.docs) {
+      const uid = usuario.id;
+      const reportesSnap = await getDocs(collection(this.firestore, `usuarios/${uid}/reportesDiarios`));
+  
+      reportesSnap.forEach(reporte => {
+        const data = reporte.data();
+        const unidad = data['unidad'];
+        const nombre = data['nombre'];
+  
+        if (unidad && nombre && !unidadesMap.has(unidad)) {
+          unidadesMap.set(unidad, nombre);
+        }
+      });
+    }
+  
+    return Array.from(unidadesMap.entries()).map(([unidad, nombre]) => ({ unidad, nombre }));
+  }
 }
+

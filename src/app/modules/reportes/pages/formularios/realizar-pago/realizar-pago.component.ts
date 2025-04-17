@@ -151,21 +151,10 @@ export class RealizarPagoComponent implements OnInit {
   
       if (!tienePago) continue;
   
-      // 1️⃣ Guardar el documento del pago en Firestore
-      const ref = collection(
-        this.firestore,
-        `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
-      );
-      
-      await addDoc(ref, {
-        fecha,
-        detalles,
-        total
-      });
-  
-      // 2️⃣ Generar y subir el recibo del pago
-      await this.generarYGuardarReciboPago(this.uidUsuario, registro.id!, {
+      // 1️⃣ Generar PDF y obtener URL
+      const urlPDF = await this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
         nombre: registro.nombre,
+        apellido: registro.apellido,
         unidad: registro.unidad,
         administracion: detalles['administracion'] || 0,
         minutosBase: detalles['minutosBase'] || 0,
@@ -173,13 +162,66 @@ export class RealizarPagoComponent implements OnInit {
         multas: detalles['multas'] || 0,
         total
       });
+  
+      // 2️⃣ Guardar el documento en Firestore (UNA sola vez)
+      const ref = collection(
+        this.firestore,
+        `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
+      );
+  
+      await addDoc(ref, {
+        fecha,
+        detalles,
+        total,
+        urlPDF
+      });
     }
   
     alert('✅ Pagos registrados y recibos generados correctamente.');
     this.router.navigate(['/reportes/lista-reportes']);
   }
   
+  async generarReciboYSubirPDF(uid: string, reporteId: string, datos: {
+    nombre: string;
+    apellido: string;
+    unidad: string;
+    administracion: number;
+    minutosBase: number;
+    minutosAtraso: number;
+    multas: number;
+    total: number;
+  }): Promise<string> {
+    const fechaActual = new Date();
+    const fechaTexto = fechaActual.toLocaleString();
   
+    const docPDF = new jsPDF();
+    docPDF.setFontSize(16);
+    docPDF.text('RECIBO DE PAGO', 80, 20);
+    docPDF.setFontSize(12);
+    docPDF.text(`Fecha: ${fechaTexto}`, 20, 30);
+    docPDF.text(`Nombre: ${datos.nombre}`, 20, 40);
+    docPDF.text(`Unidad: ${datos.unidad}`, 20, 50);
+  
+    docPDF.text('Detalle del pago:', 20, 70);
+    docPDF.text(`- Administración: $${datos.administracion.toFixed(2)}`, 30, 80);
+    docPDF.text(`- Minutos Base: $${datos.minutosBase.toFixed(2)}`, 30, 90);
+    docPDF.text(`- Minutos Atraso: $${datos.minutosAtraso.toFixed(2)}`, 30, 100);
+    docPDF.text(`- Multas: $${datos.multas.toFixed(2)}`, 30, 110);
+  
+    docPDF.setFontSize(14);
+    docPDF.text(`TOTAL PAGADO: $${datos.total.toFixed(2)}`, 20, 130);
+    docPDF.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
+    // PDF como blob
+    const pdfBlob = docPDF.output('blob');
+    const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
+  
+    // Subida a Firebase Storage
+    const storageRef = ref(this.storage, fileName);
+    await uploadBytes(storageRef, pdfBlob);
+    const pdfUrl = await getDownloadURL(storageRef);
+  
+    return pdfUrl;
+  }
 
   calcularDeuda(registro: NuevoRegistro, campo: CampoClave): number {
     const total = registro[campo as keyof NuevoRegistro] as number;
@@ -282,56 +324,7 @@ export class RealizarPagoComponent implements OnInit {
     this.router.navigate(['/reportes/lista-reportes']);
   }
 
-  async generarYGuardarReciboPago(uid: string, reporteId: string, datos: {
-    nombre: string;
-    unidad: string;
-    administracion: number;
-    minutosBase: number;
-    minutosAtraso: number;
-    multas: number;
-    total: number;
-  }) {
-    const fechaActual = new Date();
-    const fechaTexto = fechaActual.toLocaleString();
-
-    const docPDF = new jsPDF();
-
-    // 🧾 Contenido del PDF
-    docPDF.setFontSize(16);
-    docPDF.text('RECIBO DE PAGO', 80, 20);
-    docPDF.setFontSize(12);
-    docPDF.text(`Fecha: ${fechaTexto}`, 20, 30);
-    docPDF.text(`Nombre: ${datos.nombre}`, 20, 40);
-    docPDF.text(`Unidad: ${datos.unidad}`, 20, 50);
-
-    docPDF.text('Detalle del pago:', 20, 70);
-    docPDF.text(`- Administración: $${datos.administracion.toFixed(2)}`, 30, 80);
-    docPDF.text(`- Minutos Base: $${datos.minutosBase.toFixed(2)}`, 30, 90);
-    docPDF.text(`- Minutos Atraso: $${datos.minutosAtraso.toFixed(2)}`, 30, 100);
-    docPDF.text(`- Multas: $${datos.multas.toFixed(2)}`, 30, 110);
-
-    docPDF.setFontSize(14);
-    docPDF.text(`TOTAL PAGADO: $${datos.total.toFixed(2)}`, 20, 130);
-    docPDF.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
-    // 📁 Convertir PDF a blob
-    const pdfBlob = docPDF.output('blob');
-    const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
-
-    // 🔼 Subir a Firebase Storage
-    const storageRef = ref(this.storage, fileName);
-    await uploadBytes(storageRef, pdfBlob);
-    const pdfUrl = await getDownloadURL(storageRef);
-
-    // 🔥 Guardar en Firestore
-    const reciboRef = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}/pagosTotales/${Date.now()}`);
-    await setDoc(reciboRef, {
-      ...datos,
-      urlPDF: pdfUrl,
-      fecha: serverTimestamp()
-    });
-
-    alert('✅ Recibo generado, subido y guardado correctamente.');
-  }
+  
 }
 
 

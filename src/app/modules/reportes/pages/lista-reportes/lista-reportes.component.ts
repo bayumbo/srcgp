@@ -174,4 +174,9 @@ export class ReporteListaComponent implements OnInit {
   irAPagar(uid: string, id: string): void {
     this.router.navigate([`/reportes/realizar-pago`, uid, id]);
   }
+
+  irACuentasPorCobrar() {
+    this.router.navigate(['/reportes/cuentas-por-cobrar']);
+  }
 }
+

@@ -46,7 +46,7 @@
     </thead>
     <tbody>
       <tr *ngFor="let reporte of reportes">
-        <td data-label="Nombre">{{ reporte.nombre }}</td>
+        <td data-label="Nombre">{{ reporte.nombre +' '+ reporte.apellido}}</td>
         <td data-label="Unidad">{{ reporte.unidad }}</td>
 
         <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
@@ -72,7 +72,11 @@
       </tr>
     </tbody>
   </table>
-
+  <div class="acciones-superiores">
+    <button class="btn-cuentas" (click)="irACuentasPorCobrar()">
+      Cuentas por cobrar
+    </button>
+  </div>
   <ng-template #cargando>
     <p>Cargando reportes...</p>
   </ng-template>

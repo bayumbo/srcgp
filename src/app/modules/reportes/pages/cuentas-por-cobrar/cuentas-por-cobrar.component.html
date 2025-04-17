@@ -1,0 +1,52 @@
+<h2 class="titulo">CUENTAS POR COBRAR</h2>
+
+<div class="contenedor-principal">
+  <!-- IZQUIERDA -->
+  <div class="contenedor-unidades">
+    <h3 class="subtitulo">Seleccione la unidad</h3>
+
+    <input
+      type="text"
+      [(ngModel)]="filtro"
+      placeholder="Buscar"
+      class="buscador"
+    />
+
+    <table class="tabla-unidades">
+      <thead>
+        <tr>
+          <th>UNIDAD</th>
+          <th>PROPIETARIO</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          *ngFor="let item of unidadesFiltradas"
+          (click)="seleccionarUnidad(item.unidad)"
+          [ngClass]="{ 'selected': unidadSeleccionada?.unidad === item.unidad }"
+        >
+          <td>{{ item.unidad }}</td>
+          <td>{{ item.nombre }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <button class="btn-cargar" (click)="unidadSeleccionada && generarPago(unidadSeleccionada.uid, unidadSeleccionada.id)">
+      CARGAR
+    </button>
+  </div>
+
+  <!-- DERECHA -->
+  <div *ngIf="unidadSeleccionada" class="reporte-usuario">
+    <h3>REPORTE POR USUARIO</h3>
+    <p><strong>Unidad:</strong> {{ unidadSeleccionada.unidad }}</p>
+    <p><strong>Propietario:</strong> {{ unidadSeleccionada.nombre }}</p>
+    <p>Saldo atraso minutos: {{ saldoAtraso }}</p>
+    <p>Saldo administración: {{ saldoAdministracion }}</p>
+    <p>Saldo minutos base: {{ saldoMinBase }}</p>
+    <p>Saldo multas: {{ saldoMultas }}</p>
+    <p class="total"><strong>SALDO TOTAL:</strong> {{ total }}</p>
+
+   <button class="btn-pago" (click)="generarPago(unidadSeleccionada.uid, unidadSeleccionada.id)">GENERAR PAGO</button>
+  </div>
+</div>

@@ -11,6 +11,7 @@ export interface NuevoRegistro {
     multas: number;
     multasPagadas: number;
     nombre: string;
+    apellido: string;
     unidad: string;
     uid?: string;
     fechaModificacion?: Timestamp;

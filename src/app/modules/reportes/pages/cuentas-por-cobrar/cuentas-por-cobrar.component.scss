@@ -1,0 +1,114 @@
+.titulo {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.contenedor-principal {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.contenedor-unidades {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.subtitulo {
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.buscador {
+  width: 90%;
+  padding: 0.6rem;
+  border-radius: 20px;
+  border: none;
+  background-color: #eee1f7;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.tabla-unidades {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  text-align: center;
+
+  th, td {
+    padding: 0.6rem;
+    border-bottom: 1px solid #ccc;
+  }
+
+  tr:hover {
+    background-color: #f1f1f1;
+    cursor: pointer;
+  }
+
+  tr.selected {
+    background-color: #d0f0d0 !important;
+  }
+}
+
+.btn-cargar {
+  padding: 0.6rem 2rem;
+  background-color: #00a651;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #00c46d;
+  }
+}
+
+.reporte-usuario {
+  background-color: #7ed957;
+  padding: 1.5rem;
+  border-radius: 15px;
+  width: 280px;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,0.15);
+
+  h3 {
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  p {
+    margin: 0.4rem 0;
+    font-size: 0.95rem;
+  }
+
+  .total {
+    font-weight: bold;
+    margin-top: 1rem;
+    font-size: 1.1rem;
+    color: #fff9c4;
+  }
+
+  .btn-pago {
+    margin-top: 1rem;
+    padding: 0.6rem 1.2rem;
+    background-color: #333;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #555;
+    }
+  }
+}

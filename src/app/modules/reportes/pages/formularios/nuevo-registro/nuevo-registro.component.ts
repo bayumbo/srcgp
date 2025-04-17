@@ -25,11 +25,14 @@ export class NuevoRegistroComponent {
     multas: 0,
     multasPagadas: 0,
     nombre: '',
+    apellido:'',
     unidad: '',
     uid: '',
   };
 
-  usuarios: { uid: string, nombre: string, unidad: string }[] = [];
+  usuarios: { uid: string; nombre: string; apellido: string; unidad: string }[] = [];
+  nombreBuscado: string = '';
+  usuarioSeleccionado: any = null;
   resultado: string | null = null;
   id: string | null = null;
 
@@ -52,14 +55,16 @@ export class NuevoRegistroComponent {
     this.usuarios = snapshot.docs.map(doc => ({
       uid: doc.id,
       nombre: doc.data()['nombres'],
+      apellido: doc.data()['apellidos'],
       unidad: doc.data()['unidad']
     }));
   }
 
-  seleccionarUsuario(uid: string) {
+    seleccionarUsuario(uid: string) {
     const usuario = this.usuarios.find(u => u.uid === uid);
     if (usuario) {
       this.reporte.nombre = usuario.nombre;
+      this.reporte.apellido = usuario.apellido;
       this.reporte.unidad = usuario.unidad;
       this.reporte.uid = usuario.uid;
     }
@@ -68,12 +73,14 @@ export class NuevoRegistroComponent {
 
   async cargarSiEsEdicion() {
     this.id = this.route.snapshot.paramMap.get('id');
-    const uid = this.reporte.uid;
+    const uid = this.route.snapshot.paramMap.get('uid'); // ahora lo leemos directo de la URL
+
     if (this.id && uid) {
       const ref = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${this.id}`);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         this.reporte = snap.data() as NuevoRegistro;
+        this.reporte.uid = uid;
       } else {
         alert('❌ Registro no encontrado');
         this.router.navigate(['/reportes/lista-reportes']);
@@ -81,21 +88,24 @@ export class NuevoRegistroComponent {
     }
   }
 
-  nombreBuscado: string = '';
-  usuarioSeleccionado: any = null;
   actualizarUsuarioSeleccionado() {
-    this.usuarioSeleccionado = this.usuarios.find(u => u.nombre.toLowerCase() === this.nombreBuscado.toLowerCase()) || null;
+    // buscar por nombre + apellido
+    this.usuarioSeleccionado = this.usuarios.find(u =>
+      `${u.nombre} ${u.apellido}`.toLowerCase() === this.nombreBuscado.toLowerCase()
+    ) || null;
+
     if (this.usuarioSeleccionado) {
       this.reporte.uid = this.usuarioSeleccionado.uid;
       this.reporte.nombre = this.usuarioSeleccionado.nombre;
+      this.reporte.apellido = this.usuarioSeleccionado.apellido;
       this.reporte.unidad = this.usuarioSeleccionado.unidad;
     } else {
       this.reporte.uid = '';
       this.reporte.nombre = '';
+      this.reporte.apellido = '';
       this.reporte.unidad = '';
     }
   }
-
   async enviar() {
     if (!this.reporte.uid || !this.reporte.nombre || !this.reporte.unidad) {
       alert('⚠️ Por favor selecciona un usuario válido.');
