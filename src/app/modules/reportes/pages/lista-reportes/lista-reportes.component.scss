@@ -10,26 +10,21 @@
   .acciones-globales {
     display: flex;
     justify-content: flex-end;
+    align-items: flex-start;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
-
-    button {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      padding: 0.4rem 0.8rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
 
     .filtro {
       background-color: rgb(0, 0, 0);
       color: #ffffff;
       width: 50px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
       &:hover {
-        background-color: #212521; // tono más oscuro
+        background-color: #212521;
       }
     }
 
@@ -37,8 +32,20 @@
       background-color: #4caf50;
       color: white;
       width: 200px;
+      min-width: 200px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      white-space: nowrap;
+      cursor: pointer;
+
       &:hover {
-        background-color: #005800; // tono más oscuro
+        background-color: #005800;
       }
     }
 
@@ -79,7 +86,7 @@
       content: "Acciones";
       font-weight: bold;
       color: #555;
-      display: none; // se muestra solo en mobile si quieres
+      display: none;
     }
 
     .editar {
@@ -93,13 +100,13 @@
       justify-content: center;
       cursor: pointer;
       gap: 0.3rem;
-    
+
       .material-icons {
         font-size: 18px;
       }
-    
+
       &:hover {
-        background-color: #45a049; // tono más oscuro
+        background-color: #45a049;
       }
     }
 
@@ -111,9 +118,9 @@
       padding: 0.3rem 0.8rem;
       font-weight: bold;
       cursor: pointer;
-    
+
       &:hover {
-        background-color: #333333; // gris oscuro
+        background-color: #333333;
       }
     }
   }
@@ -155,12 +162,45 @@
   }
 
   td.acciones {
-    flex-direction: row; // mantener botones en fila
+    flex-direction: row;
     justify-content: flex-start;
 
     &::before {
       display: block;
       margin-bottom: 0.3rem;
+    }
+  }
+
+  .panel-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    background-color: #f4f4f4;
+    padding: 1rem;
+    border-radius: 8px;
+
+    button {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .filtro-personalizado {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      input[type="date"] {
+        padding: 0.3rem;
+      }
+    }
+
+    .limpiar {
+      background-color: #999;
     }
   }
 }

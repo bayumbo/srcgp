@@ -1,0 +1,56 @@
+form {
+    background-color: #00b10f; // Verde suave (material green 50)
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-top: 1rem;
+    color: white;
+  
+    .row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+  
+      .form-group {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+  
+        label {
+          font-weight: bold;
+          margin-bottom: 0.3rem;
+        }
+  
+        input {
+          padding: 0.4rem;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+        }
+      }
+    }
+  
+    .acciones-formulario {
+      justify-content: flex-start;
+  
+      button {
+        padding: 0.5rem 1rem;
+        margin-right: 1rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+  
+        &:first-child {
+          background-color: #005f15;
+          color: white;
+        }
+        
+        &:last-child {
+          background-color: #9e9e9e;
+          color: white;
+        }
+        &:hover {
+            background-color: #004e00; // tono más oscuro
+          }
+      }
+    }
+  }

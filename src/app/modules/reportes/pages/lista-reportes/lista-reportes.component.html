@@ -2,10 +2,22 @@
   <h2>NÓMINA DE RECAUDACIÓN</h2>
 
   <div class="acciones-globales">
-    <button class="filtro">
+    <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
       <span class="material-icons">filter_alt</span>
     </button>
-    <button class="nuevo-registro">
+
+    <div class="panel-filtros" *ngIf="mostrarFiltros">
+      <button (click)="filtrarPor('hoy')">📅 Hoy</button>
+      <button (click)="filtrarPor('semana')">🕰️ Esta Semana</button>
+      <button (click)="filtrarPor('mes')">📈 Este Mes</button>
+      <div class="filtro-personalizado">
+      <input type="date" [(ngModel)]="fechaPersonalizada" />
+      <button (click)="filtrarPorFechaPersonalizada()">🔍 Buscar</button>
+      </div>
+      <button class="limpiar" (click)="cargarTodosLosReportes()">🧹 Limpiar Filtros</button>
+      </div>
+
+    <button class="nuevo-registro" (click)="irANuevoRegistro()">
       <span class="material-icons">add</span>
       Nuevo Registro
     </button>
@@ -39,7 +51,7 @@
       <td data-label="Multas">{{ r.multas }}</td>
       <td data-label="Minutos por Atraso">{{ r.multasPagadas }}</td>
       <td class="acciones" data-label="Acciones">
-        <button class="editar" title="Editar">
+        <button class="editar" title="Editar" (click)="irAEditar(r.id!)">
           <span class="material-icons">edit</span>
         </button>
         <button class="pagar" title="Pagar">
