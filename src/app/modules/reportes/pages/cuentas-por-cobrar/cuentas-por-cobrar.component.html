@@ -1,17 +1,15 @@
 <h2 class="titulo">CUENTAS POR COBRAR</h2>
 
 <div class="contenedor-principal">
-  <!-- IZQUIERDA -->
+  <!-- IZQUIERDA: Buscar unidad -->
   <div class="contenedor-unidades">
-    <h3 class="subtitulo">Seleccione la unidad</h3>
-
+    <h3>Seleccione la unidad</h3>
     <input
       type="text"
       [(ngModel)]="filtro"
-      placeholder="Buscar"
+      placeholder="Buscar unidad o nombre"
       class="buscador"
     />
-
     <table class="tabla-unidades">
       <thead>
         <tr>
@@ -23,30 +21,64 @@
         <tr
           *ngFor="let item of unidadesFiltradas"
           (click)="seleccionarUnidad(item.unidad)"
-          [ngClass]="{ 'selected': unidadSeleccionada?.unidad === item.unidad }"
+          [ngClass]="{ 'selected': unidadSeleccionada === item.unidad }"
         >
           <td>{{ item.unidad }}</td>
           <td>{{ item.nombre }}</td>
         </tr>
       </tbody>
     </table>
-
-    <button class="btn-cargar" (click)="unidadSeleccionada && generarPago(unidadSeleccionada.uid, unidadSeleccionada.id)">
-      CARGAR
-    </button>
   </div>
 
-  <!-- DERECHA -->
-  <div *ngIf="unidadSeleccionada" class="reporte-usuario">
-    <h3>REPORTE POR USUARIO</h3>
-    <p><strong>Unidad:</strong> {{ unidadSeleccionada.unidad }}</p>
-    <p><strong>Propietario:</strong> {{ unidadSeleccionada.nombre }}</p>
-    <p>Saldo atraso minutos: {{ saldoAtraso }}</p>
-    <p>Saldo administración: {{ saldoAdministracion }}</p>
-    <p>Saldo minutos base: {{ saldoMinBase }}</p>
-    <p>Saldo multas: {{ saldoMultas }}</p>
-    <p class="total"><strong>SALDO TOTAL:</strong> {{ total }}</p>
+  <!-- DERECHA: Detalle de reportes -->
+  <div class="detalle-usuario" *ngIf="unidadSeleccionada">
+    <div class="detalle-contenido">
+    <ng-container *ngIf="!cargando; else cargandoSpinner">
+    <div *ngIf="reportesSeleccionados.length > 0" class="detalle-usuario">
+      <h3>Reporte acumulado</h3>
+      <p><strong>Unidad:</strong> {{ unidadSeleccionada }}</p>
+      <p><strong>Reportes encontrados:</strong> {{ reportesSeleccionados.length }}</p>
 
-   <button class="btn-pago" (click)="generarPago(unidadSeleccionada.uid, unidadSeleccionada.id)">GENERAR PAGO</button>
-  </div>
+      <table class="tabla-reportes">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Administrador</th>
+            <th>Min. Base</th>
+            <th>Min. Atraso</th>
+            <th>Multas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of reportesSeleccionados">
+            <td>{{ r.fechaModificacion?.toDate() | date: 'shortDate' }}</td>
+            <td>{{ r.administracion - r.adminPagada | currency:'USD' }}</td>
+            <td>{{ r.minutosBase - r.minBasePagados | currency:'USD' }}</td>
+            <td>{{ r.minutosAtraso - r.minutosPagados | currency:'USD' }}</td>
+            <td>{{ r.multas - r.multasPagadas | currency:'USD' }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="totales">
+        <p>Administración adeudada: <strong>{{ saldoAdministracion | currency:'USD' }}</strong></p>
+        <p>Minutos base adeudados: <strong>{{ saldoMinBase | currency:'USD' }}</strong></p>
+        <p>Minutos atraso adeudados: <strong>{{ saldoAtraso | currency:'USD' }}</strong></p>
+        <p>Multas adeudadas: <strong>{{ saldoMultas | currency:'USD' }}</strong></p>
+        <p class="total">TOTAL ADEUDADO: <strong>{{ total | currency:'USD' }}</strong></p>
+      </div>
+
+      <button class="btn-pago" (click)="generarPago()">GENERAR PAGO</button>
+    </div>
+  </ng-container>
+  <ng-template #cargandoSpinner>
+    <div class="spinner-contenedor">
+      <div class="spinner"></div>
+      <p>Cargando reportes...</p>
+    </div>
+  </ng-template>
 </div>
+</div>
+</div>
+
+

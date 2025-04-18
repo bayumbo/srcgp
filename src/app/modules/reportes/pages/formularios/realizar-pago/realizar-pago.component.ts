@@ -210,7 +210,7 @@ export class RealizarPagoComponent implements OnInit {
   
     docPDF.setFontSize(14);
     docPDF.text(`TOTAL PAGADO: $${datos.total.toFixed(2)}`, 20, 130);
-    docPDF.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
+    
     // PDF como blob
     const pdfBlob = docPDF.output('blob');
     const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
@@ -219,7 +219,7 @@ export class RealizarPagoComponent implements OnInit {
     const storageRef = ref(this.storage, fileName);
     await uploadBytes(storageRef, pdfBlob);
     const pdfUrl = await getDownloadURL(storageRef);
-  
+    docPDF.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
     return pdfUrl;
   }
 

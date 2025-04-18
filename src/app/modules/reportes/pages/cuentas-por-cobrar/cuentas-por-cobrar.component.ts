@@ -15,7 +15,8 @@ import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 export class CuentasPorCobrarComponent implements OnInit {
   filtro: string = '';
   listaUnidades: { unidad: string; nombre: string }[] = [];
-  unidadSeleccionada: ReporteConPagos | null = null;
+  unidadSeleccionada: string | null = null;
+  reportesSeleccionados: ReporteConPagos[] = [];
   cargando: boolean = false;
   error: string = '';
 
@@ -39,45 +40,54 @@ export class CuentasPorCobrarComponent implements OnInit {
   async seleccionarUnidad(unidad: string) {
     this.cargando = true;
     this.error = '';
+    this.unidadSeleccionada = unidad;
+
     try {
-      const reporte = await this.reportesService.obtenerReportePorUnidad(unidad);
-      if (reporte) {
-        this.unidadSeleccionada = reporte;
+      const reportes = await this.reportesService.obtenerReportePorUnidad(unidad);
+      if (reportes && reportes.length > 0) {
+        this.reportesSeleccionados = reportes;
       } else {
-        this.unidadSeleccionada = null;
-        this.error = 'No se encontró reporte para esta unidad.';
+        this.reportesSeleccionados = [];
+        this.error = 'No se encontraron reportes para esta unidad.';
       }
     } catch (err) {
-      this.error = 'Ocurrió un error al buscar el reporte.';
+      this.reportesSeleccionados = [];
+      this.error = 'Ocurrió un error al buscar los reportes.';
     } finally {
       this.cargando = false;
     }
   }
 
   get saldoAdministracion(): number {
-    return (this.unidadSeleccionada?.administracion ?? 0) - (this.unidadSeleccionada?.adminPagada ?? 0);
+    return this.reportesSeleccionados.reduce((acc, r) =>
+      acc + (r.administracion - r.adminPagada), 0);
   }
 
   get saldoMinBase(): number {
-    return (this.unidadSeleccionada?.minutosBase ?? 0) - (this.unidadSeleccionada?.minBasePagados ?? 0);
+    return this.reportesSeleccionados.reduce((acc, r) =>
+      acc + (r.minutosBase - r.minBasePagados), 0);
   }
 
   get saldoAtraso(): number {
-    return (this.unidadSeleccionada?.minutosAtraso ?? 0) - (this.unidadSeleccionada?.minutosPagados ?? 0);
+    return this.reportesSeleccionados.reduce((acc, r) =>
+      acc + (r.minutosAtraso - r.minutosPagados), 0);
   }
 
   get saldoMultas(): number {
-    return (this.unidadSeleccionada?.multas ?? 0) - (this.unidadSeleccionada?.multasPagadas ?? 0);
+    return this.reportesSeleccionados.reduce((acc, r) =>
+      acc + (r.multas - r.multasPagadas), 0);
   }
 
   get total(): number {
     return this.saldoAdministracion + this.saldoMinBase + this.saldoAtraso + this.saldoMultas;
   }
 
-  generarPago(uid: string, id: string): void {
-    this.router.navigate([`/reportes/realizar-pago`, uid, id]);
+  generarPago(): void {
+    if (this.reportesSeleccionados.length > 0) {
+      const { uid, id } = this.reportesSeleccionados[0];
+      this.router.navigate(['/reportes/realizar-pago', uid, id]);
+    }
   }
-  
 
   get unidadesFiltradas() {
     return this.listaUnidades.filter(item =>

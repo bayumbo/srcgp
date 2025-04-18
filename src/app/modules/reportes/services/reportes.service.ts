@@ -44,27 +44,28 @@ export class ReportesService {
       pagado: true
     });
   }
-  async obtenerReportePorUnidad(unidadBuscada: string): Promise<ReporteConPagos | null> {
-    const usuariosSnap = await getDocs(collection(this.firestore, 'usuarios'));
+  async obtenerReportePorUnidad(unidad: string): Promise<ReporteConPagos[]> {
+    const refUsuarios = collection(this.firestore, 'usuarios');
+    const snapshotUsuarios = await getDocs(refUsuarios);
   
-    for (const usuario of usuariosSnap.docs) {
-      const uid = usuario.id;
-      const reportesSnap = await getDocs(collection(this.firestore, `usuarios/${uid}/reportesDiarios`));
+    const resultados: ReporteConPagos[] = [];
   
-      for (const reporte of reportesSnap.docs) {
-        const data = reporte.data() as ReporteConPagos;
-        if (data.unidad.toLowerCase() === unidadBuscada.toLowerCase()) {
-          return {
-            ...data,
-            uid,
-            id: reporte.id
-          };
+    for (const userDoc of snapshotUsuarios.docs) {
+      const uid = userDoc.id;
+      const refReportes = collection(this.firestore, `usuarios/${uid}/reportesDiarios`);
+      const snapshotReportes = await getDocs(refReportes);
+  
+      for (const docReporte of snapshotReportes.docs) {
+        const data = docReporte.data() as ReporteConPagos;
+        if (data.unidad === unidad) {
+          resultados.push({ ...data, id: docReporte.id, uid });
         }
       }
     }
   
-    return null;
+    return resultados;
   }
+  
 
   async obtenerTodasLasUnidadesConNombre(): Promise<{ unidad: string; nombre: string }[]> {
     const unidadesMap = new Map<string, string>();
