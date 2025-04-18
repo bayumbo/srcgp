@@ -19,8 +19,7 @@ import {
   getDocs,
   getDoc
 } from '@angular/fire/firestore';
-import { Usuario } from '../../interfaces/user.interface';
-import { Credential } from '../../interfaces/user.interface';
+
 
 
 import { initializeApp, deleteApp } from 'firebase/app';

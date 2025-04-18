@@ -21,6 +21,7 @@ export class HeaderComponent implements OnInit {
   menuLateralAbierto = false;
   menuUsuarioAbierto = false;
   iniciales: string = '';
+  nombreEmpresa: string = '...'; 
 
   private elementRef = inject(ElementRef);
   private router = inject(Router);
@@ -39,6 +40,7 @@ export class HeaderComponent implements OnInit {
           const apellidos = data['apellidos'] || '';
           this.iniciales =
             (nombres[0] || '').toUpperCase() + (apellidos[0] || '').toUpperCase();
+            this.nombreEmpresa = data['empresa'] || 'Mi Empresa'; 
         }
       }
     } catch (error) {
