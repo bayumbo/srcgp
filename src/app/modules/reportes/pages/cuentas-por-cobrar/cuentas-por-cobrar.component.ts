@@ -95,4 +95,7 @@ export class CuentasPorCobrarComponent implements OnInit {
       item.nombre.toLowerCase().includes(this.filtro.toLowerCase())
     );
   }
+  volver() {
+    this.router.navigate(['/reportes/lista-reportes']);
+  }
 }

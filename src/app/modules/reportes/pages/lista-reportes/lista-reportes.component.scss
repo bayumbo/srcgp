@@ -1,3 +1,26 @@
+.contenedor-boton-volver {
+  position: fixed;
+  top: 10px; // o ajusta según tu header
+  left: 20px;
+  z-index: 1100;
+
+}
+
+.boton-volver {
+  padding: 8px 12px;
+  font-size: 14px;
+  background-color:#006b00;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.boton-volver:hover {
+  background-color: #02811d;
+}
+
+
 .tabla-container {
   padding: 1rem;
   font-family: 'Roboto', sans-serif;
@@ -111,7 +134,7 @@
     }
 
     .pagar {
-      background-color: rgb(0, 0, 0);
+      background-color: #4caf50;
       color: white;
       border: none;
       border-radius: 4px;
@@ -207,10 +230,11 @@
     display: flex;
     justify-content: flex-end;
     margin-bottom: 1rem;
+
   }
   
   .btn-cuentas {
-    background-color: #66bb6a;
+    background-color: #66bb6a ;
     color: #1b5e20;
     padding: 0.5rem 1rem;
     border: none;
@@ -223,5 +247,4 @@
       background-color: #81c784;
     }
   }
-  
-}
+ }

@@ -1,8 +1,9 @@
 <h2 class="titulo">CUENTAS POR COBRAR</h2>
-
+<button class="volver" (click)="volver()">⬅️ Volver</button>
 <div class="contenedor-principal">
   <!-- IZQUIERDA: Buscar unidad -->
   <div class="contenedor-unidades">
+    <ng-container *ngIf="!cargando; else cargandoSpinner">
     <h3>Seleccione la unidad</h3>
     <input
       type="text"
@@ -28,6 +29,13 @@
         </tr>
       </tbody>
     </table>
+  </ng-container>
+  <ng-template #cargandoSpinner>
+    <div class="spinner-contenedor">
+      <div class="spinner"></div>
+      <p>Cargando unidades...</p>
+    </div>
+  </ng-template>
   </div>
 
   <!-- DERECHA: Detalle de reportes -->
@@ -78,6 +86,7 @@
     </div>
   </ng-template>
 </div>
+
 </div>
 </div>
 

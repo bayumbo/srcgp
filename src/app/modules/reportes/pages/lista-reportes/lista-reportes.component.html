@@ -1,3 +1,7 @@
+<div class="contenedor-boton-volver">
+  <button class="boton-volver" (click)="volver()">← Volver</button>
+</div>
+
 <div class="tabla-container">
   <h2>NÓMINA DE RECAUDACIÓN</h2>
 
@@ -62,10 +66,10 @@
         <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
 
         <td class="acciones" data-label="Acciones">
-          <button (click)="irAEditar(reporte.uid, reporte.id)">
+          <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)">
             <span class="material-icons">edit</span>
           </button>
-          <button (click)="irAPagar(reporte.uid, reporte.id)">
+          <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)">
             <span class="material-icons">payments</span>
           </button>
         </td>
@@ -73,7 +77,7 @@
     </tbody>
   </table>
   <div class="acciones-superiores">
-    <button class="btn-cuentas" (click)="irACuentasPorCobrar()">
+    <button class="cuentas" (click)="irACuentasPorCobrar()">
       Cuentas por cobrar
     </button>
   </div>
