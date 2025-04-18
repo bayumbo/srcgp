@@ -39,6 +39,7 @@ export class MenuComponent implements OnInit {
   goTo(route: string): void {
     this.router.navigate([route]);
   }
+ 
 }
 
 
