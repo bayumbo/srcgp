@@ -147,4 +147,61 @@ input:disabled {
   .perfil-container {
     margin-left: 0;
   }
+
+  .tabla-reportes-usuario {
+    flex: 1 1 55%;
+    min-width: 350px;
+    background: #f9f9f9;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    overflow-x: auto;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  
+  .tabla-reportes-usuario h3 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    color: #333;
+    margin-bottom: 1rem;
+  }
+  
+  .tabla-reportes-usuario table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    background-color: white;
+  }
+  
+  .tabla-reportes-usuario th,
+  .tabla-reportes-usuario td {
+    padding: 0.75rem;
+    text-align: center;
+    border: 1px solid #ccc;
+  }
+  
+  .tabla-reportes-usuario thead {
+    background-color: #e0f7fa;
+    font-weight: bold;
+  }
+  
+  .tabla-reportes-usuario tbody tr:hover {
+    background-color: #f1f1f1;
+    transition: background-color 0.2s ease-in-out;
+  }
+  
+  /* Responsive */
+  @media screen and (max-width: 1024px) {
+    .perfil-wrapper {
+      flex-direction: column;
+      align-items: center;
+    }
+  
+    .perfil-container,
+    .tabla-reportes-usuario {
+      width: 100%;
+      flex: unset;
+    }
+  }
 }

@@ -8,9 +8,18 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from '@angular/fire/auth';
-import { doc, getDoc, getFirestore } from '@angular/fire/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  orderBy,
+  query
+} from '@angular/fire/firestore';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from 'src/app/core/auth/services/auth.service';
+import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 
 @Component({
   standalone: true,
@@ -27,13 +36,14 @@ export class PerfilComponent implements OnInit {
   contrasenaActual: string = '';
   unidad: string = '';
   cedula: string = '';
-  empresa: string='';
+  empresa: string = '';
 
   uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
   esAdmin: boolean = false;
   soloLectura: boolean = false;
+  reportesUsuario: NuevoRegistro[] = [];
 
   constructor(
     private router: Router,
@@ -44,31 +54,33 @@ export class PerfilComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const uidParam = this.route.snapshot.paramMap.get('uid');
     const auth = getAuth();
-  
+
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe(); // ✅ Esto evita bucles
+
       if (user) {
         this.correo = user.email || '';
-  
+
         if (uidParam) {
           this.uid = uidParam;
-  
-          // ✅ Comparar UID actual con el UID del perfil que se va a ver
+
+          // Ver si el perfil es de otro usuario
           if (uidParam !== user.uid) {
             this.soloLectura = true;
           }
         } else {
           this.uid = user.uid;
         }
-  
+
         await this.cargarDatosUsuario();
-  
+        await this.obtenerReportesUsuario();
+
         const rol = await this.authService.cargarRolActual();
         this.esAdmin = rol === 'admin';
       }
-  
-      unsubscribe(); // detiene el listener
     });
   }
+
   async cargarDatosUsuario() {
     try {
       const firestore = getFirestore();
@@ -89,6 +101,20 @@ export class PerfilComponent implements OnInit {
     } catch (error) {
       console.error('Error al cargar usuario:', error);
     }
+  }
+
+  async obtenerReportesUsuario() {
+    if (!this.uid) return;
+
+    const firestore = getFirestore();
+    const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
+    const q = query(reportesRef, orderBy('fechaModificacion', 'desc'));
+
+    const querySnapshot = await getDocs(q);
+    this.reportesUsuario = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as NuevoRegistro[];
   }
 
   get passwordStrength(): string {

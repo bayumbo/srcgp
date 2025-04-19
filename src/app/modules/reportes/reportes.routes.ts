@@ -34,5 +34,10 @@ export const REPORTES_ROUTES: Routes = [
     loadComponent: () =>
       import('./pages/cuentas-por-cobrar/cuentas-por-cobrar.component')
         .then(m => m.CuentasPorCobrarComponent)
+  },
+  {
+    path: 'cierre-caja',
+    loadComponent: () =>
+      import('./pages/cierre-caja/cierre-caja.component').then(m => m.CierreCajaComponent)
   }
  ];

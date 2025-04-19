@@ -233,7 +233,7 @@
 
   }
   
-  .btn-cuentas {
+  .cuentas {
     background-color: #66bb6a ;
     color: #1b5e20;
     padding: 0.5rem 1rem;
@@ -246,5 +246,20 @@
     &:hover {
       background-color: #81c784;
     }
+  }
+  .boton-cierre-caja {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    margin-left: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+  }
+  
+  .boton-cierre-caja:hover {
+    background-color: #45a045;
   }
  }

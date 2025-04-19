@@ -178,6 +178,9 @@ export class ReporteListaComponent implements OnInit {
   irACuentasPorCobrar() {
     this.router.navigate(['/reportes/cuentas-por-cobrar']);
   }
+  irACierreCaja() {
+    this.router.navigate(['/reportes/cierre-caja']);
+  }
   volver() {
     this.router.navigate(['']);
   }
