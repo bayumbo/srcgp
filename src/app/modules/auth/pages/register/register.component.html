@@ -91,6 +91,10 @@
     <button type="submit">
       <span class="material-icons">person_add</span> Registrar Nuevo Usuario
     </button>
+    <div *ngIf="mensajeError" class="error-message">
+      <span class="material-icons">error</span> {{ mensajeError }}
+    </div>
+    
 
     <!-- Éxito -->
     <div *ngIf="mensajeExito" class="success-message">

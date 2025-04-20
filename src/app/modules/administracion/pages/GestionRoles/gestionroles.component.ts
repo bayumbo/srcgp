@@ -12,14 +12,21 @@ import { UsuariosService, Usuario } from 'src/app/core/auth/services/usuarios.se
   styleUrls: ['./gestionroles.component.scss']
 })
 export class GestionRolesComponent implements OnInit {
+  todosLosUsuarios: Usuario[] = [];
   usuariosFiltrados: Usuario[] = [];
+  usuariosPaginados: Usuario[] = [];
+
   rolesDisponibles = ['usuario', 'admin'];
   mostrarSoloActivos = false;
-  mostrarToast: boolean = false;
-  cargando: boolean = true;
-  busquedaActiva: boolean = false;
-  cedulaBuscada: string = '';
-  todosLosUsuarios: Usuario[] = []; // respaldo general
+  mostrarToast = false;
+  cargando = true;
+  busquedaActiva = false;
+  cedulaBuscada = '';
+
+  // 🔢 Paginación
+  paginaActual = 1;
+  itemsPorPagina = 15;
+  totalPaginas = 0;
 
   constructor(
     public usuariosService: UsuariosService,
@@ -32,8 +39,7 @@ export class GestionRolesComponent implements OnInit {
         ...usuario,
         estado: usuario.estado ?? true
       }));
-
-      this.todosLosUsuarios = listaConEstado; // respaldo
+      this.todosLosUsuarios = listaConEstado;
       this.filtrarUsuarios(listaConEstado);
       this.cargando = false;
     });
@@ -42,37 +48,24 @@ export class GestionRolesComponent implements OnInit {
   }
 
   filtrarUsuarios(lista: Usuario[]): void {
-    this.usuariosFiltrados = this.mostrarSoloActivos
-      ? lista.filter(u => u.estado)
-      : lista;
+    const base = this.mostrarSoloActivos ? lista.filter(u => u.estado) : lista;
+    this.usuariosFiltrados = base;
+    this.totalPaginas = Math.ceil(base.length / this.itemsPorPagina);
+    this.paginaActual = 1;
+    this.actualizarPaginacion();
   }
 
-  async cambiarEstado(uid: string, estado: boolean): Promise<void> {
-    await this.usuariosService.actualizarEstado(uid, estado);
-
-    const actualizados = this.todosLosUsuarios.map(usuario =>
-      usuario.uid === uid ? { ...usuario, estado } : usuario
-    );
-
-    this.todosLosUsuarios = actualizados;
-    this.filtrarUsuarios(actualizados);
+  actualizarPaginacion(): void {
+    const inicio = (this.paginaActual - 1) * this.itemsPorPagina;
+    const fin = inicio + this.itemsPorPagina;
+    this.usuariosPaginados = this.usuariosFiltrados.slice(inicio, fin);
   }
 
-  async guardarNuevoRol(uid: string, nuevoRol: string): Promise<void> {
-    await this.usuariosService.actualizarRol(uid, nuevoRol);
-
-    const actualizados = this.todosLosUsuarios.map(usuario => {
-      if (usuario.uid === uid) {
-        return { ...usuario, rol: nuevoRol, nuevoRol };
-      }
-      return usuario;
-    });
-
-    this.todosLosUsuarios = actualizados;
-    this.filtrarUsuarios(actualizados);
-
-    this.mostrarToast = true;
-    setTimeout(() => (this.mostrarToast = false), 3000);
+  cambiarPagina(nuevaPagina: number): void {
+    if (nuevaPagina >= 1 && nuevaPagina <= this.totalPaginas) {
+      this.paginaActual = nuevaPagina;
+      this.actualizarPaginacion();
+    }
   }
 
   onEstadoChange(event: Event, uid: string): void {
@@ -80,10 +73,42 @@ export class GestionRolesComponent implements OnInit {
     this.cambiarEstado(uid, input.checked);
   }
 
+  async cambiarEstado(uid: string, estado: boolean): Promise<void> {
+    await this.usuariosService.actualizarEstado(uid, estado);
+    this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
+      usuario.uid === uid ? { ...usuario, estado } : usuario
+    );
+    this.filtrarUsuarios(this.todosLosUsuarios);
+  }
+
+  async guardarNuevoRol(uid: string, nuevoRol: string): Promise<void> {
+    await this.usuariosService.actualizarRol(uid, nuevoRol);
+    this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
+      usuario.uid === uid ? { ...usuario, rol: nuevoRol, nuevoRol } : usuario
+    );
+    this.filtrarUsuarios(this.todosLosUsuarios);
+
+    this.mostrarToast = true;
+    setTimeout(() => (this.mostrarToast = false), 3000);
+  }
+
   onToggleFiltro(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.mostrarSoloActivos = input.checked;
-    this.buscarPorCedula(); // actualizar búsqueda según estado
+    this.buscarPorCedula();
+  }
+
+  buscarPorCedula(): void {
+    const termino = this.cedulaBuscada.trim().toLowerCase();
+    this.busquedaActiva = termino.length > 0;
+
+    const coincidencias = this.todosLosUsuarios.filter(usuario =>
+      usuario.cedula.toLowerCase().includes(termino) ||
+      `${usuario.nombres} ${usuario.apellidos}`.toLowerCase().includes(termino)
+    );
+
+    const listaFinal = this.busquedaActiva ? coincidencias : this.todosLosUsuarios;
+    this.filtrarUsuarios(listaFinal);
   }
 
   verPerfil(uid: string): void {
@@ -94,25 +119,7 @@ export class GestionRolesComponent implements OnInit {
     this.router.navigate(['/menu']);
   }
 
-  buscarPorCedula(): void {
-    const termino = this.cedulaBuscada.trim().toLowerCase();
-    this.busquedaActiva = termino.length > 0;
-
-    if (!termino) {
-      this.filtrarUsuarios(this.todosLosUsuarios);
-      return;
-    }
-
-    const coincidencias = this.todosLosUsuarios.filter(usuario =>
-      usuario.cedula.toLowerCase().includes(termino) ||
-      `${usuario.nombres} ${usuario.apellidos}`.toLowerCase().includes(termino)
-    );
-
-    // Si no hay coincidencias, mostrar la lista completa
-    if (coincidencias.length === 0) {
-      this.filtrarUsuarios(this.todosLosUsuarios);
-    } else {
-      this.filtrarUsuarios(coincidencias);
-    }
+  generarArrayPaginas(): number[] {
+    return Array.from({ length: this.totalPaginas }, (_, i) => i + 1);
   }
 }

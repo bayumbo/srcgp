@@ -26,6 +26,8 @@ export class RegisterComponent {
 
   hidePassword: boolean = true;
   mensajeExito: string = '';
+  mensajeError: string = '';
+
 
   form: FormGroup = this.fb.group({
     cedula: ['', [Validators.required, Validators.pattern(/^\d{10}$/)]],
@@ -97,10 +99,17 @@ volverAlMenu: any;
     } catch (error: any) {
       console.error('Error en el registro:', error);
       if (error.code === 'auth/email-already-in-use') {
-        alert('Este correo ya está registrado.');
+        this.mensajeError = 'Ya existe un usuario registrado con este correo electrónico.';
       } else {
-        alert(error.message || 'Hubo un error al registrar al usuario.');
+        this.mensajeError = 'Ocurrió un error al registrar. Intenta nuevamente.';
       }
+      
+      // 🔁 Oculta el mensaje de error luego de 3 segundos
+      setTimeout(() => {
+        this.mensajeError = '';
+      }, 3000);
+      
+      
     }
   }
 }

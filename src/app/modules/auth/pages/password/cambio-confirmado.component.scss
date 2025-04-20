@@ -23,8 +23,8 @@ body, :host {
   }
   
   /* Título */
-  h2 {
-    color: #1976d2;
+  h5 {
+    color: #1c2c3c;
     font-size: 24px;
     font-weight: bold;
     margin-bottom: 1.5rem;
@@ -60,17 +60,17 @@ body, :host {
   button[type='submit'] {
     width: 100%;
     padding: 12px;
-    background-color: #1976d2;
+    background-color: #2f8071;
     color: white;
     font-weight: bold;
-    font-size: 15px;
+    font-size: 16px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     transition: background-color 0.3s ease;
   
     &:hover {
-      background-color: #125ea3;
+      background-color: #64ccca;
     }
   }
   

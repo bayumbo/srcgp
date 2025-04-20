@@ -1,13 +1,24 @@
-html, body {
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 64px); // 64px = altura de tu header aprox.
+}
+/* Garantiza que todo el viewport tenga altura completa */
+html, body, app-root, app-login {
   height: 100%;
   margin: 0;
+  padding: 0;
   font-family: 'Segoe UI', sans-serif;
   background: linear-gradient(135deg, #1c1c1c, #2b2b2b);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
 }
 
+/* Contenedor del formulario login */
 .login-wrapper {
   width: 100%;
   max-width: 420px;
@@ -16,8 +27,12 @@ html, body {
   box-shadow: 0 15px 25px rgba(0, 0, 0, 0.8);
   border-radius: 10px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
+/* Título */
 .login-wrapper h2 {
   margin: 0 0 30px;
   color: #ffffff;
@@ -26,12 +41,13 @@ html, body {
   letter-spacing: 1px;
 }
 
-/* Campos flotantes */
+/* Agrupación de campos */
 .form-group {
   position: relative;
   margin-bottom: 30px;
 }
 
+/* Inputs */
 .form-group input {
   width: 100%;
   padding: 10px 0;
@@ -44,6 +60,7 @@ html, body {
   z-index: 1;
 }
 
+/* Etiquetas flotantes */
 .form-group label {
   position: absolute;
   top: 10px;
@@ -54,6 +71,7 @@ html, body {
   transition: 0.3s ease;
 }
 
+/* Activación de etiqueta flotante */
 .form-group input:focus ~ label,
 .form-group input:not(:placeholder-shown) ~ label {
   top: -18px;
@@ -61,18 +79,24 @@ html, body {
   color: #03e9f4;
 }
 
-
+/* Error debajo del input */
 .error {
   color: #ff6b6b;
   font-size: 12px;
   margin-top: 4px;
 }
 
+/* Password + icono de mostrar/ocultar */
+.password-group {
+  position: relative;
+}
+
 .password-wrapper {
   position: relative;
 }
-.password-group {
-  position: relative;
+
+.password-wrapper input {
+  padding-right: 38px;
 }
 
 .toggle-password {
@@ -92,7 +116,7 @@ html, body {
   }
 }
 
-
+/* Botón de envío */
 button[type="submit"] {
   background: transparent;
   color: #03e9f4;
@@ -105,6 +129,14 @@ button[type="submit"] {
   text-transform: uppercase;
   letter-spacing: 1px;
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  .material-icons {
+    font-size: 20px;
+  }
 
   &:hover {
     background: #03e9f4;
@@ -117,6 +149,7 @@ button[type="submit"] {
   }
 }
 
+/* Enlace como botón debajo */
 p button {
   background: none;
   border: none;
@@ -132,8 +165,7 @@ p button {
   }
 }
 
-
-/* Estilo para inputs autofill de Chrome */
+/* Estilo para autofill */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,

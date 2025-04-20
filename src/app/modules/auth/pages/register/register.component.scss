@@ -183,3 +183,18 @@ a:hover {
     width: 100%;
   }
 }
+.error-message {
+  color: #d32f2f;
+  background-color: #ffebee;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .material-icons {
+    font-size: 18px;
+  }
+}
