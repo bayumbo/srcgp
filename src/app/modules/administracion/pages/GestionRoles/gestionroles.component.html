@@ -1,12 +1,15 @@
-<!-- ✅ Mostrar loading si aún no hay datos cargados -->
-<div *ngIf="cargando || usuariosFiltrados.length === 0" class="loading-container">
+<!-- 🔄 Mostrar mientras carga desde Firestore -->
+<body>
+  
+  <main class="contenido-principal">
+<div *ngIf="cargando" class="loading-container">
   <div class="spinner"></div>
   <p>Cargando usuarios...</p>
 </div>
 
-<!-- ✅ Mostrar contenido completo solo si hay datos reales -->
-<div *ngIf="!cargando && usuariosFiltrados.length > 0">
-  <!-- 🔘 Filtro de solo activos -->
+<!-- ✅ Mostrar tabla aunque no haya coincidencias -->
+<div *ngIf="!cargando">
+  <!-- Filtro -->
   <div style="margin-bottom: 1rem;">
     <label>
       <input type="checkbox" (change)="onToggleFiltro($event)" />
@@ -14,81 +17,76 @@
     </label>
   </div>
 
-  <!-- 📋 Tabla de usuarios -->
+  <!-- Búsqueda -->
+  <div class="search-bar">
+    <span class="material-icons">search</span>
+    <input
+      type="text"
+      [(ngModel)]="cedulaBuscada"
+      placeholder="Buscar por nombre o cédula"
+      (input)="buscarPorCedula()"
+    />
+  </div>
+
+  <!-- Tabla con scroll horizontal en móviles -->
   <div class="tabla-container">
-    <table>
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Cédula</th>
-          <th>Empresa</th>
-          <th>Rol actual</th>
-          <th>Asignar Rol</th>
-          <th>Guardar</th>
-          <th>Ver</th>
-          <th>Estado</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          *ngFor="let usuario of usuariosFiltrados"
-          [ngClass]="{ 'inactivo': usuario.estado === false }"
-        >
-          <td>{{ usuario.nombres }} {{ usuario.apellidos }}</td>
-          <td>{{ usuario.cedula }}</td>
-          <td>{{ usuario.empresa }}</td>
-          <td>{{ usuario.rol }}</td>
-          <td>
-            <select
-              [(ngModel)]="usuario.nuevoRol"
-              [disabled]="usuario.estado === false"
-            >
-              <option *ngFor="let rol of rolesDisponibles" [value]="rol">
-                {{ rol }}
-              </option>
-            </select>
-          </td>
-          <td>
-            <button
-              class="btn-ver"
-              [disabled]="usuario.estado === false || !usuario.nuevoRol || usuario.nuevoRol === usuario.rol"
-              (click)="guardarNuevoRol(usuario.uid, usuario.nuevoRol!)"
-            >
-              💾
-            </button>
-          </td>
-          <td>
-            <button
-              class="btn-ver"
-              [disabled]="usuario.estado === false"
-              (click)="verPerfil(usuario.uid)"
-            >
-              👁️
-            </button>
-          </td>
-          <td>
-            <label class="switch">
-              <input
-                type="checkbox"
-                [checked]="usuario.estado"
-                (change)="onEstadoChange($event, usuario.uid)"
-              />
-              <span class="slider"></span>
-            </label>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="tabla-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Cédula</th>
+            <th>Empresa</th>
+            <th>Rol actual</th>
+            <th>Asignar Rol</th>
+            <th>Guardar</th>
+            <th>Ver</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let usuario of usuariosFiltrados" [ngClass]="{ 'inactivo': !usuario.estado }">
+            <td>{{ usuario.nombres }} {{ usuario.apellidos }}</td>
+            <td>{{ usuario.cedula }}</td>
+            <td>{{ usuario.empresa }}</td>
+            <td>{{ usuario.rol }}</td>
+            <td>
+              <select [(ngModel)]="usuario.nuevoRol" [disabled]="!usuario.estado">
+                <option *ngFor="let rol of rolesDisponibles" [value]="rol">{{ rol }}</option>
+              </select>
+            </td>
+            <td>
+              <button class="btn-ver" [disabled]="!usuario.estado || !usuario.nuevoRol || usuario.nuevoRol === usuario.rol"
+                (click)="guardarNuevoRol(usuario.uid, usuario.nuevoRol!)">
+                <span class="material-icons">save</span>
+              </button>
+            </td>
+            <td>
+              <button class="btn-ver" [disabled]="!usuario.estado" (click)="verPerfil(usuario.uid)">
+                <span class="material-icons">visibility</span>
+              </button>
+            </td>
+            <td>
+              <label class="switch">
+                <input type="checkbox" [checked]="usuario.estado" (change)="onEstadoChange($event, usuario.uid)" />
+                <span class="slider"></span>
+              </label>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <div style="text-align: center; margin-top: 1rem;">
       <button (click)="usuariosService.cargarMasUsuarios()">Ver más</button>
     </div>
 
-    <button class="logout-btn" (click)="volverAlMenu()">🔒 Menu</button>
+    <button class="logout-btn" (click)="volverAlMenu()">
+      <span class="material-icons">arrow_back</span> Menú Principal
+    </button>
 
-    <!-- 🔔 Toast -->
-    <div class="toast" *ngIf="mostrarToast">
-      ✅ Rol actualizado con éxito
-    </div>
+    <div class="toast" *ngIf="mostrarToast">✅ Rol actualizado con éxito</div>
   </div>
 </div>
+</main>
+</body>

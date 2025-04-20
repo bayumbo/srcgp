@@ -17,6 +17,9 @@ export class GestionRolesComponent implements OnInit {
   mostrarSoloActivos = false;
   mostrarToast: boolean = false;
   cargando: boolean = true;
+  busquedaActiva: boolean = false;
+  cedulaBuscada: string = '';
+  todosLosUsuarios: Usuario[] = []; // respaldo general
 
   constructor(
     public usuariosService: UsuariosService,
@@ -25,7 +28,13 @@ export class GestionRolesComponent implements OnInit {
 
   ngOnInit(): void {
     this.usuariosService.usuarios$.subscribe(lista => {
-      this.filtrarUsuarios(lista);
+      const listaConEstado = lista.map(usuario => ({
+        ...usuario,
+        estado: usuario.estado ?? true
+      }));
+
+      this.todosLosUsuarios = listaConEstado; // respaldo
+      this.filtrarUsuarios(listaConEstado);
       this.cargando = false;
     });
 
@@ -33,38 +42,33 @@ export class GestionRolesComponent implements OnInit {
   }
 
   filtrarUsuarios(lista: Usuario[]): void {
-    const listaConEstado = lista.map(usuario => ({
-      ...usuario,
-      estado: usuario.estado ?? true
-    }));
-
     this.usuariosFiltrados = this.mostrarSoloActivos
-      ? listaConEstado.filter(u => u.estado)
-      : listaConEstado;
+      ? lista.filter(u => u.estado)
+      : lista;
   }
 
   async cambiarEstado(uid: string, estado: boolean): Promise<void> {
     await this.usuariosService.actualizarEstado(uid, estado);
 
-    const actualizados = this.usuariosService.listaUsuarios.map(usuario =>
+    const actualizados = this.todosLosUsuarios.map(usuario =>
       usuario.uid === uid ? { ...usuario, estado } : usuario
     );
 
-    this.usuariosService.actualizarListaUsuarios(actualizados);
+    this.todosLosUsuarios = actualizados;
     this.filtrarUsuarios(actualizados);
   }
 
   async guardarNuevoRol(uid: string, nuevoRol: string): Promise<void> {
     await this.usuariosService.actualizarRol(uid, nuevoRol);
 
-    const actualizados = this.usuariosService.listaUsuarios.map(usuario => {
+    const actualizados = this.todosLosUsuarios.map(usuario => {
       if (usuario.uid === uid) {
         return { ...usuario, rol: nuevoRol, nuevoRol };
       }
       return usuario;
     });
 
-    this.usuariosService.actualizarListaUsuarios(actualizados);
+    this.todosLosUsuarios = actualizados;
     this.filtrarUsuarios(actualizados);
 
     this.mostrarToast = true;
@@ -79,7 +83,7 @@ export class GestionRolesComponent implements OnInit {
   onToggleFiltro(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.mostrarSoloActivos = input.checked;
-    this.filtrarUsuarios(this.usuariosService.listaUsuarios);
+    this.buscarPorCedula(); // actualizar búsqueda según estado
   }
 
   verPerfil(uid: string): void {
@@ -88,5 +92,27 @@ export class GestionRolesComponent implements OnInit {
 
   volverAlMenu(): void {
     this.router.navigate(['/menu']);
+  }
+
+  buscarPorCedula(): void {
+    const termino = this.cedulaBuscada.trim().toLowerCase();
+    this.busquedaActiva = termino.length > 0;
+
+    if (!termino) {
+      this.filtrarUsuarios(this.todosLosUsuarios);
+      return;
+    }
+
+    const coincidencias = this.todosLosUsuarios.filter(usuario =>
+      usuario.cedula.toLowerCase().includes(termino) ||
+      `${usuario.nombres} ${usuario.apellidos}`.toLowerCase().includes(termino)
+    );
+
+    // Si no hay coincidencias, mostrar la lista completa
+    if (coincidencias.length === 0) {
+      this.filtrarUsuarios(this.todosLosUsuarios);
+    } else {
+      this.filtrarUsuarios(coincidencias);
+    }
   }
 }

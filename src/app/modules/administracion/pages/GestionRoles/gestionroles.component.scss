@@ -1,114 +1,148 @@
-/* 🔄 Spinner de carga global */
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 0;
-  font-size: 16px;
-  color: #555;
-
-  .spinner {
-    margin-bottom: 1rem;
-    width: 40px;
-    height: 40px;
-    border: 5px solid #1976d2;
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
+.contenido-principal {
+  margin-top: 70px; // para no solaparse con el header
+  padding: 1rem;
 }
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 📋 Estilo tabla de usuarios */
 .tabla-container {
   margin: 2rem auto;
-  max-width: 900px;
+  max-width: 100%;
 
-  table {
+  .tabla-scroll {
+    overflow-x: auto;
     width: 100%;
-    border-collapse: collapse;
-    text-align: center;
+    display: block;
 
-    th, td {
-      padding: 12px;
-      border: 1px solid #ccc;
-    }
+    table {
+      width: 100%;
+      min-width: 900px; // esto fuerza el scroll en pantallas pequeñas
+      border-collapse: collapse;
+      background-color: #ffffff;
+      border-radius: 6px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.06);
 
-    th {
-      background-color: #00A547;
-      color: white;
-    }
-
-    .btn-ver {
-      background: none;
-      border: none;
-      font-size: 20px;
-      cursor: pointer;
-    }
-
-    select {
-      padding: 5px;
-      border-radius: 4px;
-    }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 40px;
-      height: 20px;
-
-      input {
-        opacity: 0;
-        width: 0;
-        height: 0;
+      th, td {
+        padding: 12px 16px;
+        text-align: center;
+        border-bottom: 1px solid #eee;
       }
 
-      .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        transition: 0.4s;
-        border-radius: 34px;
+      th {
+        background-color: #1976d2;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
 
-        &:before {
-          position: absolute;
-          content: "";
-          height: 14px;
-          width: 14px;
-          left: 3px;
-          bottom: 3px;
-          background-color: white;
-          transition: 0.4s;
-          border-radius: 50%;
+      td {
+        font-size: 14px;
+        color: #333;
+      }
+
+      .btn-ver {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        color: #1976d2;
+        transition: transform 0.2s;
+
+        .material-icons {
+          font-size: 22px;
+        }
+
+        &:hover {
+          transform: scale(1.1);
+        }
+
+        &:disabled {
+          opacity: 0.3;
+          pointer-events: none;
         }
       }
 
-      input:checked + .slider {
-        background-color: #00cc66;
+      select {
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
       }
 
-      input:checked + .slider:before {
-        transform: translateX(20px);
+      tr.inactivo {
+        opacity: 0.5;
+        background-color: #f8f8f8;
       }
-    }
 
-    // 🔒 Efecto visual para usuarios inactivos
-    tr.inactivo {
-      opacity: 0.5;
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+
+        input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #ccc;
+          transition: 0.4s;
+          border-radius: 34px;
+
+          &:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+          }
+        }
+
+        input:checked + .slider {
+          background-color: #00cc66;
+        }
+
+        input:checked + .slider:before {
+          transform: translateX(20px);
+        }
+      }
     }
   }
 
-  /* ✅ Toast visual */
+  .logout-btn {
+    margin-top: 2rem;
+    background-color: #1976d2;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 30px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+
+    &:hover {
+      background-color: #0d47a1;
+    }
+
+    .material-icons {
+      font-size: 18px;
+    }
+  }
+
   .toast {
     position: fixed;
     bottom: 20px;
@@ -123,12 +157,24 @@
   }
 
   @keyframes fadein {
-    from { opacity: 0; bottom: 10px; }
-    to   { opacity: 1; bottom: 20px; }
+    from {
+      opacity: 0;
+      bottom: 10px;
+    }
+    to {
+      opacity: 1;
+      bottom: 20px;
+    }
   }
 
   @keyframes fadeout {
-    from { opacity: 1; bottom: 20px; }
-    to   { opacity: 0; bottom: 10px; }
+    from {
+      opacity: 1;
+      bottom: 20px;
+    }
+    to {
+      opacity: 0;
+      bottom: 10px;
+    }
   }
 }

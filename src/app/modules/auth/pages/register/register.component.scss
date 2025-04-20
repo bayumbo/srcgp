@@ -1,23 +1,30 @@
 body {
   margin: 0;
-  min-height: 100vh;
   background-color: #f3f3f3;
-  font-family: "Segoe UI";
+  font-family: "Segoe UI", sans-serif;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 40px 12px;
+  justify-content: center; // centro horizontal
+  padding: 40px 12px;       // deja espacio superior
 }
 
 .container {
   width: 100%;
   max-width: 540px;
+  margin-top: 40px;        // separa del header
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
   padding: 28px 32px;
   box-sizing: border-box;
 }
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 64px); // 64px = altura de tu header aprox.
+}
+
 
 h5 {
   text-align: center;
