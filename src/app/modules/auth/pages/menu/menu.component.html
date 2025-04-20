@@ -1,35 +1,91 @@
-<div class="menu-container">
-  <div class="circle-menu">
-    <button *ngIf="rol === 'admin'" class="menu-circle" (click)="goTo('/reportes')">
-      📊
-      <span>Reportes</span>
-    </button>
+<div class="page-home">
+  <div class="pt-table desktop-768">
+    <div class="pt-tablecell page-home relative">
+      <div class="overlay"></div>
+      <div class="container">
+        <div class="row">
+          <div class="col-xs-12 col-md-offset-1 col-md-10 col-lg-offset-2 col-lg-8 text-center">
+            <div class="hex-container">   
 
-    <button *ngIf="rol === 'admin'" class="menu-circle" (click)="goTo('/usuarios')">
-      📘
-      <span>Contabilidad</span>
-    </button>
+              <!-- Hexagon Reportes -->
+              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goTo('/reportes')">
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-content">
+                  <div class="hex-content-inner">
+                    <span class="icon material-icons">insert_chart</span>
+                    <span class="title">Reportes</span>
+                  </div>
+                  <svg viewBox="0 0 173.20508075688772 200">
+                    <path d="M86.6 0l86.6 50v100l-86.6 50-86.6-50v-100z" fill="#1e2530" />
+                  </svg>
+                </div>
+              </div>
 
-    <button *ngIf="rol === 'admin'" class="menu-circle" (click)="goTo('/gestionroles')">
-      🛠
-      <span>Administración</span>
-    </button>
+              <!-- Hexagon Contabilidad -->
+              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goTo('/usuarios')">
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-content">
+                  <div class="hex-content-inner">
+                    <span class="icon material-icons">calculate</span>
+                    <span class="title">Contabilidad</span>
+                  </div>
+                  <svg viewBox="0 0 173.20508075688772 200">
+                    <path d="M86.6 0l86.6 50v100l-86.6 50-86.6-50v-100z" fill="#1e2530" />
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Hexagon Administración -->
+              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goTo('/gestionroles')">
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-content">
+                  <div class="hex-content-inner">
+                    <span class="icon material-icons">admin_panel_settings</span>
+                    <span class="title">Admin</span>
+                  </div>
+                  <svg viewBox="0 0 173.20508075688772 200">
+                    <path d="M86.6 0l86.6 50v100l-86.6 50-86.6-50v-100z" fill="#1e2530" />
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Hexagon Registro -->
+              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goToRegister()">
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-item">
+                  <div></div><div></div><div></div>
+                </div>
+                <div class="hex-content">
+                  <div class="hex-content-inner">
+                    <span class="icon material-icons">person_add</span>
+                    <span class="title">Registrar Usuario</span>
+                  </div>
+                  <svg viewBox="0 0 173.20508075688772 200">
+                    <path d="M86.6 0l86.6 50v100l-86.6 50-86.6-50v-100z" fill="#1e2530" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  
-  <hr />
-
-  <button class="logout-btn" (click)="logOut()">🔒 Cerrar Sesión</button>
-
-  <p *ngIf="rol === 'admin'" class="register-text">
-    ¿Desea registrar un nuevo usuario?
-    <a (click)="goToRegister()" class="register-link">Registro</a>
-  </p>
 </div>
-
-
-<!-- Preloader mientras se obtiene el rol -->
-<ng-template #loading>
-  <div style="text-align: center; margin-top: 40px;">
-    <p>Cargando menú...</p>
-  </div>
-</ng-template>
