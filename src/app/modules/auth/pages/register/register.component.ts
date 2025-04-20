@@ -37,6 +37,7 @@ export class RegisterComponent {
     unidad:['', Validators.required],
     empresa: ['General Pintag', Validators.required]
   });
+volverAlMenu: any;
   
 
   async signUp(): Promise<void> {
