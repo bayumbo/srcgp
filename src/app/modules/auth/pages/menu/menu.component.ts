@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
   standalone: true,
   selector: 'app-menu',
   templateUrl: './menu.component.html',
-  styleUrls: ['./menu.component.css'],
+  styleUrls: ['./menu.component.scss'],
   imports: [CommonModule]
 })
 export class MenuComponent implements OnInit {

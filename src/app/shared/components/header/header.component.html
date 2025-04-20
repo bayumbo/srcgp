@@ -1,26 +1,38 @@
-<header class="header-container">
-  <!-- Menú izquierdo -->
-  <div class="menu-izquierdo">
-    <button class="menu-btn" (click)="toggleMenuLateral()">☰ Menú</button>
-    <ul class="dropdown" [class.visible]="menuLateralAbierto">
-      <li (click)="goTo('/reportes')">📊 Reportes</li>
-      <li (click)="goTo('/usuarios')">📘 Contabilidad</li>
-      <li (click)="goTo('/gestionroles')">🛠 Administración</li>
-    </ul>
+<!-- Sidebar lateral independiente del header -->
+<div *ngIf="rolUsuario === 'admin'" class="side_menu" [ngClass]="{ 'opened': menuLateralAbierto }">
+  <ul>
+    <li (click)="goTo('/reportes')"><span class="material-icons">insert_chart</span> Reportes</li>
+    <li (click)="goTo('/usuarios')"><span class="material-icons">calculate</span> Contabilidad</li>
+    <li (click)="goTo('/gestionroles')"><span class="material-icons">admin_panel_settings</span> Administración</li>
+  </ul>
+</div>
+
+<!-- HEADER PRINCIPAL -->
+<header class="header-container" [ngStyle]="{ 'padding-left': rolUsuario === 'admin' && menuLateralAbierto ? '250px' : '0' }">
+
+  <!-- Botón de menú para admins -->
+  <div *ngIf="rolUsuario === 'admin'" class="menu-toggle">
+    <button class="menu-btn material-icons" (click)="toggleMenuLateral()" title="Menú">
+      menu
+    </button>
   </div>
 
-  <!-- Título o nombre empresa -->
-  <h1 class="titulo-app">{{ nombreEmpresa }}</h1>
+  <!-- Nombre empresa -->
+  <h5 class="titulo-app">{{ nombreEmpresa }}</h5>
 
   <!-- Menú derecho -->
   <div class="menu-derecho">
     <button class="avatar-btn avatar-circle" (click)="toggleMenuUsuario()">
       {{ iniciales }}
-    </button>    
+    </button>
     <ul class="dropdown" [class.visible]="menuUsuarioAbierto">
-      <li (click)="goTo('/perfil')">👥 Ir al Perfil</li>
-      <li (click)="salir()">🔒 Cerrar sesión</li>
-      
+      <li *ngIf="rolUsuario === 'admin'" (click)="goTo('/perfil')">
+        <span class="material-icons">person</span> Perfil
+      </li>
+      <li (click)="salir()">
+        <span class="material-icons">logout</span> Cerrar sesión
+      </li>
     </ul>
   </div>
+
 </header>
