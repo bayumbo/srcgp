@@ -1,6 +1,7 @@
 <header class="header-container">
-  <!-- Menú izquierdo -->
-  <div class="menu-izquierdo">
+
+  <!-- Menú izquierdo solo para administradores -->
+  <div *ngIf="rolUsuario === 'admin'" class="menu-izquierdo">
     <button class="menu-btn" (click)="toggleMenuLateral()">☰ Menú</button>
     <ul class="dropdown" [class.visible]="menuLateralAbierto">
       <li (click)="goTo('/reportes')">📊 Reportes</li>
@@ -9,18 +10,18 @@
     </ul>
   </div>
 
-  <!-- Título o nombre empresa -->
-  <h1 class="titulo-app">{{ nombreEmpresa }}</h1>
+  <!-- Nombre de la empresa al centro -->
+  <h5 class="titulo-app">{{ nombreEmpresa }}</h5>
 
-  <!-- Menú derecho -->
+  <!-- Menú derecho disponible para todos los roles -->
   <div class="menu-derecho">
     <button class="avatar-btn avatar-circle" (click)="toggleMenuUsuario()">
       {{ iniciales }}
-    </button>    
+    </button>
     <ul class="dropdown" [class.visible]="menuUsuarioAbierto">
-      <li (click)="goTo('/perfil')">👥 Ir al Perfil</li>
+      <li *ngIf="rolUsuario === 'admin'" (click)="goTo('/perfil')">👥Perfil</li>
       <li (click)="salir()">🔒 Cerrar sesión</li>
-      
     </ul>
   </div>
+  
 </header>

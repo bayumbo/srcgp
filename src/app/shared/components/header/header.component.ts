@@ -21,7 +21,8 @@ export class HeaderComponent implements OnInit {
   menuLateralAbierto = false;
   menuUsuarioAbierto = false;
   iniciales: string = '';
-  nombreEmpresa: string = '...'; 
+  nombreEmpresa: string = '...';
+  rolUsuario: string = ''; // <- NUEVO: para controlar visibilidad del menú lateral
 
   private elementRef = inject(ElementRef);
   private router = inject(Router);
@@ -40,11 +41,12 @@ export class HeaderComponent implements OnInit {
           const apellidos = data['apellidos'] || '';
           this.iniciales =
             (nombres[0] || '').toUpperCase() + (apellidos[0] || '').toUpperCase();
-            this.nombreEmpresa = data['empresa'] || 'Mi Empresa'; 
+          this.nombreEmpresa = data['empresa'] || 'Mi Empresa';
+          this.rolUsuario = data['rol'] || ''; // <- NUEVO: guardar rol
         }
       }
     } catch (error) {
-      console.error('Error al obtener las iniciales del usuario:', error);
+      console.error('Error al obtener los datos del usuario:', error);
     }
   }
 
@@ -64,7 +66,7 @@ export class HeaderComponent implements OnInit {
   toggleMenuUsuario() {
     this.menuUsuarioAbierto = !this.menuUsuarioAbierto;
     this.menuLateralAbierto = false;
-  } 
+  }
 
   goTo(ruta: string) {
     this.router.navigate([ruta]);
