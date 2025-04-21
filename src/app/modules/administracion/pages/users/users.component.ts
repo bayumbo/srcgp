@@ -38,8 +38,7 @@ export class PerfilComponent implements OnInit {
   unidad: string = '';
   cedula: string = '';
   empresa: string = '';
-  empresa: string = '';
-
+  
   uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
