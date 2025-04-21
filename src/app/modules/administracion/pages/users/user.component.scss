@@ -1,14 +1,16 @@
+
 .perfil-wrapper {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: flex-start;
   width: 100%;
   min-height: 100vh;
-  padding: 24px 16px;
+  padding: 24px 32px;
   background-color: #f4f6f8;
   font-family: 'Segoe UI', sans-serif;
   box-sizing: border-box;
- 
+  flex-wrap: wrap; // para mejor responsividad
+  gap: 2rem; // espacio entre secciones
 }
 
 .perfil-container {
@@ -18,9 +20,9 @@
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
   max-width: 460px;
   width: 100%;
-  margin-right: auto;
   box-sizing: border-box;
-  margin-top: 40px;   
+ 
+  flex: 1 1 420px;
 
   h5 {
     display: flex;
@@ -41,7 +43,7 @@
   form {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem; // 📏 menos separación
+    gap: 0.6rem;
     width: 100%;
   }
 
@@ -195,17 +197,104 @@
     }
   }
 }
+.perfil-derecho {
+  flex: 1 1 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem; // 👍 esto controla el espaciado entre reportes y recibos
+}
+.tabla-reportes-usuario {
+  flex: 1 1 600px;
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  max-height: 90vh;
+ 
+}
 
-@media (max-width: 768px) {
+.tabla-reportes-usuario h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  color: #333;
+  margin-bottom: 1rem;
+  
+}
+
+.tabla-reportes-usuario table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background-color: white;
+}
+
+.tabla-reportes-usuario th,
+.tabla-reportes-usuario td {
+  padding: 0.75rem;
+  text-align: center;
+  border: 1px solid #ccc;
+}
+
+.tabla-reportes-usuario thead {
+  background-color: #2f8071;
+  color: #e4fffd;
+  font-family: 'Segoe UI';
+}
+
+.tabla-reportes-usuario tbody tr:hover {
+  background-color: #f1f1f1;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.titulo-reportes {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.acciones-exportar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #2f8071;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease-in-out;
+
+  &:hover {
+    background-color: #1c5e50;
+  }
+
+  .material-icons {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 1024px) {
   .perfil-wrapper {
     flex-direction: column;
     align-items: center;
-    padding: 1rem;
+    padding: 1.5rem;
   }
 
-  .perfil-container {
+  .perfil-container,
+  .perfil-derecho,
+  .tabla-reportes-usuario,
+  .tabla-recibos-usuario {
     width: 100%;
-    margin: 0 auto;
+    max-width: 100%;
   }
 
   .form-row {
@@ -215,61 +304,107 @@
       width: 100%;
     }
   }
+}
 
-  .tabla-reportes-usuario {
-    flex: 1 1 55%;
-    min-width: 350px;
-    background: #f9f9f9;
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    overflow-x: auto;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  
-  .tabla-reportes-usuario h3 {
-    margin-top: 0;
+.tabla-recibos-usuario {
+  margin-top: 2rem;
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-family: 'Segoe UI';
+
+  h3 {
     font-size: 1.2rem;
-    color: #333;
+    color: #2c3e50;
     margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
-  
-  .tabla-reportes-usuario table {
+
+  table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     background-color: white;
   }
-  
-  .tabla-reportes-usuario th,
-  .tabla-reportes-usuario td {
+
+  th, td {
     padding: 0.75rem;
     text-align: center;
-    border: 1px solid #ccc;
+    border: 1px solid #e0e0e0;
   }
-  
-  .tabla-reportes-usuario thead {
-    background-color: #e0f7fa;
-    font-weight: bold;
+
+  thead {
+    background-color: #2f8071;
+    ;
   }
-  
-  .tabla-reportes-usuario tbody tr:hover {
-    background-color: #f1f1f1;
+
+  tbody tr:hover {
+    background-color: #f9f9f9;
     transition: background-color 0.2s ease-in-out;
   }
-  
-  /* Responsive */
-  @media screen and (max-width: 1024px) {
-    .perfil-wrapper {
-      flex-direction: column;
-      align-items: center;
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: #2f8071;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+
+    .material-icons {
+      font-size: 18px;
     }
-  
-    .perfil-container,
-    .tabla-reportes-usuario {
-      width: 100%;
-      flex: unset;
+
+    &:hover {
+      background-color: #1c5e50;
     }
+  }
+
+  .paginacion {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+
+    button {
+      background-color: #2f8071;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: #1c5e50;
+      }
+
+      &:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+    }
+
+    span {
+      font-weight: 500;
+      color: #2c3e50;
+    }
+  }
+
+  p {
+    text-align: center;
+    color: #888;
+    margin-top: 1rem;
   }
 }

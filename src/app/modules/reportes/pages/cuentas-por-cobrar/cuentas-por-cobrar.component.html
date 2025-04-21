@@ -1,10 +1,10 @@
-<h2 class="titulo">CUENTAS POR COBRAR</h2>
-<button class="volver" (click)="volver()">⬅️ Volver</button>
+<h4 class="titulo">CUENTAS POR COBRAR</h4>
+
 <div class="contenedor-principal">
   <!-- IZQUIERDA: Buscar unidad -->
   <div class="contenedor-unidades">
     <ng-container *ngIf="!cargando; else cargandoSpinner">
-    <h3>Seleccione la unidad</h3>
+    <h5>Seleccione la unidad</h5>
     <input
       type="text"
       [(ngModel)]="filtro"
@@ -27,8 +27,9 @@
           <td>{{ item.unidad }}</td>
           <td>{{ item.nombre }}</td>
         </tr>
-      </tbody>
+      </tbody>      
     </table>
+    <button class="boton-volver" (click)="volver()">← Volver</button>
   </ng-container>
   <ng-template #cargandoSpinner>
     <div class="spinner-contenedor">
@@ -43,7 +44,7 @@
     <div class="detalle-contenido">
     <ng-container *ngIf="!cargando; else cargandoSpinner">
     <div *ngIf="reportesSeleccionados.length > 0" class="detalle-usuario">
-      <h3>Reporte acumulado</h3>
+      <h5 class="titulo-reporte">Reporte acumulado</h5>
       <p><strong>Unidad:</strong> {{ unidadSeleccionada }}</p>
       <p><strong>Reportes encontrados:</strong> {{ reportesSeleccionados.length }}</p>
 

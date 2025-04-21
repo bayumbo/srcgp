@@ -10,6 +10,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
+import { Router } from '@angular/router';
  
 @Component({
   selector: 'app-cierre-caja',
@@ -34,7 +35,10 @@ export class CierreCajaComponent implements OnInit {
   egresos: { modulo: string; valor: number }[] = [];
   nuevoEgreso = { modulo: '', valor: 0 };
 
-  constructor(private cierreCajaService: CierreCajaService) {}
+  constructor(
+    private cierreCajaService: CierreCajaService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
     this.actualizarTituloFecha();
@@ -215,5 +219,8 @@ export class CierreCajaComponent implements OnInit {
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const nombreArchivo = `CierreCaja-${fechaId}.xlsx`;
     FileSaver.saveAs(new Blob([wbout], { type: 'application/octet-stream' }), nombreArchivo);
+  }
+  volver() {
+    this.router.navigate(['/reportes/lista-reportes']);
   }
 }

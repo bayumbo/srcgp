@@ -5,16 +5,15 @@
     <p>Cargando reportes...</p>
   </div>
 
-  <div class="contenedor-boton-volver">
-    <button class="boton-volver" (click)="volver()">← Volver</button>
-  </div>
+
 
   <!-- Contenido principal -->
   <div class="tabla-container" *ngIf="!cargando">
     <h5>NÓMINA DE RECAUDACIÓN</h5>
-
+    <button class="boton-volver" (click)="volver()">← Volver</button>
     <!-- Acciones -->
     <div class="acciones-globales">
+          
       <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
         <span class="material-icons">filter_alt</span>
       </button>
@@ -57,7 +56,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let reporte of reportes">
+        <tr *ngFor="let reporte of reportesPaginados">
           <td data-label="Nombre">{{ reporte.nombre + ' ' + reporte.apellido }}</td>
           <td data-label="Unidad">{{ reporte.unidad }}</td>
 
@@ -86,7 +85,29 @@
         </tr>
       </tbody>
     </table>
-
+    <div class="paginacion" *ngIf="totalPaginas > 1">
+      <button
+        (click)="cambiarPagina(paginaActual - 1)"
+        [disabled]="paginaActual === 1"
+      >
+        ← Anterior
+      </button>
+    
+      <button
+        *ngFor="let pagina of [].constructor(totalPaginas); let i = index"
+        (click)="cambiarPagina(i + 1)"
+        [class.activa]="paginaActual === i + 1"
+      >
+        {{ i + 1 }}
+      </button>
+    
+      <button
+        (click)="cambiarPagina(paginaActual + 1)"
+        [disabled]="paginaActual === totalPaginas"
+      >
+        Siguiente →
+      </button>
+    </div>
     <!-- Botones inferiores -->
     <div class="botones-inferiores">
       <button (click)="irACuentasPorCobrar()">

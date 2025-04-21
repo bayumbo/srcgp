@@ -1,81 +1,64 @@
-<h2>Nuevo Registro</h2>
+<div class="nuevo-registro-card">
+  <h2>Nuevo Registro</h2>
 
-<form (ngSubmit)="enviar()" #form="ngForm">
-  <!-- Nombre y Unidad -->
-  <div class="row">
-    <div class="form-group">
-      <label for="nombre">Nombre:</label>
-      <input
-        id="nombre"
-        list="usuariosList"
-        [(ngModel)]="nombreBuscado"
-        name="nombre"
-        (input)="actualizarUsuarioSeleccionado()"
-        placeholder="Escriba un nombre"
-        required
-      />
-      <datalist id="usuariosList">
-        <option *ngFor="let u of usuarios" [value]="u.nombre + ' ' + u.apellido"></option>
-      </datalist>
-    </div>
-   
-    <div class="form-group">
-      <label>Unidad:</label>
-      <input type="text" [value]="usuarioSeleccionado?.unidad || ''" readonly />
-    </div>
-  </div>
+  <form (ngSubmit)="enviar()" #form="ngForm">
+    <!-- Nombre y Unidad -->
+    <div class="row">
+      <div class="form-group">
+        <label for="nombre">Nombre</label>
+        <input
+          id="nombre"
+          list="usuariosList"
+          [(ngModel)]="nombreBuscado"
+          name="nombre"
+          (input)="actualizarUsuarioSeleccionado()"
+          placeholder="Escriba un nombre"
+          required
+          class="input-text"
+        />
+        <datalist id="usuariosList">
+          <option *ngFor="let u of usuarios" [value]="u.nombre + ' ' + u.apellido"></option>
+        </datalist>
+      </div>
 
-  <!-- Administración y Minutos Base -->
-  <div class="row">
-    <div class="form-group">
-      <label>Administración:</label>
-      <input
-        type="number"
-        name="administracion"
-        [(ngModel)]="reporte.administracion"
-        required
-      />
+      <div class="form-group">
+        <label>Unidad</label>
+        <input type="text" [value]="usuarioSeleccionado?.unidad || ''" readonly />
+      </div>
     </div>
 
-    <div class="form-group">
-      <label>Minutos Base:</label>
-      <input
-        type="number"
-        name="minutosBase"
-        [(ngModel)]="reporte.minutosBase"
-        required
-      />
-    </div>
-  </div>
+    <!-- Administración y Minutos Base -->
+    <div class="row">
+      <div class="form-group">
+        <label>Administración</label>
+        <input type="number" name="administracion" [(ngModel)]="reporte.administracion" required />
+      </div>
 
-  <!-- Minutos Atraso y Multas -->
-  <div class="row">
-    <div class="form-group">
-      <label>Minutos Atraso:</label>
-      <input
-        type="number"
-        name="minutosAtraso"
-        [(ngModel)]="reporte.minutosAtraso"
-        required
-      />
+      <div class="form-group">
+        <label>Minutos Base</label>
+        <input type="number" name="minutosBase" [(ngModel)]="reporte.minutosBase" required />
+      </div>
     </div>
 
-    <div class="form-group">
-      <label>Multas:</label>
-      <input
-        type="number"
-        name="multas"
-        [(ngModel)]="reporte.multas"
-        required
-      />
+    <!-- Minutos Atraso y Multas -->
+    <div class="row">
+      <div class="form-group">
+        <label>Minutos Atraso</label>
+        <input type="number" name="minutosAtraso" [(ngModel)]="reporte.minutosAtraso" required />
+      </div>
+
+      <div class="form-group">
+        <label>Multas</label>
+        <input type="number" name="multas" [(ngModel)]="reporte.multas" required />
+      </div>
     </div>
-  </div>
 
-  <!-- Botones -->
-  <div class="row acciones-formulario">
-    <button type="submit">Guardar</button>
-    <button type="button" (click)="cancelar()">Cancelar</button>
-  </div>
-</form>
+    <!-- Botones -->
+    <div class="acciones-formulario">
+      <button type="submit" class="guardar">💾 Guardar</button>
+      <button type="button" class="cancelar" (click)="cancelar()">Cancelar</button>
+    </div>
+  </form>
 
-<p *ngIf="resultado">✅ Reporte guardado con ID: {{ resultado }}</p>
+  <p *ngIf="resultado">✅ Reporte guardado con ID: {{ resultado }}</p>
+</div>

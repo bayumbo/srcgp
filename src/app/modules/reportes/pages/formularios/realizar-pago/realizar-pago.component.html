@@ -1,7 +1,7 @@
 <div class="pago-container">
   <div class="pago-header">
     <span class="material-icons icono-pago">payments</span>
-    <h2>Gestión de Pago</h2>
+    <h4>Gestión de Pago</h4>
   </div>
 
   <div class="info-usuario" *ngIf="registros.length > 0">
@@ -74,7 +74,7 @@
                   [max]="calcularDeuda(registro, campo)"
                   [(ngModel)]="pagosActuales[registro.id!][campo]"
                   (ngModelChange)="validarPago(registro.id!, campo)"
-                  placeholder="Ingrese pago"
+                  placeholder="Ingresar"
                 />
               </td>
             </tr>
@@ -90,7 +90,11 @@
   </div>
 
   <div class="acciones-finales">
-    <button class="volver" (click)="volver()">⬅️ Volver</button>
-    <button class="guardar" (click)="guardarPagosGenerales()">💾 Guardar pagos</button>
+    <button class="volver" (click)="volver()">
+      <span class="material-icons">arrow_back_ios_new</span> Volver
+    </button>
+    <button class="guardar" (click)="guardarPagosGenerales()">
+      <span class="material-icons">task_alt</span> Guardar pagos
+    </button>
   </div>
 </div>

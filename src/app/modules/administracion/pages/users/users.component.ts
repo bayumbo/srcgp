@@ -10,6 +10,7 @@ import {
 } from '@angular/fire/auth';
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -19,7 +20,7 @@ import {
 } from '@angular/fire/firestore';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from 'src/app/core/auth/services/auth.service';
-import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
+import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 
 @Component({
   standalone: true,
@@ -43,7 +44,14 @@ export class PerfilComponent implements OnInit {
   showNewPassword: boolean = false;
   esAdmin: boolean = false;
   soloLectura: boolean = false;
-  reportesUsuario: NuevoRegistro[] = [];
+  reportesUsuario: ReporteConPagos[] = [];
+
+  //Datos para lista de pagos
+  pagos: any[] = [];
+  pagosPaginados: any[] = [];
+  paginaActualPagos: number = 1;
+  pagosPorPagina: number = 5;
+  totalPaginasPagos: number = 1;
 
   constructor(
     private router: Router,
@@ -74,7 +82,7 @@ export class PerfilComponent implements OnInit {
 
         await this.cargarDatosUsuario();
         await this.obtenerReportesUsuario();
-
+        await this.cargarPagosUsuario();
         const rol = await this.authService.cargarRolActual();
         this.esAdmin = rol === 'admin';
       }
@@ -105,17 +113,51 @@ export class PerfilComponent implements OnInit {
 
   async obtenerReportesUsuario() {
     if (!this.uid) return;
-
+  
     const firestore = getFirestore();
     const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
     const q = query(reportesRef, orderBy('fechaModificacion', 'desc'));
-
-    const querySnapshot = await getDocs(q);
-    this.reportesUsuario = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as NuevoRegistro[];
+  
+    const snapshot = await getDocs(q);
+    const tempReportes: ReporteConPagos[] = [];
+  
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data() as NuevoRegistro;
+      const id = docSnap.id;
+  
+      const pagosRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios/${id}/pagosTotales`);
+      const pagosSnap = await getDocs(pagosRef);
+  
+      let minutosPagados = 0;
+      let adminPagada = 0;
+      let minBasePagados = 0;
+      let multasPagadas = 0;
+  
+      pagosSnap.forEach(pagoDoc => {
+        const pago = pagoDoc.data();
+        const detalles = pago['detalles'] ?? {};
+  
+        minutosPagados += detalles.minutosAtraso || 0;
+        adminPagada += detalles.administracion || 0;
+        minBasePagados += detalles.minutosBase || 0;
+        multasPagadas += detalles.multas || 0;
+      });
+  
+      tempReportes.push({
+        ...data,
+        id,
+        uid: this.uid,
+        minutosPagados,
+        adminPagada,
+        minBasePagados,
+        multasPagadas
+      });
+    }
+  
+    this.reportesUsuario = tempReportes;
   }
+  
+ 
 
   get passwordStrength(): string {
     const pass = this.nuevaContrasena;
@@ -179,7 +221,55 @@ export class PerfilComponent implements OnInit {
     }
   }
 
+  async cargarPagosUsuario() {
+    if (!this.uid) return;
+  
+    const firestore = getFirestore();
+    const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
+    const reportesSnap = await getDocs(reportesRef);
+  
+    const pagosTotales: any[] = [];
+  
+    for (const reporte of reportesSnap.docs) {
+      const pagosRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios/${reporte.id}/pagosTotales`);
+      const pagosSnap = await getDocs(pagosRef);
+  
+      pagosSnap.forEach(pagoDoc => {
+        const pagoData = pagoDoc.data();
+        pagosTotales.push({
+          ...pagoData,
+          fecha: pagoData['fecha']?.toDate?.() || null,
+          urlPDF: pagoData['urlPDF'] || null
+        });
+      });
+    }
+  
+    this.pagos = pagosTotales.sort((a, b) => (b.fecha as any) - (a.fecha as any));
+    this.totalPaginasPagos = Math.ceil(this.pagos.length / this.pagosPorPagina);
+    this.actualizarPagosPaginados();
+  }
+
+  actualizarPagosPaginados() {
+    const inicio = (this.paginaActualPagos - 1) * this.pagosPorPagina;
+    const fin = inicio + this.pagosPorPagina;
+    this.pagosPaginados = this.pagos.slice(inicio, fin);
+  }
+  
+  cambiarPaginaPagos(valor: number) {
+    const nuevaPagina = this.paginaActualPagos + valor;
+    if (nuevaPagina >= 1 && nuevaPagina <= this.totalPaginasPagos) {
+      this.paginaActualPagos = nuevaPagina;
+      this.actualizarPagosPaginados();
+    }
+  }
+  
+  descargarPDF(url: string) {
+    window.open(url, '_blank');
+  }
+
   volverAlMenu(): void {
     this.router.navigate(['/menu']);
   }
+  
+  
 }

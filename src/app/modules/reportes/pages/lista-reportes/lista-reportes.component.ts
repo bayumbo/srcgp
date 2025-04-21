@@ -31,6 +31,25 @@ export class ReporteListaComponent implements OnInit {
   mostrarFiltros = false;
   fechaPersonalizada: string = '';
 
+  // Paginación
+  paginaActual: number = 1;
+  reportesPorPagina: number = 5;
+
+  get totalPaginas(): number {
+    return Math.ceil(this.reportes.length / this.reportesPorPagina);
+  }
+
+  get reportesPaginados(): ReporteConPagos[] {
+    const inicio = (this.paginaActual - 1) * this.reportesPorPagina;
+    return this.reportes.slice(inicio, inicio + this.reportesPorPagina);
+  }
+
+  cambiarPagina(pagina: number) {
+    if (pagina >= 1 && pagina <= this.totalPaginas) {
+      this.paginaActual = pagina;
+    }
+  }
+
   private firestore = inject(Firestore);
   private router = inject(Router);
 
@@ -140,6 +159,7 @@ export class ReporteListaComponent implements OnInit {
       }
 
       this.reportes = tempReportes;
+      this.paginaActual = 1;
     } catch (error) {
       console.error('Error al consultar por rango:', error);
     } finally {

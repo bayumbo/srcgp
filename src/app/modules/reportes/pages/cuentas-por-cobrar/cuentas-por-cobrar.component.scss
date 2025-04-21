@@ -1,6 +1,7 @@
 .titulo {
   text-align: center;
   margin-bottom: 2rem;
+  margin-top: 20px;
 }
 
 .contenedor-principal {
@@ -22,7 +23,7 @@
 
 .buscador {
   width: 90%;
-
+  height: 20px;
   border-radius: 8px;
   border: 1px solid #ccc;
   margin-bottom: 1rem;
@@ -46,14 +47,17 @@
 }
 
 .selected {
-  background-color: #c8e6c9 !important;
+  background-color: #389282 !important;
+  color: #f7f7f7;
 }
-
+.titulo-reporte{
+  color: #f7f7f7;
+}
 .detalle-usuario {
   flex: 1;
   min-width: 400px;
   max-width: 650px;
-  background: #e8f5e9;
+  background: #2f8071;
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
@@ -68,7 +72,8 @@
   width: 100%;
   margin: 1rem 0;
   border-collapse: collapse;
-  background-color: #fff;
+  background-color: #2f8071;
+  color: #f7f7f7;
 }
 
 .tabla-reportes th,
@@ -119,14 +124,27 @@
 .btn-pago {
   margin-top: 1rem;
   padding: 0.6rem 1.2rem;
-  background-color: #2e7d32;
+  background-color: rgb(55, 71, 79);
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-
+  width: 100%s;
   &:hover {
-    background-color: #1b5e20;
+    background-color: rgb(42, 83, 80);
   }
   
+}
+.boton-volver {
+  padding: 8px 12px;
+  font-size: 14px;
+  background-color: #2f8071;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  width: 100%;
+  &:hover {
+    background-color: #37474f;
+  }
 }

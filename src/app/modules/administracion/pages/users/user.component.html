@@ -1,4 +1,5 @@
-
+<div class="perfil-wrapper">
+  <!-- Perfil -->
   <div class="perfil-container">
     <h5><span class="material-icons">person</span> Perfil</h5>
 
@@ -114,3 +115,75 @@
     </form>
   </div>
 
+  <!-- Tabla -->
+  <div class="perfil-derecho">
+    <!-- Tabla de Reportes -->
+    <div class="tabla-reportes-usuario">
+      <h3>📄 Tus Reportes Registrados</h3>
+      <table *ngIf="reportesUsuario.length > 0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Unidad</th>
+            <th>Min. Atraso</th>
+            <th>Min. Atraso Pagados</th>
+            <th>Admin</th>
+            <th>Admin Pagada</th>
+            <th>Min. Base</th>
+            <th>Min. Base Pagados</th>
+            <th>Multas</th>
+            <th>Multas Pagadas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let reporte of reportesUsuario">
+            <td>{{ reporte.fechaModificacion?.toDate() | date: 'shortDate' }}</td>
+            <td>{{ reporte.unidad }}</td>
+            <td>{{ reporte.minutosAtraso }}</td>
+            <td>{{ reporte.minutosPagados }}</td>
+            <td>{{ reporte.administracion }}</td>
+            <td>{{ reporte.adminPagada }}</td>
+            <td>{{ reporte.minutosBase }}</td>
+            <td>{{ reporte.minBasePagados }}</td>
+            <td>{{ reporte.multas }}</td>
+            <td>{{ reporte.multasPagadas }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p *ngIf="reportesUsuario.length === 0">Aún no tienes reportes registrados.</p>
+      <div class="tabla-recibos-usuario">
+        <h3>📥 Recibos de Pagos</h3>
+        <table *ngIf="pagosPaginados.length > 0">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Total Pagado</th>
+              <th>Descargar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let pago of pagosPaginados">
+              <td>{{ pago.fecha | date: 'short' }}</td>
+              <td>{{ pago.total | currency: 'USD' }}</td>
+              <td>
+                <button class="btn-icon" (click)="descargarPDF(pago.urlPDF)">
+                  <span class="material-icons">download</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p *ngIf="pagosPaginados.length === 0">No se han generado pagos aún.</p>
+  
+        <div class="paginacion">
+          <button (click)="cambiarPaginaPagos(-1)" [disabled]="paginaActualPagos === 1">« Anterior</button>
+          <span>Página {{ paginaActualPagos }} de {{ totalPaginasPagos }}</span>
+          <button (click)="cambiarPaginaPagos(1)" [disabled]="paginaActualPagos >= totalPaginasPagos">Siguiente »</button>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <!-- Tabla de Recibos -->
+    

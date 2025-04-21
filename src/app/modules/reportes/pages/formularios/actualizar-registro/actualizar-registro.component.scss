@@ -1,0 +1,137 @@
+:host {
+    display: block;
+    background-color: #f4f6f8;
+    padding: 2rem 1rem;
+    min-height: 100vh;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  
+  .actualizar-registro-card {
+    max-width: 700px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+    padding: 2rem;
+  }
+  
+  h2 {
+    text-align: center;
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+    color: #1a1f20;
+  }
+  
+  /* Distribución en filas */
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-group {
+    flex: 1 1 45%;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .full-width {
+    flex: 1 1 100%;
+  }
+  
+  /* Etiquetas */
+  label {
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    color: #1a1f20;
+    font-size: 0.95rem;
+  }
+  
+  /* Campos editables */
+  input[type="number"] {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.95rem;
+    border: 1px solid #d3d3d3;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+  }
+  
+  input:focus {
+    outline: none;
+    border-color: #2f8071;
+    background-color: #ffffff;
+  }
+  
+  /* Campos no editables visualmente */
+  .campo-no-editable .campo-texto {
+    background-color: #2f8071;
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    color: #eefffc;
+    font-weight: 500;
+    border: 1px solid #c9e4dc;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  }
+  
+  /* Botones */
+  .acciones-formulario {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+  
+    button {
+      padding: 0.65rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+  
+    .guardar {
+      background-color: #2f8071;
+      color: white;
+  
+      &:hover {
+        background-color: #26685c;
+      }
+    }
+  
+    .cancelar {
+      background-color: #d3d3d3;
+      color: #333;
+  
+      &:hover {
+        background-color: #bcbcbc;
+      }
+    }
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .row {
+      flex-direction: column;
+    }
+  
+    .form-group {
+      flex: 1 1 100%;
+    }
+  
+    .acciones-formulario {
+      flex-direction: column;
+      align-items: stretch;
+  
+      button {
+        width: 100%;
+      }
+    }
+  }
+  

@@ -1,31 +1,29 @@
 .pago-container {
-  padding: 1rem;
-  max-width: 100%;
-  overflow-x: hidden;
+  padding: 1.5rem;
+  background-color: #f4f6f8;
+  font-family: 'Segoe UI', sans-serif;
+
   .pago-header {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    background-color: #2e7d32;
+    background-color: #2f8071;
     padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
     color: white;
-  
-    h2 {
+
+    h4 {
       margin: 0;
       font-size: 1.8rem;
       font-weight: bold;
-      font-family: 'Segoe UI', sans-serif;
     }
-  
+
     .icono-pago {
       font-size: 2rem;
     }
   }
- 
-
 
   .info-usuario {
     display: flex;
@@ -33,109 +31,91 @@
     padding: 0 2rem;
     margin-bottom: 1rem;
     font-weight: bold;
+    font-size: 1rem;
+    color: #1a1f20;
   }
 
   .contenedor-modulos {
     display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: nowrap;
-    overflow-x: hidden;
+    flex-direction: row;
+    flex-wrap: nowrap; // 🚫 evita que se vayan a nueva línea
+    gap: 1.2rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    scroll-behavior: smooth;
   }
 
   .modulo {
-    flex: 1;
-    min-width: 0;
-    background-color: #fff;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    flex: 0 0 280px; // 🔒 ancho fijo
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     padding: 1rem;
     max-height: 60vh;
     overflow-y: auto;
+    scroll-snap-align: start;
 
     h3 {
       text-align: center;
-      font-size: 16px;
-      margin-bottom: 0.5rem;
+      font-size: 1rem;
+      margin-bottom: 0.8rem;
+      color: #2f8071;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 0.9rem;
 
       th, td {
         border: 1px solid #ccc;
-        padding: 0.4rem;
+        padding: 0.5rem;
         text-align: center;
       }
 
       input {
         width: 100%;
-        padding: 0.2rem;
-        font-size: 13px;
+        padding: 0.4rem;
+        font-size: 0.9rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background-color: #f9f9f9;
+        box-sizing: border-box; // 🔒 evita desbordes
+        display: block;
+
+        &:focus {
+          outline: none;
+          border-color: #2f8071;
+          background-color: #ffffff;
+        }
+      }
+
+      td[colspan="2"] {
+        text-align: center;
+        font-style: italic;
+        color: #888;
       }
     }
   }
-
-  .resumen-total {
-    text-align: center;
-    margin-top: 1rem;
-
-    h3 {
-      margin-bottom: 0.3rem;
-    }
-
-    .total-pagar {
-      font-size: 20px;
-      font-weight: bold;
-      color: #4caf50;
-    }
+  .contenedor-modulos::-webkit-scrollbar {
+    height: 8px;
   }
-
-  .acciones-finales {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: 1rem;
-
-    button {
-      padding: 0.5rem 1.5rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-
-      &.volver {
-        background-color: #777;
-        color: white;
-      }
-
-      &.guardar {
-        background-color: #4caf50;
-        color: white;
-      }
-
-      &:hover {
-        opacity: 0.9;
-      }
-    }
+  .contenedor-modulos::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 4px;
   }
   .fila-pago {
     position: relative;
   }
-  
+
   .celda-pago-editable {
     position: relative;
-    width: 100px;
-    min-width: 100px;
   }
-  
+
   .pago-campo {
     width: 100%;
-    text-align: left;
   }
-  
+
   .acciones-edicion,
   .accion-editar {
     position: absolute;
@@ -146,30 +126,104 @@
     gap: 4px;
     z-index: 2;
   }
-  
+
   .acciones-edicion button,
   .accion-editar button {
-    padding: 2px 6px;
+    padding: 3px 6px;
     font-size: 0.9rem;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    background-color: #2e7d32;
+    background-color: #2f8071;
+    color: white;
 
+    &:hover {
+      background-color: #26685c;
+    }
+  }
+
+  .resumen-total {
+    text-align: center;
+    margin-top: 2rem;
+
+    h3 {
+      margin-bottom: 0.3rem;
+    }
+
+    .total-pagar {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #2f8071;
+    }
+  }
+
+  .acciones-finales {
+    display: flex;
+    justify-content: center;
+    gap: 1.2rem;
+    margin-top: 2rem;
+  
+    button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.5rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.25s ease, transform 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  
+      .material-icons {
+        font-size: 1.3rem;
+        vertical-align: middle;
+      }
+  
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+  
+      &.volver {
+        background-color: #757575;
+        color: #fff;
+  
+        &:hover {
+          background-color: #5a5a5a;
+        }
+      }
+  
+      &.guardar {
+        background-color: #2f8071;
+        color: #fff;
+  
+        &:hover {
+          background-color: #26685c;
+        }
+      }
+    }
   }
   
-  // Modo responsive
   @media (max-width: 768px) {
     .contenedor-modulos {
       flex-direction: column;
+      align-items: center;
     }
 
     .modulo {
+      width: 100%;
       max-height: unset;
     }
+
+    .info-usuario {
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-start;
+      padding: 0 1rem;
+    }
   }
+  
 }
-
-
-
 
