@@ -4,13 +4,17 @@ import { CommonModule } from '@angular/common';
 import { CatalogoService } from '../../Services/comprobante.service';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+
+
 
 @Component({
   selector: 'app-agregar-cuenta',
   standalone: true,
   templateUrl: './agregarcuenta.component.html',
   styleUrls: ['./stylesagregarcuenta.scss'],
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, FormsModule]
+  imports: [CommonModule, ReactiveFormsModule, MatIconModule, RouterModule, FormsModule]
+  
 })
 export class AgregarCuentaComponent implements OnInit {
   formCuenta!: FormGroup;
@@ -27,6 +31,7 @@ export class AgregarCuentaComponent implements OnInit {
   registrosPorPagina: number = 10;
   totalPaginas: number = 1;
 
+
   constructor(private fb: FormBuilder, private catalogoService: CatalogoService) {}
 
   ngOnInit(): void {
@@ -37,7 +42,15 @@ export class AgregarCuentaComponent implements OnInit {
     });
 
     this.obtenerCuentas();
+    
+  // ✅ Asegura que el scroll comience después del header
+  window.scrollTo({ top: 0 });
+
+  // ✅ Agrega padding al body si no existe
+  const body = document.querySelector('body');
+  if (body) body.setAttribute('style', 'padding-top: 55px');
   }
+  menuAbierto: boolean = false;
 
   async agregarCuenta(): Promise<void> {
     if (this.formCuenta.invalid) {

@@ -1,20 +1,24 @@
 <header>
-  <div class="logo">
-    <img src="logo.png" alt="Logo" />
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
   </div>
-  <nav>
-    <ul class="menu">
-     
-      <li><a routerLink="/auth/"> ↩️</a></li>
-      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-      <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
-      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
-      <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
-      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
-    </ul>
-  </nav>
 </header>
 <!-- PRELOADER -->
 <div id="preloader">
@@ -27,7 +31,7 @@
 <div class="comprobante-flex-container">
   <!-- FORMULARIO -->
   <div class="form-card">
-    <h2>Nuevo Comprobante de Egreso</h2>
+    <h5>Nuevo Comprobante de Egreso</h5>
     <form [formGroup]="egresoForm" (ngSubmit)="agregarTransaccion()">
       <div class="form-grid">
         <div class="form-group"><label>Beneficiario</label><input formControlName="beneficiario" /></div>
@@ -145,7 +149,7 @@
         <td>${{ comprobante.totalHaber.toFixed(2) }}</td>
         <td>
           <a [href]="comprobante.pdfURL" target="_blank" class="btn-ver">📄 Ver PDF</a>
-          <button type="button" (click)="eliminarComprobante(comprobante.id, comprobante.comprobanteId)" class="btn-eliminar">🗑️</button>
+          <button type="button" (click)="eliminarComprobante(comprobante.id, comprobante.comprobanteId)" class="btn-eliminar">🗑️ Eliminar</button>
         </td>
       </tr>
     </tbody>

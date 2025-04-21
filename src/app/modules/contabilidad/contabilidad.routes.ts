@@ -16,6 +16,7 @@ export const CONTABILIDAD_ROUTES: Routes = [
     path: 'balances',
     loadComponent: () =>
       import('./Pages/Balances/blances.component').then(m => m.BalanceComponent)
+    
   },
   {
     path: 'comprobante-egresos',

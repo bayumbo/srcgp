@@ -7,13 +7,13 @@ import { EstadoResultadosService } from '../../Services/comprobante.service';
 import { getStorage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, Timestamp, serverTimestamp } from '@angular/fire/firestore';
 import { jsPDF } from 'jspdf';
-
+import { MatIconModule } from '@angular/material/icon';
 @Component({
   selector: 'app-estados-resultados',
   standalone: true,
   templateUrl: './estadosresultados.component.html',
   styleUrls: ['./estadosresultados.component.scss'],
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, MatIconModule,RouterModule],
 })
 export class EstadosResultadosComponent implements OnInit {
   fechaInicio: string = '';
@@ -34,6 +34,7 @@ export class EstadosResultadosComponent implements OnInit {
       setTimeout(() => (preloader.style.display = 'none'), 1000);
     }
   }
+  menuAbierto: boolean = false;
 
   async generarEstado(): Promise<void> {
     if (!this.fechaInicio || !this.fechaFin) return;

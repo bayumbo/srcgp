@@ -1,20 +1,24 @@
 <header>
-  <div class="logo">
-    <img src="logo.png" alt="Logo" />
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
   </div>
-  <nav>
-    <ul class="menu">
-     
-      <li><a routerLink="/auth/"> ↩️</a></li>
-      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-      <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
-      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
-      <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
-      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
-    </ul>
-  </nav>
 </header>
 
 <div id="preloader">
@@ -25,7 +29,7 @@
 
 <div class="estado-wrapper">
   <div class="estado-card">
-    <h2>Estado de Resultados</h2>
+    <h5>Estado de Resultados</h5>
 
     <div class="filtros">
       <label for="fechaInicio">Desde:</label>
@@ -40,7 +44,7 @@
     <div *ngIf="resultados.length > 0">
 
       <div *ngFor="let grupo of resultados">
-        <h3>{{ grupo.grupo }}</h3>
+        <h5>{{ grupo.grupo }}</h5>
         <table>
           <thead>
             <tr>
@@ -76,7 +80,7 @@
 <div class="modal-overlay" *ngIf="modalAbierto">
   <div class="modal-contenido">
     <button class="cerrar" (click)="cerrarModal()">✖</button>
-    <h3>📂 Resultados Generados</h3>
+    <h5>📂 Resultados Generados</h5>
 
     <div class="filtros-modal">
       <input type="date" [(ngModel)]="filtroInicio" />

@@ -7,13 +7,13 @@ import { EstadoFinancieroService } from '../../Services/comprobante.service';
 import { getStorage, ref, uploadBytes, getDownloadURL, } from '@angular/fire/storage';
 import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, Timestamp, serverTimestamp } from '@angular/fire/firestore';
 import { jsPDF } from 'jspdf';
-
+import { MatIconModule } from '@angular/material/icon';
 @Component({
   selector: 'app-estados',
   standalone: true,
   templateUrl: './estados.component.html',
   styleUrls: ['./estados.component.scss'],
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, MatIconModule,RouterModule],
 })
 export class EstadosComponent implements OnInit {
   fechaInicio: string = '';
@@ -35,6 +35,7 @@ export class EstadosComponent implements OnInit {
       setTimeout(() => preloader.style.display = 'none', 1000);
     }
   }
+  menuAbierto: boolean = false;
 
   async generarEstado(): Promise<void> {
     if (!this.fechaInicio || !this.fechaFin) return;

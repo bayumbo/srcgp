@@ -1,21 +1,27 @@
 <header>
-  <div class="logo">
-    <img src="logo.png" alt="Logo" />
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
+        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
   </div>
-  <nav>
-    <ul class="menu">
-     
-      <li><a routerLink="/auth/"> ↩️</a></li>
-      <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-      <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-      <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-      <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
-      <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
-      <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
-      <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
-    </ul>
-  </nav>
 </header>
+
+
   <div id="preloader">
     <div class="preloader">
       <span></span><span></span><span></span><span></span>
@@ -23,7 +29,7 @@
   </div>
   
   <div class="cuentas-container">
-    <h2>Catálogo de Cuentas</h2>
+    <h5>Catálogo de Cuentas</h5>
   
     <!-- Formulario de nueva cuenta -->
     <form [formGroup]="formCuenta" (ngSubmit)="agregarCuenta()" class="form-cuenta">

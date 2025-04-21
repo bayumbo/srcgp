@@ -4,11 +4,12 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { RouterModule } from '@angular/router';
 import { jsPDF } from 'jspdf';
 import { LibroMayorService } from '../../Services/comprobante.service';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-blances',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule],
+  imports: [CommonModule, ReactiveFormsModule,MatIconModule, RouterModule],
   templateUrl: './blances.component.html',
   styleUrls: ['./blances.component.scss']
 })
@@ -16,6 +17,7 @@ import { LibroMayorService } from '../../Services/comprobante.service';
 export class BalanceComponent implements OnInit {
   formFiltro!: FormGroup;
   datosBalance: any[] = [];
+
 
   constructor(
     private fb: FormBuilder,
@@ -36,6 +38,7 @@ export class BalanceComponent implements OnInit {
       }
     }, 600);
   }
+  menuAbierto: boolean = false;
 
   async generarBalance(): Promise<void> {
     const { inicio, fin, tipoBalance } = this.formFiltro.value;
