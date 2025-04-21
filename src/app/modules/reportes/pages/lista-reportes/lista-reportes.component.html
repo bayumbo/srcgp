@@ -1,90 +1,102 @@
-<div class="contenedor-boton-volver">
-  <button class="boton-volver" (click)="volver()">← Volver</button>
-</div>
-
-<div class="tabla-container">
-  <h2>NÓMINA DE RECAUDACIÓN</h2>
-
-  <!-- Acciones -->
-  <div class="acciones-globales">
-    <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
-      <span class="material-icons">filter_alt</span>
-    </button>
-    <button class="nuevo-registro" (click)="irANuevoRegistro()">
-      <span class="material-icons">add</span>
-      Nuevo Registro
-    </button>
+<body>
+  <!-- Overlay de carga -->
+  <div class="overlay-cargando" *ngIf="cargando">
+    <div class="spinner"></div>
+    <p>Cargando reportes...</p>
   </div>
 
-  <!-- Panel de filtros -->
-  <div class="panel-filtros" *ngIf="mostrarFiltros">
-    <button (click)="filtrarPor('hoy')">Hoy</button>
-    <button (click)="filtrarPor('semana')">Esta semana</button>
-    <button (click)="filtrarPor('mes')">Este mes</button>
+  <div class="contenedor-boton-volver">
+    <button class="boton-volver" (click)="volver()">← Volver</button>
+  </div>
 
-    <div class="filtro-personalizado">
-      <label for="fecha">Fecha personalizada:</label>
-      <input type="date" [(ngModel)]="fechaPersonalizada" id="fecha" />
-      <button (click)="filtrarPorFechaPersonalizada()">Buscar</button>
+  <!-- Contenido principal -->
+  <div class="tabla-container" *ngIf="!cargando">
+    <h5>NÓMINA DE RECAUDACIÓN</h5>
+
+    <!-- Acciones -->
+    <div class="acciones-globales">
+      <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
+        <span class="material-icons">filter_alt</span>
+      </button>
+      <button class="nuevo-registro" (click)="irANuevoRegistro()">
+        <span class="material-icons">add</span>
+        Nuevo Registro
+      </button>
     </div>
 
-    <button class="limpiar" (click)="cargarTodosLosReportes()">Limpiar filtros</button>
+    <!-- Panel de filtros -->
+    <div class="panel-filtros" *ngIf="mostrarFiltros">
+      <button (click)="filtrarPor('hoy')">Hoy</button>
+      <button (click)="filtrarPor('semana')">Esta semana</button>
+      <button (click)="filtrarPor('mes')">Este mes</button>
+
+      <div class="filtro-personalizado">
+        <label for="fecha">Fecha personalizada:</label>
+        <input type="date" [(ngModel)]="fechaPersonalizada" id="fecha" />
+        <button (click)="filtrarPorFechaPersonalizada()">Buscar</button>
+      </div>
+
+      <button class="limpiar" (click)="cargarTodosLosReportes()">Limpiar filtros</button>
+    </div>
+
+    <!-- Tabla -->
+    <table *ngIf="reportes.length > 0">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Unidad</th>
+          <th>Min. Atraso</th>
+          <th>Min. Pagados</th>
+          <th>Administración</th>
+          <th>Admin Pagada</th>
+          <th>Min. Base</th>
+          <th>Min. Base Pagados</th>
+          <th>Multas</th>
+          <th>Multas Pagadas</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let reporte of reportes">
+          <td data-label="Nombre">{{ reporte.nombre + ' ' + reporte.apellido }}</td>
+          <td data-label="Unidad">{{ reporte.unidad }}</td>
+
+          <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
+          <td data-label="Min. Pagados">{{ reporte.minutosPagados }}</td>
+
+          <td data-label="Administración">{{ reporte.administracion }}</td>
+          <td data-label="Admin Pagada">{{ reporte.adminPagada }}</td>
+
+          <td data-label="Min. Base">{{ reporte.minutosBase }}</td>
+          <td data-label="Min. Base Pagados">{{ reporte.minBasePagados }}</td>
+
+          <td data-label="Multas">{{ reporte.multas }}</td>
+          <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
+
+          <td class="acciones" data-label="Acciones">
+            <div class="acciones-contenedor">
+              <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)">
+                <span class="material-icons">edit</span>
+              </button>
+              <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)">
+                <span class="material-icons">payments</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Botones inferiores -->
+    <div class="botones-inferiores">
+      <button (click)="irACuentasPorCobrar()">
+        <span class="material-icons">account_balance_wallet</span>
+        Cuentas por cobrar
+      </button>
+      <button (click)="irACierreCaja()">
+        <span class="material-icons">check_circle</span>
+        Cierre de Caja
+      </button>
+    </div>
   </div>
-
-  <!-- Tabla -->
-  <table *ngIf="reportes.length > 0; else cargando">
-    <thead>
-      <tr>
-        <th>Nombre</th>
-        <th>Unidad</th>
-        <th>Min. Atraso</th>
-        <th>Min. Pagados</th>
-        <th>Administración</th>
-        <th>Admin Pagada</th>
-        <th>Min. Base</th>
-        <th>Min. Base Pagados</th>
-        <th>Multas</th>
-        <th>Multas Pagadas</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let reporte of reportes">
-        <td data-label="Nombre">{{ reporte.nombre +' '+ reporte.apellido}}</td>
-        <td data-label="Unidad">{{ reporte.unidad }}</td>
-
-        <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
-        <td data-label="Min. Pagados">{{ reporte.minutosPagados }}</td>
-
-        <td data-label="Administración">{{ reporte.administracion }}</td>
-        <td data-label="Admin Pagada">{{ reporte.adminPagada }}</td>
-
-        <td data-label="Min. Base">{{ reporte.minutosBase }}</td>
-        <td data-label="Min. Base Pagados">{{ reporte.minBasePagados }}</td>
-
-        <td data-label="Multas">{{ reporte.multas }}</td>
-        <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
-
-        <td class="acciones" data-label="Acciones">
-          <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)">
-            <span class="material-icons">edit</span>
-          </button>
-          <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)">
-            <span class="material-icons">payments</span>
-          </button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-  <div class="acciones-superiores">
-    <button class="cuentas" (click)="irACuentasPorCobrar()">
-      Cuentas por cobrar
-    </button>
-    <button class="boton-cierre-caja" (click)="irACierreCaja()">
-      🧾 Cierre de Caja
-    </button>
-  </div>
-  <ng-template #cargando>
-    <p>Cargando reportes...</p>
-  </ng-template>
-</div>
+</body>

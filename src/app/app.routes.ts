@@ -48,8 +48,7 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/administracion/pages/GestionRoles/gestionroles.component').then(m => m.GestionRolesComponent),
       },
-    ]
-  },
+    
   {
     path: 'auth',
     canActivate: [publicGuard],
@@ -73,5 +72,6 @@ export const APP_ROUTES: Routes = [
     redirectTo: '',
     pathMatch: 'full',
   },
-  
+]
+},
 ];

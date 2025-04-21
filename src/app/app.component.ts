@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { getApps } from 'firebase/app';
 import { ReportesService } from './modules/reportes/services/reportes.service';
+import { HeaderComponent } from '@shared/components/header/header.component';
 
 @Component({
   selector: 'app-root',
