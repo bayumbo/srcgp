@@ -6,6 +6,14 @@ import { REPORTES_ROUTES } from './modules/reportes/reportes.routes';
 import {CONTABILIDAD_ROUTES} from './modules/contabilidad/contabilidad.routes';
 
 export const APP_ROUTES: Routes = [
+  // 🔓 RUTAS PÚBLICAS (sin auth)
+  {
+    path: 'auth',
+    canActivate: [publicGuard],
+    children: AUTH_ROUTES,
+  },
+
+  // 🔐 RUTAS PROTEGIDAS (requieren login)
   {
     path: '',
     canActivate: [authGuard],
@@ -19,20 +27,18 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: 'perfil',
-        children:[
+        children: [
           {
-            path:'',
+            path: '',
             loadComponent: () =>
               import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
           },
           {
             path: ':uid',
-      loadComponent: () =>
-        import('./modules/administracion/pages/users/users.component').then(
-          m => m.PerfilComponent
-        ),
+            loadComponent: () =>
+              import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
           },
-        ]  
+        ],
       },
       {
         path: 'register',
@@ -48,30 +54,24 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/administracion/pages/GestionRoles/gestionroles.component').then(m => m.GestionRolesComponent),
       },
-    
-  {
-    path: 'auth',
-    canActivate: [publicGuard],
-    children: AUTH_ROUTES,
-  },
-  
-  {
-    path: 'contabilidad',
-    canActivate: [authGuard],
-    children: CONTABILIDAD_ROUTES,
-  },
-
-  {
-    path: 'reportes',
-    canActivate: [authGuard],
-    children: REPORTES_ROUTES,
+      {
+        path: 'contabilidad',
+        canActivate: [authGuard],
+        children: CONTABILIDAD_ROUTES,
+      },
+      {
+        path: 'reportes',
+        canActivate: [authGuard],
+        children: REPORTES_ROUTES,
+      },
+    ],
   },
 
+  // Redirección
   {
     path: '**',
     redirectTo: '',
     pathMatch: 'full',
   },
-]
-},
 ];
+
