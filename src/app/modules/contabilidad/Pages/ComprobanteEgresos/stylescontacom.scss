@@ -50,6 +50,7 @@ header {
     font-size: 26px;
     cursor: pointer;
     margin-left: auto;
+    width: 160px;
   }
 }
 
@@ -332,7 +333,7 @@ label {
   justify-content: space-between;
   align-items: flex-start;
   padding: 30px;
-  margin-top: 250px;
+  margin-top: 0px;
   gap: 30px;
   width: 100%;
   max-width: 100%;
@@ -370,6 +371,8 @@ label {
   padding: 1.5rem;
   border-radius: 10px;
   box-shadow: 0 0 10px #00000050;
+  margin-left: 138px;
+  margin-right: 173px;
 
   h3 {
     color: #353232;

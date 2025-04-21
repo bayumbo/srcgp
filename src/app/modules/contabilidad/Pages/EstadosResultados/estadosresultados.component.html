@@ -5,6 +5,9 @@
         <mat-icon>home</mat-icon>
         <span>Inicio</span>
       </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
     </div>
 
     <nav [class.abierto]="menuAbierto">
@@ -43,7 +46,8 @@
 
     <div *ngIf="resultados.length > 0">
 
-      <div *ngFor="let grupo of resultados">
+      <div class="estado-listado" *ngIf="resultados.length > 0">
+        <div class="grupo" *ngFor="let grupo of resultados">
         <h5>{{ grupo.grupo }}</h5>
         <table>
           <thead>
@@ -66,8 +70,9 @@
           </tbody>
         </table>
       </div>
+    </div>
 
-      <button class="btn-pdf" (click)="generarPDF()">
+      <button class="btn-pdf1" (click)="generarPDF()">
         📄 Descargar y Guardar PDF
       </button>
     </div>
@@ -83,7 +88,9 @@
     <h5>📂 Resultados Generados</h5>
 
     <div class="filtros-modal">
-      <input type="date" [(ngModel)]="filtroInicio" />
+      <label>Desde:</label>
+      <input type="date" [(ngModel)]="filtroInicio">
+      <label>Hasta:</label>
       <input type="date" [(ngModel)]="filtroFin" />
       <button (click)="filtrarResultados()">Filtrar</button>
     </div>

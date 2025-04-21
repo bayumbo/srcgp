@@ -7,7 +7,7 @@ import { LibroMayorService } from '../../Services/comprobante.service';
 import { RouterModule } from '@angular/router';
 import { Storage } from '@angular/fire/storage';
 import { MatIconModule } from '@angular/material/icon';
-
+import autoTable from 'jspdf-autotable'; 
 @Component({
   selector: 'app-libmayor',
   standalone: true,
@@ -111,7 +111,7 @@ export class LibroMayorComponent implements OnInit {
     let y = 20;
     doc.setFontSize(16);
     doc.setFont('Helvetica', 'bold');
-    doc.text('LIBRO MAYOR 2024', 15, y);
+    doc.text('LIBRO MAYOR - CONSORCIO PINTAG EXPRESS', 15, y);
     y += 10;
 
     doc.setFontSize(10);
@@ -120,49 +120,42 @@ export class LibroMayorComponent implements OnInit {
     // Encabezado
     const { fechaInicio, fechaFin } = this.formFiltro.value;
     doc.text(`Desde: ${fechaInicio}`, 15, y);
-    doc.text(`Hasta: ${fechaFin}`, 140, y);
+    doc.text(`Hasta: ${fechaFin}`, 150, y);
     y += 10;
 
-    // Cabecera de tabla
-    doc.setFillColor(200,200,200);
-    doc.rect(10, y, 190, 10, 'F');
-    doc.setTextColor(0);
-    doc.setFont('Helvetica', 'bold');
-    doc.text('Fecha', 20, y + 7);
-    doc.text('N° Doc.', 40, y + 7);
-    doc.text('Cuenta', 65, y + 7);
-    doc.text('Concepto', 95, y + 7);
-    doc.text('Débito', 145, y + 7);
-    doc.text('Crédito', 170, y + 7);
-    doc.text('Saldo', 195, y + 7, { align: 'right' });
-    y += 12;
-
-    doc.setFont('Helvetica' , 'normal');
-    this.librosMayoresGenerados.forEach(item => {
-      doc.text(item.fecha, 20, y);
-      doc.text(item.numero, 40, y);
-      doc.text(item.cuenta, 65, y);
-      doc.text(item.concepto?.slice(0, 20), 95, y);
-      doc.text(item.debe?.toFixed(2), 145, y, { align: 'right' });
-      doc.text(item.haber?.toFixed(2), 170, y, { align: 'right' });
-      doc.text(item.saldo?.toFixed(2), 195, y, { align: 'right' });
-      y += 7;
-
-      if (y >= 270) {
-        doc.addPage();
-        y = 20;
-      }
+    autoTable(doc, {
+      startY: y,
+      head: [['Fecha', 'N° Doc.', 'Cuenta', 'Concepto', 'Débito', 'Crédito', 'Saldo']],
+      body: this.librosMayoresGenerados.map(item => [
+        item.fecha,
+        item.numero,
+        item.cuenta,
+        item.concepto?.slice(0, 30) || '',
+        item.debe?.toFixed(2),
+        item.haber?.toFixed(2),
+        item.saldo?.toFixed(2)
+      ]),
+      styles: {
+        halign: 'center',
+        fontSize: 9,
+        cellPadding: 3
+      },
+      headStyles: {
+        fillColor: [180, 180, 180],
+        textColor: 20,
+        fontStyle: 'bold'
+      },
+      foot: [[
+        { content: 'SUMAN', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: this.totalDebe.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: this.totalHaber.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: this.totalSaldo.toFixed(2), styles: { fontStyle: 'bold' } }
+      ]]
     });
-
-    // Línea resumen final
-    doc.setFont('Helvetica', 'bold');
-    doc.text('SUMAN', 95, y);
-    doc.text(this.totalDebe.toFixed(2), 145, y, { align: 'right' });
-    doc.text(this.totalHaber.toFixed(2), 170, y, { align: 'right' });
-    doc.text(this.totalSaldo.toFixed(2), 195, y, { align: 'right' });
-    const blob = doc.output('blob');
+  
     const nombrePDF = `LibroMayor_${new Date().toISOString().slice(0, 10)}.pdf`;
-
+    const blob = doc.output('blob');
+  
     try {
       await this.libroMayorService.subirPDFLibroMayor(blob, nombrePDF);
       doc.save(nombrePDF);
@@ -172,7 +165,6 @@ export class LibroMayorComponent implements OnInit {
       alert('❌ Ocurrió un error al subir el PDF.');
     }
   }
-
   async obtenerLibrosGuardados(): Promise<void> {
     this.librosMayoresGenerados = await this.libroMayorService.obtenerLibrosGuardados();
   }

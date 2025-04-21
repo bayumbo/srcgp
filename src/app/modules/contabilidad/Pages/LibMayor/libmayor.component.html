@@ -5,6 +5,9 @@
         <mat-icon>home</mat-icon>
         <span>Inicio</span>
       </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
     </div>
 
     <nav [class.abierto]="menuAbierto">
@@ -73,12 +76,12 @@
 
     <!-- Botón para abrir el modal -->
 <div class="contenedor-btn-libros">
-  <button class="btn-ver-libros" (click)="abrirModalLibros()">📚 Ver Libros Guardados</button>
+  <button class="btn-ver-libros" (click)="abrirModalLibros()"> 📚 Ver Libros Guardados</button>
 </div>
 <div class="modal-libros-mayores" *ngIf="mostrarModalLibros">
   <div class="modal-content">
     <div class="modal-header">
-      <h3>Libros Mayores</h3>
+      <h5> 📚 Libros Mayores</h5>
       <button class="cerrar-modal" (click)="cerrarModalLibros()">✖</button>
     </div>
 

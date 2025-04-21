@@ -14,6 +14,7 @@ import { jsPDF } from 'jspdf';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   selector: 'app-libdiario',
@@ -98,72 +99,74 @@ export class LibroDiarioComponent implements OnInit {
     };
 
     const doc = new jsPDF();
+    
     let y = 20;
 
     // Estilo tipo imagen proporcionada
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('LIBRO DIARIO 2024', 15, y);
+    doc.setFontSize(14);
+    doc.text('LIBRO DIARIO - CONSORCIO PINTAG EXPRESS', 15, y);
     y += 10;
     doc.setFontSize(10);
     doc.setFont('Helvetica', 'normal');
     doc.text(`Numero: ${asiento.numero}`, 15, y);
     doc.text(`Fecha: ${asiento.fecha}`, 160, y, { align: 'right' });
-    y += 8;
+    y += 10;
     doc.text(`Concepto: ${asiento.concepto}`, 15, y);
     y += 10;
 
-  // Títulos de columna con sombreado
-doc.setFillColor(200,200,200); // gris claro
-doc.rect(20, y, 170, 10, 'F'); // fondo para encabezado
-doc.setTextColor(0);
-doc.setFont('Helvetica', 'bold');
-doc.text('CUENTA', 30, y + 7, { align: 'center' });
-doc.text('DESCRIPCIÓN', 75, y + 7, { align: 'center' });
-doc.text('C. COSTOS', 110, y + 7, { align: 'center' });
-doc.text('DEBITO', 150, y + 7, { align: 'center' });
-doc.text('CREDITO', 185, y + 7, { align: 'center' });
 
-y += 12;
-    doc.setFont('Helvetica', 'normal');
-    let totalDebe = 0;
-    let totalHaber = 0;
+ // 🔢 Totales
+ let totalDebe = 0;
+ let totalHaber = 0;
+ asiento.detalles.forEach((item: any) => {
+   totalDebe += item.debe;
+   totalHaber += item.haber;
+ });
+ // 📋 Tabla con AutoTable
+ autoTable(doc, {
+  startY: y,
+  head: [['CUENTA', 'DESCRIPCIÓN', 'C. COSTOS', 'DEBITO', 'CREDITO']],
+  body: asiento.detalles.map((item: any) => [
+    item.cuenta,
+    item.descripcion,
+    item.centroCostos,
+    item.debe.toFixed(2),
+    item.haber.toFixed(2)
+  ]),
+  styles: {
+    halign: 'center',
+    fontSize: 10,
+    cellPadding: 4,
+    lineColor: [0, 0, 0],
+    lineWidth: 0.1
+  },
+  headStyles: {
+    fillColor: [180, 180, 180],
+    textColor: 20,
+    fontStyle: 'bold'
+  },
+  foot: [[
+    { content: 'TOTAL:', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
+    { content: totalDebe.toFixed(2), styles: { fontStyle: 'bold' } },
+    { content: totalHaber.toFixed(2), styles: { fontStyle: 'bold' } }
+  ]]
+});
 
-    asiento.detalles.forEach((item: any) => {
-      doc.text(item.cuenta, 30, y, { align: 'center' });
-      doc.text(item.descripcion, 75, y, { align: 'center' });
-      doc.text(item.centroCostos, 110, y, { align: 'center' });
-      doc.text(item.debe.toFixed(2), 150, y, { align: 'center' });
-      doc.text(item.haber.toFixed(2), 185, y, { align: 'center' });
-      totalDebe += item.debe;
-      totalHaber += item.haber;
-      y += 8;
+const nombreArchivo = `${asiento.numero}.pdf`;
+const pdfBlob = doc.output('blob');
+doc.save(nombreArchivo);
+await this.diarioService.guardarAsientoConPDF(asiento, pdfBlob);
 
-      if (y >= 270) {
-        doc.addPage();
-        y = 20;
-      }
-    });
+alert('✅ Asiento guardado y PDF generado.');
+this.formAsiento.reset();
+this.detalles.clear();
+this.agregarDetalle();
+this.formAsiento.patchValue({ numero: this.generarCodigoAsiento() });
 
-    // Totales
-    doc.setFont('Helvetica', 'bold');
-    doc.text('TOTAL:', 130, y);
-    doc.text(totalDebe.toFixed(2), 150, y, { align: 'right' });
-    doc.text(totalHaber.toFixed(2), 180, y, { align: 'right' });
+if (this.filtroInicio && this.filtroFin) await this.filtrarPorFechas();
+}
 
-    const nombreArchivo = `${asiento.numero}.pdf`;
-    const pdfBlob = doc.output('blob');
-    doc.save(nombreArchivo);
-    await this.diarioService.guardarAsientoConPDF(asiento, pdfBlob);
-
-    alert('✅ Asiento guardado y PDF generado.');
-    this.formAsiento.reset();
-    this.detalles.clear();
-    this.agregarDetalle();
-    this.formAsiento.patchValue({ numero: this.generarCodigoAsiento() });
-
-    if (this.filtroInicio && this.filtroFin) await this.filtrarPorFechas();
-  }
 
   async filtrarPorFechas(): Promise<void> {
     if (this.filtroInicio && this.filtroFin) {

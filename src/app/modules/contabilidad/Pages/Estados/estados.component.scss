@@ -49,6 +49,7 @@ header {
     font-size: 26px;
     cursor: pointer;
     margin-left: auto;
+    width: 160px;
   }
 }
 
@@ -256,6 +257,23 @@ nav {
   padding: 1rem;
   border-radius: 8px;
   border: 1px solid #444;
+
+  a{
+    background-color: #61b3b9;
+    color: white;
+    font-weight: bold;
+    padding: 0.4rem 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    padding:
+3px;
+  margin-right: 9px;
+
+    &:hover {
+      background-color: #3e7b80;
+    }
+  }
 }
 
 .paginacion {
@@ -397,6 +415,7 @@ input {
       background: rgba(255, 255, 255, 0.05);
     }
   }
+  
 
   button {
     width: 100%;
@@ -413,4 +432,32 @@ margin-bottom: 10px;
       background-color: #2f8071;
     }
   }
+}
+.btn-generar1{
+  margin-top: 1rem;
+  background-color: #2f8071;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  padding:
+12px;
+  align-self: center;
+  width: 126px;
+}
+
+.btn-generar{
+  margin-top: -4rem;
+  background-color: #2f8071;
+  border: none;
+  border-radius: 9px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  padding:
+12px;
+  align-self: center;
+  width: 220px;
+  margin-left: 293px;
 }

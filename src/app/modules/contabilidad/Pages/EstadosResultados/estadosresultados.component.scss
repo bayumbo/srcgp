@@ -49,6 +49,7 @@ header {
     font-size: 26px;
     cursor: pointer;
     margin-left: auto;
+    width: 160px;
   }
 }
 
@@ -278,9 +279,16 @@ nav {
   margin-top: 1.5rem;
 
   .grupo {
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #ccc;
   }
-
+  h5 {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #1e1e1e;
+  }
   table {
     width: 100%;
     border-collapse: collapse;
@@ -290,11 +298,7 @@ nav {
     td {
       padding: 0.5rem;
       text-align: left;
-      margin-bottom: 30px; // espacio entre secciones
-      h5{
-        font-size: tahoma;
-        text-align: left;
-      }
+     
     }
 
     .valor {
@@ -304,26 +308,28 @@ nav {
     .total-row {
       font-weight: bold;
       background: rgba(255, 255, 255, 0.05);
+      border-top: 2px solid #bbb;
     }
+    td {color: #000;}
   }
 
-  .btn-pdf {
-    width: 100%;
-    margin-top: 1rem;
-    background-color: #0d47a1;
-    padding: 0.6rem;
-    border: none;
-    border-radius: 6px;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
+  
+}
+.btn-pdf1 {
+  width: 100%;
+  margin-top: 1rem;
+  background-color: #0d47a1;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
 
-    &:hover {
-      background-color: #0b3d91;
-    }
+  &:hover {
+    background-color: #0b3d91;
   }
 }
-
 // MODAL
 .modal-overlay {
   position: fixed;
@@ -331,7 +337,7 @@ nav {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(184, 183, 183, 0.7);
+  background-color: rgba(46, 45, 45, 0.7);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -346,7 +352,8 @@ nav {
   max-width: 700px;
   max-height: 90%;
   overflow-y: auto;
-  color: rgb(0, 0, 0);
+  color: #1e1e1e;
+  color: rgb(255, 255, 255);
   position: relative;
 
   h5 {
@@ -354,7 +361,9 @@ nav {
     text-align: center;
     color: #1e1e1e;
   }
-}
+} label{
+  color: #000000;
+  }
 
 .cerrar {
   position: absolute;
@@ -403,10 +412,11 @@ nav {
 }
 
 .balance-card {
-  background-color: #e4e0e0;
+  background-color: #444;
   padding: 1rem;
   border-radius: 8px;
   border: 1px solid #444;
+  color: white
 
   p {
     margin: 0.3rem 0;
@@ -421,6 +431,7 @@ nav {
     margin-top: 0.5rem;
     cursor: pointer;
     size: 100%;
+    margin-right: 7px;
 
     &:hover {
       background-color: #4a8d81;
@@ -464,5 +475,12 @@ nav {
     &:hover:not(:disabled) {
       background-color: #777;
     }
+  }
+}
+@media (max-width: 600px) {
+  .estado-listado table th,
+  .estado-listado table td {
+    font-size: 13px;
+    padding: 6px;
   }
 }
