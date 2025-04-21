@@ -26,6 +26,8 @@ export class RegisterComponent {
 
   hidePassword: boolean = true;
   mensajeExito: string = '';
+  mensajeError: string = '';
+
 
   form: FormGroup = this.fb.group({
     cedula: ['', [Validators.required, Validators.pattern(/^\d{10}$/)]],
@@ -33,8 +35,12 @@ export class RegisterComponent {
     apellidos: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
-    rol: ['usuario', Validators.required] // ✅ 
+    rol: ['usuario', Validators.required], // ✅ 
+    unidad:['', Validators.required],
+    empresa: ['General Pintag', Validators.required]
   });
+volverAlMenu: any;
+  
 
   async signUp(): Promise<void> {
     if (this.form.invalid) {
@@ -43,7 +49,8 @@ export class RegisterComponent {
       return;
     }
 
-    const { cedula, nombres, apellidos, email, password, rol } = this.form.value;
+    const { 
+      cedula, nombres, apellidos, email, password, rol, unidad, empresa } = this.form.value;
 
     try {
       const cedulaExiste = await this.authService.existeCedula(cedula);
@@ -65,6 +72,9 @@ export class RegisterComponent {
         apellidos,
         email,
         rol, // ✅ guarda el rol como 'usuario' o 'admin'
+        unidad,
+        empresa,
+        estado: true, // ✅ Se registra como activo por defecto
         creadoEn: new Date()
       };
 
@@ -89,10 +99,17 @@ export class RegisterComponent {
     } catch (error: any) {
       console.error('Error en el registro:', error);
       if (error.code === 'auth/email-already-in-use') {
-        alert('Este correo ya está registrado.');
+        this.mensajeError = 'Ya existe un usuario registrado con este correo electrónico.';
       } else {
-        alert(error.message || 'Hubo un error al registrar al usuario.');
+        this.mensajeError = 'Ocurrió un error al registrar. Intenta nuevamente.';
       }
+      
+      // 🔁 Oculta el mensaje de error luego de 3 segundos
+      setTimeout(() => {
+        this.mensajeError = '';
+      }, 3000);
+      
+      
     }
   }
 }

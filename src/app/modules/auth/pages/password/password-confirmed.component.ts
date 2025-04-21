@@ -6,7 +6,8 @@ import { Router } from '@angular/router';
   standalone: true,
   selector: 'app-password-confirmed',
   imports: [CommonModule],
-  templateUrl: './password-confirmed.component.html'
+  templateUrl: './password-confirmed.component.html',
+  styleUrl: './password-confirmed.component.scss'
 })
 export class PasswordConfirmedComponent {
   constructor(private router: Router) {}

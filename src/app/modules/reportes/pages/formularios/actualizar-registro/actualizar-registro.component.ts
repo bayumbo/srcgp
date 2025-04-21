@@ -17,8 +17,10 @@ export class ActualizarRegistroComponent implements OnInit {
   private router = inject(Router);
   private firestore = inject(Firestore);
 
+  uid: string = '';
   id: string = '';
-  registro: NuevoRegistro & { nombre?: string; unidad?: string } = {
+
+  registro: NuevoRegistro & { nombre?: string; apellido?: string; unidad?: string } = {
     administracion: 0,
     minutosAtraso: 0,
     minutosBase: 0,
@@ -28,25 +30,29 @@ export class ActualizarRegistroComponent implements OnInit {
     minutosPagados: 0,
     multasPagadas: 0,
     nombre: '',
+    apellido: '',
     unidad: ''
   };
 
-  async ngOnInit() {this.route.paramMap.subscribe(async params => {
-    this.id = params.get('id')!;
-    const ref = doc(this.firestore, 'reportesDiarios', this.id);
-    const snap = await getDoc(ref);
-  
-    if (snap.exists()) {
-      this.registro = snap.data() as NuevoRegistro & { nombre?: string; unidad?: string };
-    } else {
-      alert('❌ Registro no encontrado');
-      this.router.navigate(['/reportes/lista-reportes']);
-    }
-  });
+  async ngOnInit() {
+    this.route.paramMap.subscribe(async params => {
+      this.id = params.get('id')!;
+      this.uid = params.get('uid')!;
+
+      const ref = doc(this.firestore, `usuarios/${this.uid}/reportesDiarios/${this.id}`);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        this.registro = snap.data() as NuevoRegistro & { nombre?: string; unidad?: string };
+      } else {
+        alert('❌ Registro no encontrado');
+        this.router.navigate(['/reportes/lista-reportes']);
+      }
+    });
   }
 
   async guardar() {
-    const ref = doc(this.firestore, 'reportesDiarios', this.id);
+    const ref = doc(this.firestore, `usuarios/${this.uid}/reportesDiarios/${this.id}`);
     await updateDoc(ref, {
       administracion: this.registro.administracion,
       minutosAtraso: this.registro.minutosAtraso,
@@ -56,7 +62,7 @@ export class ActualizarRegistroComponent implements OnInit {
     });
     alert('✅ Registro actualizado');
     this.router.navigate(['/reportes/lista-reportes']);
-  };
+  }
 
   cancelar(): void {
     this.router.navigate(['/reportes/lista-reportes']);

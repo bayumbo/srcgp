@@ -1,7 +1,18 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Firestore, collection, getDocs, doc, collection as fsCollection, query, where, Timestamp, orderBy } from '@angular/fire/firestore';
-import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
+import {
+  Firestore,
+  collection,
+  getDocs,
+  doc,
+  collection as fsCollection,
+  query,
+  where,
+  Timestamp,
+  orderBy,
+  collectionGroup
+} from '@angular/fire/firestore';
+import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Pago } from 'src/app/core/interfaces/pago.interface';
@@ -14,14 +25,9 @@ import { Pago } from 'src/app/core/interfaces/pago.interface';
   styleUrls: ['./lista-reportes.component.scss']
 })
 export class ReporteListaComponent implements OnInit {
-  reportes: (NuevoRegistro & {
-    id: string;
-    minutosPagados: number;
-    adminPagada: number;
-    minBasePagados: number;
-    multasPagadas: number;
-  })[] = [];
-
+  reportes: ReporteConPagos[] = [];
+  cargando: boolean = true;
+  listaReportes: any[] = [];
   mostrarFiltros = false;
   fechaPersonalizada: string = '';
 
@@ -33,104 +39,134 @@ export class ReporteListaComponent implements OnInit {
   }
 
   async cargarTodosLosReportes() {
-    const ref = collection(this.firestore, 'reportesDiarios');
-    const q = query(ref, orderBy('fechaModificacion', 'desc'));
-    const snapshot = await getDocs(q);
+    this.cargando = true;
+    try {
+      const ref = query(
+        collectionGroup(this.firestore, 'reportesDiarios'),
+        orderBy('fechaModificacion', 'desc')
+      );
+      const snapshot = await getDocs(ref);
+      const tempReportes = [];
 
-    const tempReportes = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data() as NuevoRegistro;
+        const id = docSnap.id;
+        const pathParts = docSnap.ref.path.split('/');
+        const uid = pathParts[1];
 
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data() as NuevoRegistro;
-      const id = docSnap.id;
+        const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
+        const pagosSnap = await getDocs(pagosRef);
 
-      // ✅ forma correcta de acceder a subcolección
-      const docRef = doc(this.firestore, 'reportesDiarios', id);
-      const pagosRef = fsCollection(docRef, 'pagosTotales');
-      const pagosSnap = await getDocs(pagosRef);
+        let minutosPagados = 0;
+        let adminPagada = 0;
+        let minBasePagados = 0;
+        let multasPagadas = 0;
 
-      let minutosPagados = 0;
-      let adminPagada = 0;
-      let minBasePagados = 0;
-      let multasPagadas = 0;
+        pagosSnap.forEach(pagoDoc => {
+          const pago = pagoDoc.data();
+          const detalles = pago['detalles'] ?? {};
 
-      pagosSnap.forEach(pagoDoc => {
-        const pago = pagoDoc.data() as Pago;
-        minutosPagados += pago.minutosAtraso || 0;
-        adminPagada += pago.administracion || 0;
-        minBasePagados += pago.minutosBase || 0;
-        multasPagadas += pago.multas || 0;
-      });
+          minutosPagados += detalles.minutosAtraso || 0;
+          adminPagada += detalles.administracion || 0;
+          minBasePagados += detalles.minutosBase || 0;
+          multasPagadas += detalles.multas || 0;
+        });
 
-      tempReportes.push({
-        ...data,
-        id,
-        minutosPagados,
-        adminPagada,
-        minBasePagados,
-        multasPagadas
-      });
+        tempReportes.push({
+          ...data,
+          id,
+          uid,
+          minutosPagados,
+          adminPagada,
+          minBasePagados,
+          multasPagadas
+        });
+      }
+
+      this.reportes = tempReportes;
+    } catch (error) {
+      console.error('Error al cargar reportes:', error);
+    } finally {
+      this.cargando = false;
     }
-
-    this.reportes = tempReportes;
   }
 
   async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
-    const start = Timestamp.fromDate(new Date(fechaInicio));
-    const end = Timestamp.fromDate(new Date(fechaFin.setHours(23, 59, 59, 999)));
+    this.cargando = true;
+    try {
+      const start = Timestamp.fromDate(fechaInicio);
+      const end = Timestamp.fromDate(new Date(fechaFin.setHours(23, 59, 59, 999)));
 
-    const ref = collection(this.firestore, 'reportesDiarios');
-    const q = query(ref, where('fechaModificacion', '>=', start), where('fechaModificacion', '<=', end));
-    const snapshot = await getDocs(q);
+      const ref = query(
+        collectionGroup(this.firestore, 'reportesDiarios'),
+        where('fechaModificacion', '>=', start),
+        where('fechaModificacion', '<=', end),
+        orderBy('fechaModificacion', 'desc')
+      );
+      const snapshot = await getDocs(ref);
+      const tempReportes = [];
 
-    const tempReportes = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data() as NuevoRegistro;
+        const id = docSnap.id;
+        const pathParts = docSnap.ref.path.split('/');
+        const uid = pathParts[1];
 
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data() as NuevoRegistro;
-      const id = docSnap.id;
+        const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
+        const pagosSnap = await getDocs(pagosRef);
 
-      const docRef = doc(this.firestore, 'reportesDiarios', id);
-      const pagosRef = fsCollection(docRef, 'pagosTotales');
-      const pagosSnap = await getDocs(pagosRef);
+        let minutosPagados = 0;
+        let adminPagada = 0;
+        let minBasePagados = 0;
+        let multasPagadas = 0;
 
-      let minutosPagados = 0;
-      let adminPagada = 0;
-      let minBasePagados = 0;
-      let multasPagadas = 0;
+        pagosSnap.forEach(pagoDoc => {
+          const pago = pagoDoc.data() as Pago;
+          minutosPagados += pago.minutosAtraso || 0;
+          adminPagada += pago.administracion || 0;
+          minBasePagados += pago.minutosBase || 0;
+          multasPagadas += pago.multas || 0;
+        });
 
-      pagosSnap.forEach(pagoDoc => {
-        const pago = pagoDoc.data() as Pago;
-        minutosPagados += pago.minutosAtraso || 0;
-        adminPagada += pago.administracion || 0;
-        minBasePagados += pago.minutosBase || 0;
-        multasPagadas += pago.multas || 0;
-      });
+        tempReportes.push({
+          ...data,
+          id,
+          uid,
+          minutosPagados,
+          adminPagada,
+          minBasePagados,
+          multasPagadas
+        });
+      }
 
-      tempReportes.push({
-        ...data,
-        id,
-        minutosPagados,
-        adminPagada,
-        minBasePagados,
-        multasPagadas
-      });
+      this.reportes = tempReportes;
+    } catch (error) {
+      console.error('Error al consultar por rango:', error);
+    } finally {
+      this.cargando = false;
     }
-
-    this.reportes = tempReportes;
   }
 
   async filtrarPor(tipo: 'hoy' | 'semana' | 'mes') {
     const hoy = new Date();
     let fechaInicio: Date;
-    const fechaFin = new Date(hoy);
+    let fechaFin: Date;
 
     if (tipo === 'hoy') {
-      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
     } else if (tipo === 'semana') {
-      const diaSemana = hoy.getDay();
+      const diaActual = hoy.getDay();
+      const diferencia = diaActual === 0 ? 6 : diaActual - 1;
       fechaInicio = new Date(hoy);
-      fechaInicio.setDate(hoy.getDate() - diaSemana);
+      fechaInicio.setDate(hoy.getDate() - diferencia);
+      fechaInicio.setHours(0, 0, 0, 0);
+
+      fechaFin = new Date(hoy);
+      fechaFin.setHours(23, 59, 59, 999);
     } else {
-      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0);
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
     }
 
     await this.consultarReportesEnRango(fechaInicio, fechaFin);
@@ -150,11 +186,23 @@ export class ReporteListaComponent implements OnInit {
     this.router.navigate(['/reportes/nuevo-registro']);
   }
 
-  irAEditar(id: string): void {
-    this.router.navigate(['/reportes/actualizar', id]);
+  irAEditar(uid: string, id: string): void {
+    this.router.navigate([`/reportes/actualizar`, uid, id]);
   }
 
-  irAPagar(id: string): void {
-    this.router.navigate(['/reportes/realizar-pago', id]);
+  irAPagar(uid: string, id: string): void {
+    this.router.navigate([`/reportes/realizar-pago`, uid, id]);
+  }
+
+  irACuentasPorCobrar() {
+    this.router.navigate(['/reportes/cuentas-por-cobrar']);
+  }
+
+  irACierreCaja() {
+    this.router.navigate(['/reportes/cierre-caja']);
+  }
+
+  volver() {
+    this.router.navigate(['']);
   }
 }

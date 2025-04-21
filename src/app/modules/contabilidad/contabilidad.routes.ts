@@ -3,6 +3,11 @@ import { Routes } from '@angular/router';
 export const CONTABILIDAD_ROUTES: Routes = [
     
   {
+    path: '',
+    loadComponent: () =>
+      import('./Pages/AgregarCuenta/AgregarCuenta.component').then(m => m.AgregarCuentaComponent)
+  },
+  {
     path: 'agregar-cuenta',
     loadComponent: () =>
       import('./Pages/AgregarCuenta/AgregarCuenta.component').then(m => m.AgregarCuentaComponent)

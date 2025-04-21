@@ -1,19 +1,38 @@
-<header class="header">
-    <div class="left">
-      <h1 class="logo">🚌 Sistema de la Cooperativa</h1>
-    </div>
-  
-    <div class="right">
-      <!-- Avatar con referencia -->
-      <div #avatarRef class="avatar" (click)="toggleMenu()">
-        {{ getIniciales() }}
-      </div>
-  
-      <!-- Menú con referencia -->
-      <div #menuRef class="dropdown" *ngIf="isMenuOpen">
-        <button (click)="irPerfil()">👤 Perfil</button>
-        <button (click)="logOut()">🔒 Cerrar Sesión</button>
-      </div>
-    </div>
-  </header>
-  
+<!-- Sidebar lateral independiente del header -->
+<div *ngIf="rolUsuario === 'admin'" class="side_menu" [ngClass]="{ 'opened': menuLateralAbierto }">
+  <ul>
+    <li (click)="goTo('/reportes')"><span class="material-icons">insert_chart</span> Reportes</li>
+    <li (click)="goTo('/usuarios')"><span class="material-icons">calculate</span> Contabilidad</li>
+    <li (click)="goTo('/gestionroles')"><span class="material-icons">admin_panel_settings</span> Administración</li>
+  </ul>
+</div>
+
+<!-- HEADER PRINCIPAL -->
+<header class="header-container" [ngStyle]="{ 'padding-left': rolUsuario === 'admin' && menuLateralAbierto ? '250px' : '0' }">
+
+  <!-- Botón de menú para admins -->
+  <div *ngIf="rolUsuario === 'admin'" class="menu-toggle">
+    <button class="menu-btn material-icons" (click)="toggleMenuLateral()" title="Menú">
+      menu
+    </button>
+  </div>
+
+  <!-- Nombre empresa -->
+  <h5 class="titulo-app">{{ nombreEmpresa }}</h5>
+
+  <!-- Menú derecho -->
+  <div class="menu-derecho">
+    <button class="avatar-btn avatar-circle" (click)="toggleMenuUsuario()">
+      {{ iniciales }}
+    </button>
+    <ul class="dropdown" [class.visible]="menuUsuarioAbierto">
+      <li *ngIf="rolUsuario === 'admin'" (click)="goTo('/perfil')">
+        <span class="material-icons">person</span> Perfil
+      </li>
+      <li (click)="salir()">
+        <span class="material-icons">logout</span> Cerrar sesión
+      </li>
+    </ul>
+  </div>
+
+</header>

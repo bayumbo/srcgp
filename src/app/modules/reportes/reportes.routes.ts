@@ -5,12 +5,14 @@ export const REPORTES_ROUTES: Routes = [
   {
     path: 'nuevo-registro',
     loadComponent: () =>
-      import('./pages/formularios/nuevo-registro/nuevo-registro.component').then(m => m.NuevoRegistroComponent)
+      import('./pages/formularios/nuevo-registro/nuevo-registro.component')
+    .then(m => m.NuevoRegistroComponent)
   },
   {
-    path: 'actualizar/:id',
+    path: 'actualizar/:uid/:id',
     loadComponent: () =>
-      import('./pages/formularios/actualizar-registro/actualizar-registro.component').then(m => m.ActualizarRegistroComponent)
+      import('./pages/formularios/actualizar-registro/actualizar-registro.component')
+        .then(m => m.ActualizarRegistroComponent)
   },
   {
     path: 'lista-reportes',
@@ -23,18 +25,19 @@ export const REPORTES_ROUTES: Routes = [
       import('./pages/lista-reportes/lista-reportes.component').then(m => m.ReporteListaComponent)
   },
   {
-    path: 'realizar-pago/:id',
+    path: 'realizar-pago/:uid/:id',
     loadComponent: () =>
-      import('./pages/formularios/realizar-pago/realizar-pago.component').then(m => m.RealizarPagoComponent),
-  },
-  { 
-    path: 'fecha',
-    loadComponent: () =>
-      import('./pages/reporte-fecha/reporte-fecha.component').then(m => m.ReporteFechaComponent)
+      import('./pages/formularios/realizar-pago/realizar-pago.component').then(m => m.RealizarPagoComponent)
   },
   {
-    path: 'mensual',
+    path: 'cuentas-por-cobrar',
     loadComponent: () =>
-      import('./pages/reporte-mensual/reporte-mensual.component').then(m => m.ReporteMensualComponent)
+      import('./pages/cuentas-por-cobrar/cuentas-por-cobrar.component')
+        .then(m => m.CuentasPorCobrarComponent)
+  },
+  {
+    path: 'cierre-caja',
+    loadComponent: () =>
+      import('./pages/cierre-caja/cierre-caja.component').then(m => m.CierreCajaComponent)
   }
-];
+ ];

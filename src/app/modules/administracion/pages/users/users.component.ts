@@ -8,15 +8,25 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from '@angular/fire/auth';
-import { doc, getDoc, getFirestore } from '@angular/fire/firestore';
-import { Router } from '@angular/router';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  orderBy,
+  query
+} from '@angular/fire/firestore';
+import { Router, ActivatedRoute } from '@angular/router';
+import { AuthService } from 'src/app/core/auth/services/auth.service';
+import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 
 @Component({
   standalone: true,
   selector: 'app-perfil',
   imports: [CommonModule, FormsModule],
   templateUrl: './user.component.html',
-  styleUrls: ['./user.component.css']
+  styleUrls: ['./user.component.scss']
 })
 export class PerfilComponent implements OnInit {
   nombres: string = '';
@@ -24,42 +34,57 @@ export class PerfilComponent implements OnInit {
   correo: string = '';
   nuevaContrasena: string = '';
   contrasenaActual: string = '';
-  cargando = true;
-  uid: string | undefined;
-  cancelarCambioContrasena(): void {
-    this.nuevaContrasena = '';
-    this.contrasenaActual = '';
-    this.showNewPassword = false;
-    this.showCurrentPassword = false;
-  }
-  
+  unidad: string = '';
+  cedula: string = '';
+  empresa: string = '';
 
+  uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
+  esAdmin: boolean = false;
+  soloLectura: boolean = false;
+  reportesUsuario: NuevoRegistro[] = [];
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private authService: AuthService,
+    private route: ActivatedRoute
+  ) {}
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
+    const uidParam = this.route.snapshot.paramMap.get('uid');
     const auth = getAuth();
-    const user = auth.currentUser;
 
-    if (user) {
-      this.uid = user.uid;
-      this.correo = user.email || '';
-      this.cargarDatosUsuario();
-    }
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe(); // ✅ Esto evita bucles
 
-    this.cargando = false;
+      if (user) {
+        this.correo = user.email || '';
+
+        if (uidParam) {
+          this.uid = uidParam;
+
+          // Ver si el perfil es de otro usuario
+          if (uidParam !== user.uid) {
+            this.soloLectura = true;
+          }
+        } else {
+          this.uid = user.uid;
+        }
+
+        await this.cargarDatosUsuario();
+        await this.obtenerReportesUsuario();
+
+        const rol = await this.authService.cargarRolActual();
+        this.esAdmin = rol === 'admin';
+      }
+    });
   }
 
   async cargarDatosUsuario() {
     try {
       const firestore = getFirestore();
-
-      if (!this.uid) {
-        console.error('UID no está definido');
-        return;
-      }
+      if (!this.uid) return;
 
       const docRef = doc(firestore, 'usuarios', this.uid);
       const docSnap = await getDoc(docRef);
@@ -68,12 +93,28 @@ export class PerfilComponent implements OnInit {
         const data = docSnap.data();
         this.nombres = data['nombres'] || '';
         this.apellidos = data['apellidos'] || '';
-      } else {
-        console.warn('El documento del usuario no existe en Firestore');
+        this.cedula = data['cedula'] || '';
+        this.unidad = data['unidad'] || '';
+        this.empresa = data['empresa'] || '';
+        this.correo = data['email'] || this.correo;
       }
     } catch (error) {
       console.error('Error al cargar usuario:', error);
     }
+  }
+
+  async obtenerReportesUsuario() {
+    if (!this.uid) return;
+
+    const firestore = getFirestore();
+    const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
+    const q = query(reportesRef, orderBy('fechaModificacion', 'desc'));
+
+    const querySnapshot = await getDocs(q);
+    this.reportesUsuario = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as NuevoRegistro[];
   }
 
   get passwordStrength(): string {
@@ -87,51 +128,34 @@ export class PerfilComponent implements OnInit {
   async guardarCambios() {
     const auth = getAuth();
     const user = auth.currentUser;
-  
     if (!user) return;
-  
+
     try {
-      // Validar email
       const email = user.email;
-      if (!email) {
-        alert('❌ No se puede verificar el usuario: email no disponible');
-        return;
-      }
-  
-      // Cambio de correo
+      if (!email) return alert('❌ Email no disponible');
+
       if (this.correo !== email) {
         await updateEmail(user, this.correo);
       }
-  
-      // Cambio de contraseña
+
       if (this.nuevaContrasena) {
         if (this.nuevaContrasena.length < 6) {
-          alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres');
-          return;
+          return alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres');
         }
-  
         if (!this.contrasenaActual) {
-          alert('⚠️ Debes ingresar tu contraseña actual para cambiarla');
-          return;
+          return alert('⚠️ Ingresa tu contraseña actual');
         }
-  
-        // Crear credencial segura
+
         const credential = EmailAuthProvider.credential(email, this.contrasenaActual);
-  
-        // Reautenticación
         await reauthenticateWithCredential(user, credential);
-  
-        // Si reautenticó, cambiamos contraseña
         await updatePassword(user, this.nuevaContrasena);
       }
-  
+
       alert('✅ Cambios guardados correctamente');
-      this.cancelarCambioContrasena(); // Limpia los campos
-  
+      this.cancelarCambioContrasena();
+
     } catch (error: any) {
-      console.error('🔥 Error de autenticación:', error);
       const errorCode = error?.code || error?.error?.code;
-  
       if (errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
         alert('❌ Contraseña incorrecta');
       } else {
@@ -139,6 +163,14 @@ export class PerfilComponent implements OnInit {
       }
     }
   }
+
+  cancelarCambioContrasena(): void {
+    this.nuevaContrasena = '';
+    this.contrasenaActual = '';
+    this.showNewPassword = false;
+    this.showCurrentPassword = false;
+  }
+
   togglePasswordVisibility(type: 'current' | 'new'): void {
     if (type === 'current') {
       this.showCurrentPassword = !this.showCurrentPassword;
@@ -146,9 +178,8 @@ export class PerfilComponent implements OnInit {
       this.showNewPassword = !this.showNewPassword;
     }
   }
-  
 
-  volverAlMenu() {
+  volverAlMenu(): void {
     this.router.navigate(['/menu']);
   }
 }

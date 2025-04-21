@@ -15,10 +15,10 @@
         required
       />
       <datalist id="usuariosList">
-        <option *ngFor="let u of usuarios" [value]="u.nombre"></option>
+        <option *ngFor="let u of usuarios" [value]="u.nombre + ' ' + u.apellido"></option>
       </datalist>
     </div>
-
+   
     <div class="form-group">
       <label>Unidad:</label>
       <input type="text" [value]="usuarioSeleccionado?.unidad || ''" readonly />

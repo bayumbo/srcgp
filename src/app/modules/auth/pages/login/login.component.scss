@@ -1,0 +1,177 @@
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 64px); // 64px = altura de tu header aprox.
+}
+/* Garantiza que todo el viewport tenga altura completa */
+html, body, app-root, app-login {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #1c1c1c, #2b2b2b);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Contenedor del formulario login */
+.login-wrapper {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.8);
+  border-radius: 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Título */
+.login-wrapper h2 {
+  margin: 0 0 30px;
+  color: #ffffff;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* Agrupación de campos */
+.form-group {
+  position: relative;
+  margin-bottom: 30px;
+}
+
+/* Inputs */
+.form-group input {
+  width: 100%;
+  padding: 10px 0;
+  font-size: 16px;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #ffffff;
+  outline: none;
+  z-index: 1;
+}
+
+/* Etiquetas flotantes */
+.form-group label {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  color: #ffffff;
+  font-size: 16px;
+  pointer-events: none;
+  transition: 0.3s ease;
+}
+
+/* Activación de etiqueta flotante */
+.form-group input:focus ~ label,
+.form-group input:not(:placeholder-shown) ~ label {
+  top: -18px;
+  font-size: 12px;
+  color: #03e9f4;
+}
+
+/* Error debajo del input */
+.error {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Password + icono de mostrar/ocultar */
+.password-group {
+  position: relative;
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper input {
+  padding-right: 38px;
+}
+
+.toggle-password {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  font-family: 'Material Icons';
+  font-size: 22px;
+  color: #03e9f4;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+    color: #40e0d0;
+  }
+}
+
+/* Botón de envío */
+button[type="submit"] {
+  background: transparent;
+  color: #03e9f4;
+  border: 2px solid #03e9f4;
+  padding: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  .material-icons {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: #03e9f4;
+    color: #000000;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+/* Enlace como botón debajo */
+p button {
+  background: none;
+  border: none;
+  color: #03e9f4;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 10px;
+  text-decoration: underline;
+
+  &:hover {
+    color: #40e0d0;
+  }
+}
+
+/* Estilo para autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  transition: background-color 9999s ease-in-out 0s;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: white;
+  box-shadow: 0 0 0px 1000px transparent inset;
+}

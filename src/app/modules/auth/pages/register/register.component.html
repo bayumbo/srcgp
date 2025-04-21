@@ -1,84 +1,109 @@
+<main>
 <div class="container">
-  <h2>Registro</h2>
+  <h5><span class="material-icons">person</span> Registro de Usuario</h5>
   <form [formGroup]="form" (ngSubmit)="signUp()">
-    
-    <!-- Cédula -->
-    <div class="form-group">
-      <label for="cedula">Cédula de Identidad</label>
-      <input type="text" id="cedula" formControlName="cedula" maxlength="10" pattern="[0-9]*" inputmode="numeric" placeholder="0102030405">
-      <div *ngIf="form.get('cedula')?.touched && form.get('cedula')?.invalid">
-        <small class="error" *ngIf="form.get('cedula')?.errors?.['required']">Este campo es obligatorio</small>
-        <small class="error" *ngIf="form.get('cedula')?.errors?.['pattern']">Debe contener exactamente 10 dígitos</small>
+
+    <!-- Nombres y Apellidos -->
+    <div class="form-row">
+      <div class="form-group half">
+        <label for="nombres">Nombres</label>
+        <input type="text" id="nombres" formControlName="nombres" placeholder="Nombres">
+        <small class="error" *ngIf="form.get('nombres')?.touched && form.get('nombres')?.invalid">
+          Este campo es obligatorio
+        </small>
+      </div>
+      <div class="form-group half">
+        <label for="apellidos">Apellidos</label>
+        <input type="text" id="apellidos" formControlName="apellidos" placeholder="Apellidos">
+        <small class="error" *ngIf="form.get('apellidos')?.touched && form.get('apellidos')?.invalid">
+          Este campo es obligatorio
+        </small>
       </div>
     </div>
 
-    <!-- Nombres -->
-    <div class="form-group">
-      <label for="nombres">Nombres</label>
-      <input type="text" id="nombres" formControlName="nombres" placeholder="Nombres">
-      <div *ngIf="form.get('nombres')?.touched && form.get('nombres')?.invalid">
-        <small class="error">Este campo es obligatorio</small>
+    <!-- Cédula y Correo -->
+    <div class="form-row">
+      <div class="form-group half">
+        <label for="cedula">Cédula</label>
+        <input type="text" id="cedula" formControlName="cedula" maxlength="10" placeholder="0102030405">
+        <small class="error" *ngIf="form.get('cedula')?.touched && form.get('cedula')?.invalid">
+          Cédula inválida
+        </small>
+      </div>
+      <div class="form-group half">
+        <label for="email">Correo</label>
+        <input type="email" id="email" formControlName="email" placeholder="correo@ejemplo.com">
+        <small class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
+          Correo inválido
+        </small>
       </div>
     </div>
 
-    <!-- Apellidos -->
-    <div class="form-group">
-      <label for="apellidos">Apellidos</label>
-      <input type="text" id="apellidos" formControlName="apellidos" placeholder="Apellidos">
-      <div *ngIf="form.get('apellidos')?.touched && form.get('apellidos')?.invalid">
-        <small class="error">Este campo es obligatorio</small>
+    <!-- Contraseña y Unidad -->
+    <div class="form-row">
+      <div class="form-group half">
+        <label for="password">Contraseña</label>
+        <div class="password-wrapper">
+          <input
+            [type]="hidePassword ? 'password' : 'text'"
+            id="password"
+            formControlName="password"
+            placeholder="••••••••">
+          <button type="button" class="toggle-button" (click)="hidePassword = !hidePassword">
+            <span class="material-icons">
+              {{ hidePassword ? 'visibility' : 'visibility_off' }}
+            </span>
+          </button>
+        </div>
+        <small class="error" *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
+          Mínimo 6 caracteres
+        </small>
+      </div>
+
+      <div class="form-group half">
+        <label for="unidad">Unidad</label>
+        <input type="text" id="unidad" formControlName="unidad" placeholder="Unidad">
+        <small class="error" *ngIf="form.get('unidad')?.touched && form.get('unidad')?.invalid">
+          Este campo es obligatorio
+        </small>
       </div>
     </div>
 
-    <!-- Correo -->
-    <div class="form-group">
-      <label for="email">Correo Electrónico</label>
-      <input type="email" id="email" formControlName="email" placeholder="tucorreo@ejemplo.com">
-      <div *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
-        <small class="error" *ngIf="form.get('email')?.errors?.['required']">Este campo es obligatorio</small>
-        <small class="error" *ngIf="form.get('email')?.errors?.['email']">Correo inválido</small>
+    <!-- Rol y Empresa -->
+    <div class="form-row">
+      <div class="form-group half">
+        <label for="rol">Rol</label>
+        <select id="rol" formControlName="rol">
+          <option value="usuario">Usuario</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <div class="form-group half">
+        <label for="empresa">Empresa</label>
+        <select id="empresa" formControlName="empresa">
+          <option value="General Pintag">General Pintag</option>
+          <option value="Expreso Antisana">Expreso Antisana</option>
+        </select>
       </div>
     </div>
-
-    <!-- Contraseña -->
-    <div class="form-group">
-      <label for="password">Contraseña</label>
-      <div class="password-wrapper">
-        <input
-          [type]="hidePassword ? 'password' : 'text'"
-          id="password"
-          formControlName="password"
-          placeholder="••••••••"
-        >
-        <button type="button" class="toggle-button" (click)="hidePassword = !hidePassword">
-          {{ hidePassword ? '👁️' : '🚫' }}
-        </button>
-      </div>
-      <div *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
-        <small class="error" *ngIf="form.get('password')?.errors?.['required']">Este campo es obligatorio</small>
-        <small class="error" *ngIf="form.get('password')?.errors?.['minlength']">Mínimo 6 caracteres</small>
-      </div>
-    </div>
-
-    <!-- Rol -->
-<div class="form-group">
-  <label for="rol">Rol de Usuario</label>
-  <select id="rol" formControlName="rol">
-    <option value="usuario">Usuario</option>
-    <option value="admin">Administrador</option>
-  </select>
-  <div *ngIf="form.get('rol')?.touched && form.get('rol')?.invalid">
-    <small class="error">Este campo es obligatorio</small>
-  </div>
-</div>
-
 
     <!-- Botón -->
-    <button type="submit">Registrar Nuevo Usuario</button>
+    <button type="submit">
+      <span class="material-icons">person_add</span> Registrar Nuevo Usuario
+    </button>
+    <div *ngIf="mensajeError" class="error-message">
+      <span class="material-icons">error</span> {{ mensajeError }}
+    </div>
+    
+
+    <!-- Éxito -->
+    <div *ngIf="mensajeExito" class="success-message">
+      <span class="material-icons">check_circle</span> {{ mensajeExito }}
+    </div>
+
+    <p>
+      <a href="#"><span class="material-icons">arrow_back</span> Volver al Menú</a>
+    </p>
   </form>
-<!-- Mensaje de éxito -->
-<div *ngIf="mensajeExito" style="text-align: center; margin-bottom: 15px; color: green; font-weight: bold;">
-  {{ mensajeExito }}
 </div>
-  <p><a href="#">Volver al Menú</a></p>
-</div>
+</main>

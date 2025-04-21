@@ -1,0 +1,132 @@
+.titulo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.contenedor-principal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2rem;
+  padding: 1rem;
+}
+
+.contenedor-unidades {
+  width: 300px;
+  background: #f7f7f7;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.buscador {
+  width: 90%;
+
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin-bottom: 1rem;
+}
+
+.tabla-unidades {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.tabla-unidades th,
+.tabla-unidades td {
+  padding: 0.6rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.tabla-unidades tr:hover {
+  background-color: #eef;
+  cursor: pointer;
+}
+
+.selected {
+  background-color: #c8e6c9 !important;
+}
+
+.detalle-usuario {
+  flex: 1;
+  min-width: 400px;
+  max-width: 650px;
+  background: #e8f5e9;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+.detalle-contenido {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tabla-reportes {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  background-color: #fff;
+}
+
+.tabla-reportes th,
+.tabla-reportes td {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+
+.totales {
+  background-color: #dcedc8;
+  padding: 1rem;
+  margin-top: 1rem;
+  border-radius: 8px;
+
+  p {
+    margin: 0.3rem 0;
+  }
+
+  .total {
+    font-size: 1.2rem;
+    margin-top: 1rem;
+    color: #1b5e20;
+  }
+}
+.spinner-contenedor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.spinner {
+  border: 6px solid #e0e0e0;
+  border-top: 6px solid #4caf50;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.btn-pago {
+  margin-top: 1rem;
+  padding: 0.6rem 1.2rem;
+  background-color: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #1b5e20;
+  }
+  
+}

@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
   selector: 'app-reset-password',
   imports: [CommonModule, FormsModule, MatSnackBarModule],
   templateUrl: './reset-password.component.html',
+  styleUrl:'./reset-password.component.scss'
 
 })
 export class ResetPasswordComponent {

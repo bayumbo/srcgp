@@ -6,11 +6,19 @@ import { REPORTES_ROUTES } from './modules/reportes/reportes.routes';
 import {CONTABILIDAD_ROUTES} from './modules/contabilidad/contabilidad.routes';
 
 export const APP_ROUTES: Routes = [
+  // 🔓 RUTAS PÚBLICAS (sin auth)
+  {
+    path: 'auth',
+    canActivate: [publicGuard],
+    children: AUTH_ROUTES,
+  },
+
+  // 🔐 RUTAS PROTEGIDAS (requieren login)
   {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./shared/layouts/main-layout/main-layout.component').then(m => m.LayoutComponent),
+      import('./shared/layouts/main-layout/main-layout.component').then(m => m.MainLayoutComponent),
     children: [
       {
         path: '',
@@ -19,8 +27,18 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: 'perfil',
-        loadComponent: () =>
-          import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
+          },
+          {
+            path: ':uid',
+            loadComponent: () =>
+              import('./modules/administracion/pages/users/users.component').then(m => m.PerfilComponent),
+          },
+        ],
       },
       {
         path: 'register',
@@ -29,57 +47,31 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/auth/pages/register/register.component').then(m => m.RegisterComponent),
       },
-      //{
-        //path: 'reportes',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/reportes/pages/reporte-diario/reporte-diario.component').then(
-            //m => m.ReporteDiarioComponent
-          //),
-     // },
-      //{
-        //path: 'usuarios',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/contabilidad/pages/indexconta/indexconta.component').then(
-           // m => m.IndexContaComponent
-         // ),
-      //},
-      //{
-        //path: 'cargas',
-        //canActivate: [roleGuard],
-        //data: { roles: ['admin'] },
-        //loadComponent: () =>
-          //import('./modules/administracion/pages/data-carga/data-carga.component').then(
-            //m => m.DataCargaComponent
-          //),
-     // }
-    ]
-  },
-  {
-    path: 'auth',
-    canActivate: [publicGuard],
-    children: AUTH_ROUTES,
-  },
-  
-  {
-    path: 'contabilidad',
-    canActivate: [authGuard],
-    children: CONTABILIDAD_ROUTES,
+      {
+        path: 'gestionroles',
+        canActivate: [roleGuard],
+        data: { roles: ['admin'] },
+        loadComponent: () =>
+          import('./modules/administracion/pages/GestionRoles/gestionroles.component').then(m => m.GestionRolesComponent),
+      },
+      {
+        path: 'contabilidad',
+        canActivate: [authGuard],
+        children: CONTABILIDAD_ROUTES,
+      },
+      {
+        path: 'reportes',
+        canActivate: [authGuard],
+        children: REPORTES_ROUTES,
+      },
+    ],
   },
 
-  {
-    path: 'reportes',
-    canActivate: [authGuard], 
-    children: REPORTES_ROUTES,
-  },
-
+  // Redirección
   {
     path: '**',
     redirectTo: '',
     pathMatch: 'full',
   },
-  
 ];
+

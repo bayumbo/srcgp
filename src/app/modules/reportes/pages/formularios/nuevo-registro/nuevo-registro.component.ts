@@ -13,6 +13,7 @@ import { Firestore, collection, getDocs, doc, getDoc } from '@angular/fire/fires
   templateUrl: './nuevo-registro.component.html',
   styleUrls: ['./nuevo-registro.component.scss']
 })
+
 export class NuevoRegistroComponent {
   reporte: NuevoRegistro = {
     adminPagada: 0,
@@ -24,14 +25,17 @@ export class NuevoRegistroComponent {
     multas: 0,
     multasPagadas: 0,
     nombre: '',
+    apellido:'',
     unidad: '',
-    uid: ''
+    uid: '',
   };
 
-  usuarios: { uid: string, nombre: string, unidad: string }[] = [];
-
+  usuarios: { uid: string; nombre: string; apellido: string; unidad: string }[] = [];
+  nombreBuscado: string = '';
+  usuarioSeleccionado: any = null;
   resultado: string | null = null;
   id: string | null = null;
+
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private firestore = inject(Firestore);
@@ -51,26 +55,32 @@ export class NuevoRegistroComponent {
     this.usuarios = snapshot.docs.map(doc => ({
       uid: doc.id,
       nombre: doc.data()['nombres'],
+      apellido: doc.data()['apellidos'],
       unidad: doc.data()['unidad']
     }));
   }
 
-  seleccionarUsuario(uid: string) {
+    seleccionarUsuario(uid: string) {
     const usuario = this.usuarios.find(u => u.uid === uid);
     if (usuario) {
       this.reporte.nombre = usuario.nombre;
+      this.reporte.apellido = usuario.apellido;
       this.reporte.unidad = usuario.unidad;
       this.reporte.uid = usuario.uid;
     }
   }
 
+
   async cargarSiEsEdicion() {
     this.id = this.route.snapshot.paramMap.get('id');
-    if (this.id) {
-      const ref = doc(this.firestore, 'reportesDiarios', this.id);
+    const uid = this.route.snapshot.paramMap.get('uid'); // ahora lo leemos directo de la URL
+
+    if (this.id && uid) {
+      const ref = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${this.id}`);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         this.reporte = snap.data() as NuevoRegistro;
+        this.reporte.uid = uid;
       } else {
         alert('❌ Registro no encontrado');
         this.router.navigate(['/reportes/lista-reportes']);
@@ -78,42 +88,24 @@ export class NuevoRegistroComponent {
     }
   }
 
-  autocompletarUnidad(): void {
-  const usuarioSeleccionado = this.usuarios.find(u => u.nombre === this.reporte.nombre);
-  if (usuarioSeleccionado) {
-    this.reporte.uid = usuarioSeleccionado.uid;
-    this.reporte.unidad = usuarioSeleccionado.unidad;
-  } else {
-    this.reporte.unidad = '';
-  }
-}
+  actualizarUsuarioSeleccionado() {
+    // buscar por nombre + apellido
+    this.usuarioSeleccionado = this.usuarios.find(u =>
+      `${u.nombre} ${u.apellido}`.toLowerCase() === this.nombreBuscado.toLowerCase()
+    ) || null;
 
-nombreSeleccionado: string = '';
-actualizarUnidad() {
-  const usuario = this.usuarios.find(u => u.nombre === this.nombreSeleccionado);
-  if (usuario) {
-    this.reporte.uid = usuario.uid;
-    this.reporte.nombre = usuario.nombre;
-    
+    if (this.usuarioSeleccionado) {
+      this.reporte.uid = this.usuarioSeleccionado.uid;
+      this.reporte.nombre = this.usuarioSeleccionado.nombre;
+      this.reporte.apellido = this.usuarioSeleccionado.apellido;
+      this.reporte.unidad = this.usuarioSeleccionado.unidad;
+    } else {
+      this.reporte.uid = '';
+      this.reporte.nombre = '';
+      this.reporte.apellido = '';
+      this.reporte.unidad = '';
+    }
   }
-}
-
-nombreBuscado: string = '';
-usuarioSeleccionado: any = null;
-actualizarUsuarioSeleccionado() {
-  this.usuarioSeleccionado = this.usuarios.find(u => u.nombre.toLowerCase() === this.nombreBuscado.toLowerCase()) || null;
-
-  // ⚠️ Puedes mostrar un mensaje si el usuario no existe
-  if (this.usuarioSeleccionado) {
-    this.reporte.uid = this.usuarioSeleccionado.uid;
-    this.reporte.nombre = this.usuarioSeleccionado.nombre;
-    this.reporte.unidad = this.usuarioSeleccionado.unidad;
-  } else {
-    this.reporte.uid = '';
-    this.reporte.nombre = '';
-    this.reporte.unidad = '';
-  }
-}
   async enviar() {
     if (!this.reporte.uid || !this.reporte.nombre || !this.reporte.unidad) {
       alert('⚠️ Por favor selecciona un usuario válido.');
@@ -122,10 +114,10 @@ actualizarUsuarioSeleccionado() {
 
     try {
       if (this.id) {
-        await this.reportesService.actualizarReporteDiario(this.id, this.reporte);
+        await this.reportesService.actualizarReporteDiario(this.reporte.uid, this.id, this.reporte);
         this.resultado = `Registro actualizado: ${this.id}`;
       } else {
-        const docRef = await this.reportesService.guardarReporteDiario(this.reporte);
+        const docRef = await this.reportesService.guardarReporteDiario(this.reporte.uid, this.reporte);
         this.resultado = docRef.id;
       }
 
@@ -135,3 +127,6 @@ actualizarUsuarioSeleccionado() {
     }
   }
 }
+
+
+

@@ -19,27 +19,65 @@ import {
   getDocs,
   getDoc
 } from '@angular/fire/firestore';
-import { Usuario } from '../../interfaces/user.interface';
-import { Credential } from '../../interfaces/user.interface';
 
 
+
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth as getAuthStandalone } from 'firebase/auth';
+import { environment } from 'src/environments/environment'; 
+
+export interface Credential {
+  email: string;
+  password: string;
+}
+
+export interface Usuario {
+  uid: string;
+  cedula: string;
+  nombres: string;
+  apellidos: string;
+  email: string;
+  rol: string;
+  empresa:string;
+  unidad: string;
+  
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  
+    
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
 
   readonly authState$ = authState(this.auth);
   currentUserRole: string | null = null;
-
+  
+  getUser(): Promise<import('@angular/fire/auth').User | null> {
+    return new Promise(resolve => {
+      const unsubscribe = this.auth.onAuthStateChanged(user => {
+        resolve(user);
+        unsubscribe(); // evita llamadas múltiples
+      });
+    });
+  }
   // 🔐 Registro
-  signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
-    return createUserWithEmailAndPassword(
-      this.auth,
-      credential.email,
-      credential.password
-    );
+  async signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
+    // Crear instancia secundaria de Firebase para evitar cerrar sesión actual
+    const secondaryApp = initializeApp(environment.firebase, 'SecondaryApp');
+    const secondaryAuth = getAuthStandalone(secondaryApp);
+  
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        credential.email,
+        credential.password
+      );
+      return userCredential;
+    } finally {
+      // Limpieza: cerrar sesión y eliminar app secundaria
+      await secondaryAuth.signOut();
+      await deleteApp(secondaryApp);
+    }
   }
 
   // 🔐 Login con carga de rol
@@ -61,9 +99,6 @@ export class AuthService {
   
     return userCredential;
   }
-  
-  
-
 
   // 🔓 Logout
   async logOut(): Promise<void> {

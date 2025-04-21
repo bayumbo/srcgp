@@ -1,0 +1,108 @@
+<body>
+  <main class="contenido-principal">
+    <!-- 🔄 Cargando -->
+    <div *ngIf="cargando" class="loading-container">
+      <div class="spinner"></div>
+      <p>Cargando usuarios...</p>
+    </div>
+
+    <!-- ✅ Contenido -->
+    <div *ngIf="!cargando">
+      <!-- Filtro -->
+      <div style="margin-bottom: 1rem;">
+        <label>
+          <input type="checkbox" (change)="onToggleFiltro($event)" />
+          <strong>Mostrar solo activos</strong>
+        </label>
+      </div>
+
+      <!-- Búsqueda -->
+      <div class="search-bar">
+        <span class="material-icons">search</span>
+        <input
+          type="text"
+          [(ngModel)]="cedulaBuscada"
+          placeholder="Buscar por nombre o cédula"
+          (input)="buscarPorCedula()"
+        />
+      </div>
+
+      <!-- Tabla -->
+      <div class="tabla-container">
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>Empresa</th>
+                <th>Rol actual</th>
+                <th>Asignar Rol</th>
+                <th>Guardar</th>
+                <th>Ver</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let usuario of usuariosPaginados" [ngClass]="{ 'inactivo': !usuario.estado }">
+                <td>{{ usuario.nombres }} {{ usuario.apellidos }}</td>
+                <td>{{ usuario.cedula }}</td>
+                <td>{{ usuario.empresa }}</td>
+                <td>{{ usuario.rol }}</td>
+                <td>
+                  <select [(ngModel)]="usuario.nuevoRol" [disabled]="!usuario.estado">
+                    <option *ngFor="let rol of rolesDisponibles" [value]="rol">{{ rol }}</option>
+                  </select>
+                </td>
+                <td>
+                  <button class="btn-ver" [disabled]="!usuario.estado || !usuario.nuevoRol || usuario.nuevoRol === usuario.rol"
+                    (click)="guardarNuevoRol(usuario.uid, usuario.nuevoRol!)">
+                    <span class="material-icons">save</span>
+                  </button>
+                </td>
+                <td>
+                  <button class="btn-ver" [disabled]="!usuario.estado" (click)="verPerfil(usuario.uid)">
+                    <span class="material-icons">visibility</span>
+                  </button>
+                </td>
+                <td>
+                  <label class="switch">
+                    <input type="checkbox" [checked]="usuario.estado" (change)="onEstadoChange($event, usuario.uid)" />
+                    <span class="slider"></span>
+                  </label>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 🔢 Controles de paginación -->
+        <div class="pagination-controls" *ngIf="totalPaginas > 1">
+          <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">
+            &laquo;
+          </button>
+
+          <button
+            *ngFor="let pagina of generarArrayPaginas()"
+            (click)="cambiarPagina(pagina)"
+            [ngClass]="{ 'active': pagina === paginaActual }"
+          >
+            {{ pagina }}
+          </button>
+
+          <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">
+            &raquo;
+          </button>
+        </div>
+
+        <!-- 🔙 Botón volver -->
+        <button class="logout-btn" (click)="volverAlMenu()">
+          <span class="material-icons">arrow_back</span> Menú Principal
+        </button>
+
+        <!-- ✅ Toast -->
+        <div class="toast" *ngIf="mostrarToast">✅ Rol actualizado con éxito</div>
+      </div>
+    </div>
+  </main>
+</body>

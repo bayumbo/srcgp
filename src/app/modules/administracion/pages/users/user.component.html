@@ -1,64 +1,116 @@
-<div class="perfil-container" *ngIf="!cargando">
-    <h2>👤 Perfil</h2>
-  
+
+  <div class="perfil-container">
+    <h5><span class="material-icons">person</span> Perfil</h5>
+
     <form (ngSubmit)="guardarCambios()">
       <!-- DATOS PERSONALES -->
       <div class="form-group">
-        <label>Nombres</label>
-        <input type="text" [value]="nombres" disabled />
+        <label>Cédula</label>
+        <input type="text" [value]="cedula" disabled />
       </div>
-  
-      <div class="form-group">
-        <label>Apellidos</label>
-        <input type="text" [value]="apellidos" disabled />
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombres</label>
+          <input type="text" [value]="nombres" disabled />
+        </div>
+        <div class="form-group">
+          <label>Apellidos</label>
+          <input type="text" [value]="apellidos" disabled />
+        </div>
       </div>
-  
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Unidad</label>
+          <input type="text" [value]="unidad" disabled />
+        </div>
+        <div class="form-group">
+          <label>Empresa</label>
+          <input type="text" [value]="empresa" disabled />
+        </div>
+      </div>
+
+      <!-- Correo -->
       <div class="form-group">
         <label for="correo">Correo</label>
-        <input type="email" id="correo" [(ngModel)]="correo" name="correo" required />
+        <input
+          type="email"
+          id="correo"
+          [(ngModel)]="correo"
+          name="correo"
+          required
+          [disabled]="soloLectura"
+        />
       </div>
-     <!-- CONTRASEÑA ACTUAL -->
-     <div class="divider">Cambio de contraseña</div>
-     <div class="form-group">
-<label for="contrasenaActual">Contraseña actual</label>
-<div class="password-input">
-  <input
-    [type]="showCurrentPassword ? 'text' : 'password'"
-    [(ngModel)]="contrasenaActual"
-    name="contrasenaActual"
-    id="contrasenaActual"
-    placeholder="Ingresa tu contraseña actual"
-  />
-  <button type="button" (click)="showCurrentPassword = !showCurrentPassword">
-    {{ showCurrentPassword ? '🙈' : '👁️' }}
-  </button>
-</div>
-</div>
-<!-- NUEVA CONTRASEÑA -->
-<div class="form-group">
-<label for="nuevaContrasena">Nueva contraseña</label>
-<div class="password-input">
-  <input
-    [type]="showNewPassword ? 'text' : 'password'"
-    [(ngModel)]="nuevaContrasena"
-    name="nuevaContrasena"
-    id="nuevaContrasena"
-    placeholder="Escribe tu nueva contraseña"
-  />
-  <button type="button" (click)="showNewPassword = !showNewPassword">
-    {{ showNewPassword ? '🙈' : '👁️' }}
-  </button>
-</div>
-</div>
 
+      <!-- Contraseña actual y nueva -->
+      <div class="form-row">
+        <!-- Contraseña actual -->
+        <div class="form-group" *ngIf="!soloLectura">
+          <label for="contrasenaActual">Contraseña actual</label>
+          <div class="password-input">
+            <input
+              [type]="showCurrentPassword ? 'text' : 'password'"
+              [(ngModel)]="contrasenaActual"
+              name="contrasenaActual"
+              id="contrasenaActual"
+              placeholder="Contraseña actual"
+            />
+            <button type="button" (click)="togglePasswordVisibility('current')" class="icon-button">
+              <span class="material-icons">
+                {{ showCurrentPassword ? 'visibility_off' : 'visibility' }}
+              </span>
+            </button>
+          </div>
+        </div>
 
+        <!-- Nueva contraseña -->
+        <div class="form-group" *ngIf="!soloLectura">
+          <label for="nuevaContrasena">Nueva contraseña</label>
+          <div class="password-input">
+            <input
+              [type]="showNewPassword ? 'text' : 'password'"
+              [(ngModel)]="nuevaContrasena"
+              name="nuevaContrasena"
+              id="nuevaContrasena"
+              placeholder="Nueva contraseña"
+            />
+            <button type="button" (click)="togglePasswordVisibility('new')" class="icon-button">
+              <span class="material-icons">
+                {{ showNewPassword ? 'visibility_off' : 'visibility' }}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones -->
+      <div class="form-actions" *ngIf="!soloLectura">
+        <button type="submit" class="btn-primary">
+          <span class="material-icons">save</span> Guardar cambios
+        </button>
+        <button
+          type="button"
+          class="btn-link"
+          *ngIf="nuevaContrasena || contrasenaActual"
+          (click)="cancelarCambioContrasena()"
+        >
+          <span class="material-icons">cancel</span> Cancelar cambio de contraseña
+        </button>
+      </div>
+
+      <!-- Botón volver solo para admins -->
       <div class="form-actions">
-        <button type="submit" class="btn-primary">Guardar cambios</button>
-        <button type="button" class="btn-link" *ngIf="nuevaContrasena || contrasenaActual" (click)="cancelarCambioContrasena()">Cancelar cambio de contraseña</button>
-        <button type="button" class="btn-secondary" (click)="volverAlMenu()">← Volver al menú</button>
+        <button
+          type="button"
+          class="btn-secondary"
+          *ngIf="esAdmin"
+          (click)="volverAlMenu()"
+        >
+          <span class="material-icons">arrow_back</span> Volver al menú
+        </button>
       </div>
     </form>
   </div>
-  
-  <div *ngIf="cargando" class="loading">Cargando perfil...</div>
-   
+

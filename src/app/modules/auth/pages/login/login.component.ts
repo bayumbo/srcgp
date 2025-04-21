@@ -9,6 +9,7 @@ import { AuthService } from 'src/app/core/auth/services/auth.service';
   standalone: true,
   selector: 'app-login',
   templateUrl: './login.component.html',
+  styleUrl: './login.component.scss',
   imports: [CommonModule, ReactiveFormsModule]
 })
 export class LoginComponent {
@@ -22,6 +23,7 @@ export class LoginComponent {
   });
 
   hidePassword: boolean = true;
+  isLoading: boolean = false;
 
   async logIn(): Promise<void> {
     if (this.form.invalid) {
@@ -29,6 +31,8 @@ export class LoginComponent {
       alert('Por favor completa todos los campos correctamente.');
       return;
     }
+
+    this.isLoading = true;
 
     const cedula = this.form.value.cedula;
     const password = this.form.value.password;
@@ -41,11 +45,22 @@ export class LoginComponent {
         return;
       }
 
+      // Login y carga de rol en paralelo
       await this.authService.logIn(email, password);
-      this.router.navigate(['/']);
+      const rol = await this.authService.cargarRolActual();
+
+      // Redirección según rol
+      if (rol === 'usuario') {
+        this.router.navigate(['/perfil']);
+      } else {
+        this.router.navigate(['/']);
+      }
+
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       alert('Cédula o contraseña incorrectos');
+    } finally {
+      this.isLoading = false;
     }
   }
 
