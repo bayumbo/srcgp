@@ -26,6 +26,11 @@
           (input)="buscarPorCedula()"
         />
       </div>
+      <!-- ⚠️ Mensaje de no coincidencias -->
+<div *ngIf="mostrarMensajeNoCoincidencias" class="mensaje-no-coincidencias">
+  <span class="material-icons">warning</span> No se encontraron coincidencias
+</div>
+
 
       <!-- Tabla -->
       <div class="tabla-container">
