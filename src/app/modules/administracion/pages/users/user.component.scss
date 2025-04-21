@@ -21,6 +21,8 @@
   max-width: 460px;
   width: 100%;
   box-sizing: border-box;
+ 
+  flex: 1 1 420px;
     
 
   h5 {
@@ -184,7 +186,7 @@
       }
     }
   }
-  
+}
 .perfil-derecho {
   flex: 1 1 600px;
   display: flex;
@@ -395,5 +397,4 @@
     color: #888;
     margin-top: 1rem;
   }
-}
 }
