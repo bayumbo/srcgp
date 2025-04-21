@@ -27,13 +27,17 @@ export class PerfilComponent implements OnInit {
   contrasenaActual: string = '';
   unidad: string = '';
   cedula: string = '';
-  empresa: string='';
+  empresa: string = '';
 
   uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
   esAdmin: boolean = false;
   soloLectura: boolean = false;
+
+  // Para comparar cambios
+  datosOriginales: Partial<PerfilComponent> = {};
+  hayCambios: boolean = false;
 
   constructor(
     private router: Router,
@@ -44,31 +48,31 @@ export class PerfilComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const uidParam = this.route.snapshot.paramMap.get('uid');
     const auth = getAuth();
-  
+
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         this.correo = user.email || '';
-  
+
         if (uidParam) {
           this.uid = uidParam;
-  
-          // ✅ Comparar UID actual con el UID del perfil que se va a ver
+
           if (uidParam !== user.uid) {
             this.soloLectura = true;
           }
         } else {
           this.uid = user.uid;
         }
-  
+
         await this.cargarDatosUsuario();
-  
+
         const rol = await this.authService.cargarRolActual();
         this.esAdmin = rol === 'admin';
       }
-  
+
       unsubscribe(); // detiene el listener
     });
   }
+
   async cargarDatosUsuario() {
     try {
       const firestore = getFirestore();
@@ -85,6 +89,16 @@ export class PerfilComponent implements OnInit {
         this.unidad = data['unidad'] || '';
         this.empresa = data['empresa'] || '';
         this.correo = data['email'] || this.correo;
+
+        // Guardar estado original para detección de cambios
+        this.datosOriginales = {
+          nombres: this.nombres,
+          apellidos: this.apellidos,
+          cedula: this.cedula,
+          unidad: this.unidad,
+          empresa: this.empresa,
+          correo: this.correo,
+        };
       }
     } catch (error) {
       console.error('Error al cargar usuario:', error);
@@ -97,6 +111,17 @@ export class PerfilComponent implements OnInit {
     if (pass.length < 6) return 'Débil';
     if (/[A-Z]/.test(pass) && /[0-9]/.test(pass) && /[!@#$%^&*]/.test(pass)) return 'Fuerte';
     return 'Media';
+  }
+
+  verificarCambios(): void {
+    this.hayCambios =
+      this.nombres !== this.datosOriginales.nombres ||
+      this.apellidos !== this.datosOriginales.apellidos ||
+      this.cedula !== this.datosOriginales.cedula ||
+      this.unidad !== this.datosOriginales.unidad ||
+      this.empresa !== this.datosOriginales.empresa ||
+      this.correo !== this.datosOriginales.correo ||
+      !!this.nuevaContrasena;
   }
 
   async guardarCambios() {
@@ -128,6 +153,17 @@ export class PerfilComponent implements OnInit {
       alert('✅ Cambios guardados correctamente');
       this.cancelarCambioContrasena();
 
+      // Resetear comparación
+      this.datosOriginales = {
+        nombres: this.nombres,
+        apellidos: this.apellidos,
+        cedula: this.cedula,
+        unidad: this.unidad,
+        empresa: this.empresa,
+        correo: this.correo,
+      };
+      this.hayCambios = false;
+
     } catch (error: any) {
       const errorCode = error?.code || error?.error?.code;
       if (errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
@@ -143,6 +179,7 @@ export class PerfilComponent implements OnInit {
     this.contrasenaActual = '';
     this.showNewPassword = false;
     this.showCurrentPassword = false;
+    this.verificarCambios();
   }
 
   togglePasswordVisibility(type: 'current' | 'new'): void {

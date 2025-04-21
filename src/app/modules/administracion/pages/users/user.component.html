@@ -37,7 +37,7 @@
         <input
           type="email"
           id="correo"
-          [(ngModel)]="correo"
+          [(ngModel)]="correo" (ngModelChange)="verificarCambios()" 
           name="correo"
           required
           [disabled]="soloLectura"
@@ -52,7 +52,7 @@
           <div class="password-input">
             <input
               [type]="showCurrentPassword ? 'text' : 'password'"
-              [(ngModel)]="contrasenaActual"
+              [(ngModel)]="contrasenaActual"(ngModelChange)="verificarCambios()"
               name="contrasenaActual"
               id="contrasenaActual"
               placeholder="Contraseña actual"
@@ -71,7 +71,7 @@
           <div class="password-input">
             <input
               [type]="showNewPassword ? 'text' : 'password'"
-              [(ngModel)]="nuevaContrasena"
+              [(ngModel)]="nuevaContrasena" (ngModelChange)="verificarCambios()"
               name="nuevaContrasena"
               id="nuevaContrasena"
               placeholder="Nueva contraseña"
@@ -86,25 +86,28 @@
       </div>
 
       <!-- Botones -->
-      <div class="form-actions" *ngIf="!soloLectura">
-        <button type="submit" class="btn-primary">
-          <span class="material-icons">save</span> Guardar cambios
-        </button>
-        <button
-          type="button"
-          class="btn-link"
-          *ngIf="nuevaContrasena || contrasenaActual"
-          (click)="cancelarCambioContrasena()"
-        >
-          <span class="material-icons">cancel</span> Cancelar cambio de contraseña
-        </button>
-      </div>
+      <!-- Botones -->
+<div class="form-actions" *ngIf="!soloLectura">
+  <button class="btn-guardar" (click)="guardarCambios()" [disabled]="!hayCambios">
+    <span class="material-icons">save</span> Guardar cambios
+  </button>
+
+  <button
+    type="button"
+    class="btn-cancelar"
+    *ngIf="nuevaContrasena || contrasenaActual"
+    (click)="cancelarCambioContrasena()"
+  >
+    <span class="material-icons">cancel</span> Cancelar cambio de contraseña
+  </button>
+</div>
+
 
       <!-- Botón volver solo para admins -->
       <div class="form-actions">
         <button
           type="button"
-          class="btn-secondary"
+          class="btn-volver"
           *ngIf="esAdmin"
           (click)="volverAlMenu()"
         >

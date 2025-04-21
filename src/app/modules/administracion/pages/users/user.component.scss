@@ -124,77 +124,66 @@
 
   .form-actions {
     display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    margin-top: 8px;
-
-    .btn-primary {
-      width: 100%;
-      padding: 10px;
-      background-color: #2f8071;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center; // ✅ centrado como en la imagen
+    margin-top: 1.5rem;
+  
+    button {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-
+      gap: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.2s ease;
+      font-family: 'Segoe UI', sans-serif;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  
       .material-icons {
-        font-size: 18px;
+        font-size: 20px;
       }
-
-      &:hover {
-        background-color: #46ac99;
+  
+      &:disabled {
+        background-color: #cfd8dc;
+        color: #666;
+        cursor: not-allowed;
+        box-shadow: none;
       }
     }
-
-    .btn-link {
+  
+    .btn-guardar {
+      background-color: #2f8071;
+      color: white;
+  
+      &:hover:not(:disabled) {
+        background-color: #25665a;
+        transform: translateY(-1px);
+      }
+    }
+  
+    .btn-volver {
       background: none;
-      border: none;
       color: #2f8071;
       font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-
-      .material-icons {
-        margin-right: 0.3rem;
-        font-size: 18px;
-      }
-
+      font-weight: 600;
+      text-decoration: none;
+  
       &:hover {
         text-decoration: underline;
       }
-    }
-
-    .btn-secondary {
-      background-color: transparent;
-      color: #2f8071;
-      padding: 8px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
+  
       .material-icons {
-        margin-right: 0.3rem;
         font-size: 18px;
-      }
-
-      &:hover {
-        background-color: #ffffff;
+        margin-right: 6px;
       }
     }
   }
-}
+  
 
 @media (max-width: 768px) {
   .perfil-wrapper {
@@ -216,4 +205,4 @@
     }
   }
 }
-
+}
