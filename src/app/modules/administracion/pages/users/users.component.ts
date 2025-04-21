@@ -38,12 +38,17 @@ export class PerfilComponent implements OnInit {
   unidad: string = '';
   cedula: string = '';
   empresa: string = '';
+  empresa: string = '';
 
   uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
   esAdmin: boolean = false;
   soloLectura: boolean = false;
+
+  // Para comparar cambios
+  datosOriginales: Partial<PerfilComponent> = {};
+  hayCambios: boolean = false;
   reportesUsuario: ReporteConPagos[] = [];
 
   //Datos para lista de pagos
@@ -63,14 +68,17 @@ export class PerfilComponent implements OnInit {
     const uidParam = this.route.snapshot.paramMap.get('uid');
     const auth = getAuth();
 
+
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       unsubscribe(); // ✅ Esto evita bucles
 
       if (user) {
         this.correo = user.email || '';
 
+
         if (uidParam) {
           this.uid = uidParam;
+
 
           // Ver si el perfil es de otro usuario
           if (uidParam !== user.uid) {
@@ -80,14 +88,19 @@ export class PerfilComponent implements OnInit {
           this.uid = user.uid;
         }
 
+
         await this.cargarDatosUsuario();
+
         await this.obtenerReportesUsuario();
         await this.cargarPagosUsuario();
         const rol = await this.authService.cargarRolActual();
         this.esAdmin = rol === 'admin';
       }
+
+      unsubscribe(); // detiene el listener
     });
   }
+
 
   async cargarDatosUsuario() {
     try {
@@ -105,6 +118,16 @@ export class PerfilComponent implements OnInit {
         this.unidad = data['unidad'] || '';
         this.empresa = data['empresa'] || '';
         this.correo = data['email'] || this.correo;
+
+        // Guardar estado original para detección de cambios
+        this.datosOriginales = {
+          nombres: this.nombres,
+          apellidos: this.apellidos,
+          cedula: this.cedula,
+          unidad: this.unidad,
+          empresa: this.empresa,
+          correo: this.correo,
+        };
       }
     } catch (error) {
       console.error('Error al cargar usuario:', error);
@@ -167,6 +190,17 @@ export class PerfilComponent implements OnInit {
     return 'Media';
   }
 
+  verificarCambios(): void {
+    this.hayCambios =
+      this.nombres !== this.datosOriginales.nombres ||
+      this.apellidos !== this.datosOriginales.apellidos ||
+      this.cedula !== this.datosOriginales.cedula ||
+      this.unidad !== this.datosOriginales.unidad ||
+      this.empresa !== this.datosOriginales.empresa ||
+      this.correo !== this.datosOriginales.correo ||
+      !!this.nuevaContrasena;
+  }
+
   async guardarCambios() {
     const auth = getAuth();
     const user = auth.currentUser;
@@ -196,6 +230,17 @@ export class PerfilComponent implements OnInit {
       alert('✅ Cambios guardados correctamente');
       this.cancelarCambioContrasena();
 
+      // Resetear comparación
+      this.datosOriginales = {
+        nombres: this.nombres,
+        apellidos: this.apellidos,
+        cedula: this.cedula,
+        unidad: this.unidad,
+        empresa: this.empresa,
+        correo: this.correo,
+      };
+      this.hayCambios = false;
+
     } catch (error: any) {
       const errorCode = error?.code || error?.error?.code;
       if (errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
@@ -211,6 +256,7 @@ export class PerfilComponent implements OnInit {
     this.contrasenaActual = '';
     this.showNewPassword = false;
     this.showCurrentPassword = false;
+    this.verificarCambios();
   }
 
   togglePasswordVisibility(type: 'current' | 'new'): void {

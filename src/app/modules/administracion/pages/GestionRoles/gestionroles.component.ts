@@ -22,6 +22,8 @@ export class GestionRolesComponent implements OnInit {
   cargando = true;
   busquedaActiva = false;
   cedulaBuscada = '';
+  mostrarMensajeNoCoincidencias = false;
+
 
   // 🔢 Paginación
   paginaActual = 1;
@@ -101,16 +103,28 @@ export class GestionRolesComponent implements OnInit {
   buscarPorCedula(): void {
     const termino = this.cedulaBuscada.trim().toLowerCase();
     this.busquedaActiva = termino.length > 0;
-
-    const coincidencias = this.todosLosUsuarios.filter(usuario =>
-      usuario.cedula.toLowerCase().includes(termino) ||
-      `${usuario.nombres} ${usuario.apellidos}`.toLowerCase().includes(termino)
-    );
-
-    const listaFinal = this.busquedaActiva ? coincidencias : this.todosLosUsuarios;
-    this.filtrarUsuarios(listaFinal);
+  
+    if (this.busquedaActiva) {
+      const coincidencias = this.todosLosUsuarios.filter(usuario =>
+        usuario.cedula.toLowerCase().includes(termino) ||
+        `${usuario.nombres} ${usuario.apellidos}`.toLowerCase().includes(termino)
+      );
+  
+      if (coincidencias.length > 0) {
+        this.filtrarUsuarios(coincidencias);
+      } else {
+        // ⚠️ No se encontraron resultados
+        this.mostrarMensajeNoCoincidencias = true;
+        setTimeout(() => {
+          this.mostrarMensajeNoCoincidencias = false;
+        }, 3000);
+        this.filtrarUsuarios(this.todosLosUsuarios); // Mostrar todos como respaldo
+      }
+    } else {
+      this.filtrarUsuarios(this.todosLosUsuarios);
+    }
   }
-
+  
   verPerfil(uid: string): void {
     this.router.navigate(['/perfil', uid]);
   }

@@ -1,14 +1,13 @@
 .contenido-principal {
-  margin-top: 70px;
   padding: 2rem;
-  background-color: #f5f7fa;
+  background-color: #ffffff;
   min-height: 100vh;
 }
 
 .tabla-container {
   margin: 2rem auto;
   max-width: 100%;
-  border-radius: 12px;
+  border-radius: 10px;
 
   // Estilo de botones superiores
   .tabla-header {
@@ -28,7 +27,7 @@
       border: 1px solid #b2dfdb;
       padding: 8px 14px;
       font-size: 14px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -52,10 +51,10 @@
       input {
         width: 100%;
         padding: 10px 12px 10px 36px;
-        border-radius: 8px;
+        border-radius: 10px;
         border: 1px solid #ccd2da;
         background-color: #ffffff;
-        font-size: 14px;
+        font-size: 16px;
         color: #2c3e50;
         transition: border-color 0.2s ease;
 
@@ -82,15 +81,16 @@
     overflow-x: auto;
     width: 100%;
     display: block;
-    border-radius: 12px;
-
+    border-radius: 10px;
+  
     table {
       width: 100%;
       min-width: 900px;
       border-collapse: collapse;
-      background-color: #ffffff;
-      border-radius: 12px;
+     background-color:#ffffff;
+      border-radius: 10px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      
 
       th, td {
         padding: 14px 18px;
@@ -102,7 +102,7 @@
         background-color: #2f8071;
         color: #ffffff;
         font-weight: 600;
-        font-size: 13px;
+        font-size: 16px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         white-space: nowrap;
@@ -147,8 +147,8 @@
       select {
         padding: 6px 10px;
         border: 1px solid #ccc;
-        border-radius: 6px;
-        font-size: 13px;
+        border-radius: 10px;
+        font-size: 16px;
         background-color: #f9f9f9;
       }
 
@@ -210,7 +210,7 @@
     color: #ffffff;
     border: none;
     padding: 12px 24px;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
@@ -275,8 +275,8 @@
     background-color: #e0e0e0;
     border: none;
     padding: 8px 12px;
-    font-size: 14px;
-    border-radius: 6px;
+    font-size: 16px;
+    border-radius: 10px;
     cursor: pointer;
     transition: background-color 0.2s;
 
@@ -296,5 +296,24 @@
       cursor: not-allowed;
     }
   }
+}
+.mensaje-no-coincidencias {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeOutMsg 3s forwards;
+}
+
+@keyframes fadeOutMsg {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
