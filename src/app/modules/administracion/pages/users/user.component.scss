@@ -216,23 +216,4 @@
     }
   }
 }
-.mensaje-no-coincidencias {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeeba;
-  padding: 10px 14px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: fadeOutMsg 3s forwards;
-}
-
-@keyframes fadeOutMsg {
-  0% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { opacity: 0; }
-}
 
