@@ -49,6 +49,7 @@ header {
     font-size: 26px;
     cursor: pointer;
     margin-left: auto;
+    width: 160px;
   }
 }
 
@@ -215,15 +216,20 @@ h5 {
 }
 
 .libro-mayor-container {
-  max-width: 1200px;
-  margin: 360px auto 40px auto;
- margin-left: 10%; // o 15px si deseas más separación
-
+  max-width: 1197px;
+  margin:
+35px auto 35px auto;
+    margin-left: auto;
+  margin-left: 22%;
   background-color: #ffffff;
   color: #000000;
-  border-radius: 10px;
+  border-radius:
+10px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
-  padding: 30px;
+  padding:
+29px;
+  width: 706px;
+
 }
 
 .filtros {
@@ -248,7 +254,7 @@ h5 {
       border-radius: 6px;
       background-color: #f0f0f0;
       color: #000;
-      width: 180px;
+      width: 250px;
     }
   }
 }
@@ -268,17 +274,19 @@ h5 {
   margin-top: 12px;
 
   button {
-    padding: 10px 20px;
-    background-color: #3498db;
+    padding: 14px 20px;
+    background-color: #408bad;
     color: white;
     font-weight: bold;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    margin-right: 235px;
+  width: 223px;
 
     &:hover {
-      background-color: #2980b9;
+      background-color: rgb(58, 109, 143)
     }
 
     &:disabled {
@@ -332,7 +340,7 @@ h5 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #1f1f1f;
+  background-color: #ffffff;
   padding: 20px;
   border-radius: 10px;
   z-index: 9999;
@@ -343,6 +351,10 @@ h5 {
   animation: fadeIn 0.3s ease-in-out;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+h5{
+  color:#000;
 }
 
 .modal-content {
@@ -449,13 +461,14 @@ h5 {
 
     .btn-eliminar {
       background-color: #dc3545;
-      width: 37%;
+      width: 25%;
       color: white;
       border: none;
       padding: 0px 14px;
       border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
+      margin-right: 310px;
 
       &:hover {
         background-color: #b02a37;
@@ -497,26 +510,27 @@ h5 {
 }
 .btn-filtrar {
   background-color: #2f8071;
-      width: 25%;
+      width: 37%;
       align-self: center;
-      color: wh45e;
+      color: white;
       border: none;
       position: center;
       align-items: center;
-      margin-left: 135px;
+      margin-left: -2px;
       padding: 1px;
       height: 45px;
       border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
       font-weight: bold;
+      margin-top: 19px;
 }
 .btn-ver-libros {
-  background-color: #4cbbdd;
-      width: 100%;
+  background-color: #50a1b9;
+      width: 40%;
       position: center;
       align-items: center;
-      color: wh45e;
+      color: white;
       border: none;
       padding: 1px;
       height: 45px;
@@ -524,5 +538,6 @@ h5 {
       cursor: pointer;
       font-size: 14px;
       font-weight: bold;
+      margin-left: 222px;
       
 }

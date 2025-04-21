@@ -3,21 +3,20 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { LibroMayorService } from '../../Services/comprobante.service';
 import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-blances',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule,MatIconModule, RouterModule],
+  imports: [CommonModule, ReactiveFormsModule, MatIconModule, RouterModule],
   templateUrl: './blances.component.html',
   styleUrls: ['./blances.component.scss']
 })
-
 export class BalanceComponent implements OnInit {
   formFiltro!: FormGroup;
   datosBalance: any[] = [];
-
 
   constructor(
     private fb: FormBuilder,
@@ -28,7 +27,7 @@ export class BalanceComponent implements OnInit {
     this.formFiltro = this.fb.group({
       inicio: ['', Validators.required],
       fin: ['', Validators.required],
-      tipoBalance: ['comprobacion', Validators.required] // nuevo campo para tipo
+      tipoBalance: ['comprobacion', Validators.required]
     });
 
     setTimeout(() => {
@@ -38,6 +37,7 @@ export class BalanceComponent implements OnInit {
       }
     }, 600);
   }
+
   menuAbierto: boolean = false;
 
   async generarBalance(): Promise<void> {
@@ -85,54 +85,55 @@ export class BalanceComponent implements OnInit {
   exportarPDF(): void {
     const { tipoBalance } = this.formFiltro.value;
     const doc = new jsPDF();
-    let y = 20;
-
     const titulo = tipoBalance === 'general' ? 'BALANCE GENERAL' : 'BALANCE DE COMPROBACIÓN';
+    const fecha = new Date().toISOString().slice(0, 10);
+
     doc.setFontSize(12);
-    doc.text(titulo + ' AL ' + new Date().toISOString().slice(0, 10), 105, y, { align: 'center' });
-    y += 10;
-
-    doc.setFontSize(10);
     doc.setFont('Helvetica', 'bold');
-    doc.setFillColor(200,200,200);
-    doc.rect(10, y, 190, 8, 'F');
-    doc.text('CÓDIGO', 12, y + 6);
-    doc.text('CUENTA', 35, y + 6);
-    doc.text('SUMAS', 105, y + 4);
-    doc.text('SALDOS', 150, y + 4);
+    doc.text(`${titulo} AL ${fecha}`, 105, 20, { align: 'center' });
 
-    y += 8;
-    doc.setFont('Helvetica', 'normal');
-    doc.text('DEBE', 95, y);
-    doc.text('HABER', 115, y);
-    doc.text('DEBE', 140, y);
-    doc.text('HABER', 165, y);
-    y += 6;
-
-    this.datosBalance.forEach(item => {
-      doc.text(item.cuenta, 12, y);
-      doc.text(item.nombre?.substring(0, 35), 35, y);
-      doc.text(item.debe.toFixed(2), 95, y, { align: 'right' });
-      doc.text(item.haber.toFixed(2), 115, y, { align: 'right' });
-      doc.text(item.saldoDebe.toFixed(2), 140, y, { align: 'right' });
-      doc.text(item.saldoHaber.toFixed(2), 165, y, { align: 'right' });
-      y += 7;
-      if (y > 270) {
-        doc.addPage();
-        y = 20;
+    autoTable(doc, {
+      startY: 30,
+      head: [
+        [
+          { content: 'CÓDIGO', rowSpan: 2 },
+          { content: 'CUENTA', rowSpan: 2 },
+          { content: 'SUMAS', colSpan: 2, styles: { halign: 'center' } },
+          { content: 'SALDOS', colSpan: 2, styles: { halign: 'center' } }
+        ],
+        ['DEBE', 'HABER', 'DEUDOR', 'ACREEDOR']
+      ],
+      body: this.datosBalance.map(item => [
+        item.cuenta,
+        item.nombre,
+        item.debe.toFixed(2),
+        item.haber.toFixed(2),
+        item.saldoDebe.toFixed(2),
+        item.saldoHaber.toFixed(2)
+      ]),
+      foot: [[
+        { content: 'SUMAN:', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: this.totalDebe.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: this.totalHaber.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: this.totalDeudor.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: this.totalAcreedor.toFixed(2), styles: { fontStyle: 'bold' } }
+      ]],
+      styles: {
+        halign: 'center',
+        fontSize: 9,
+        cellPadding: 4,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [180, 180, 180],
+        textColor: 20,
+        fontStyle: 'bold'
       }
     });
 
-    doc.setFont('Helvetica', 'bold');
-    doc.text('SUMAN:', 35, y);
-    doc.text(this.totalDebe.toFixed(2), 95, y, { align: 'right' });
-    doc.text(this.totalHaber.toFixed(2), 115, y, { align: 'right' });
-    doc.text(this.totalDeudor.toFixed(2), 140, y, { align: 'right' });
-    doc.text(this.totalAcreedor.toFixed(2), 165, y, { align: 'right' });
-
-
     const nombreArchivo = tipoBalance === 'general' ? 'BalanceGeneral' : 'BalanceComprobacion';
-    doc.save(`${nombreArchivo}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`${nombreArchivo}_${fecha}.pdf`);
   }
 
   get totalDebe() {

@@ -5,6 +5,9 @@
         <mat-icon>home</mat-icon>
         <span>Inicio</span>
       </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
     </div>
 
     <nav [class.abierto]="menuAbierto">
@@ -36,7 +39,7 @@
       <label for="fechaFin">Hasta:</label>
       <input type="date" id="fechaFin" [(ngModel)]="fechaFin" />
 
-      <button class="btn-generar" (click)="generarEstado()">Generar</button>
+      <button class="btn-generar1" (click)="generarEstado()">Generar</button>
     </div>
 
     <div *ngIf="estadoJerarquico.length > 0" class="estado-listado">

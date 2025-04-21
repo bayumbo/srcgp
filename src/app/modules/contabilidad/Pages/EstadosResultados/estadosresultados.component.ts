@@ -8,6 +8,14 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from '@angular/fire/stor
 import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, Timestamp, serverTimestamp } from '@angular/fire/firestore';
 import { jsPDF } from 'jspdf';
 import { MatIconModule } from '@angular/material/icon';
+import autoTable from 'jspdf-autotable';
+declare module 'jspdf' {
+  interface jsPDF {
+    lastAutoTable?: {
+      finalY: number;
+    };
+  }
+}
 @Component({
   selector: 'app-estados-resultados',
   standalone: true,
@@ -15,6 +23,7 @@ import { MatIconModule } from '@angular/material/icon';
   styleUrls: ['./estadosresultados.component.scss'],
   imports: [CommonModule, FormsModule, MatIconModule,RouterModule],
 })
+
 export class EstadosResultadosComponent implements OnInit {
   fechaInicio: string = '';
   fechaFin: string = '';
@@ -52,70 +61,112 @@ export class EstadosResultadosComponent implements OnInit {
     if (!this.resultados.length) return;
     const doc = new jsPDF();
     let y = 20;
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setFont('Helvetica', 'bold');
-    doc.text('ESTADO DE RESULTADOS', 105, y, { align: 'center' });
+    doc.text('ESTADO DE RESULTADOS - CONSORCIO PINTAG EXPRESS', 105, y, { align: 'center' });
     y += 7;
     doc.setFontSize(10);
     doc.setFont('Helvetica', 'normal');
     doc.text(`Desde: ${this.fechaInicio} - Hasta: ${this.fechaFin}`, 105, y, { align: 'center' });
     y += 12;
-
-    this.resultados.forEach(seccion => {
-      let subtotal = 0;
-      doc.setFontSize(11);
+    let totalIngresos = 0;
+    let totalGastos = 0;
+  
+    for (const seccion of this.resultados) {
+      // Sección: título (INGRESOS / GASTOS)
+      doc.setFontSize(12);
       doc.setFont('Helvetica', 'bold');
-      doc.text(seccion.grupo, 20, y);
-      y += 8;
-      doc.setFontSize(10);
-      doc.setFont('Courier', 'bold');
-      doc.text('Código', 25, y);
-      doc.text('Cuenta', 70, y);
-      doc.text('Valor', 190, y, { align: 'right' });
-      y += 2;
-      doc.setDrawColor(180);
-      doc.line(20, y, 190, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.setFont('Courier', 'normal');
-
-      seccion.cuentas.forEach(cuenta => {
-        doc.text(cuenta.codigo, 25, y);
-        doc.text(cuenta.nombre, 70, y);
-        doc.text(cuenta.valor.toLocaleString('es-EC', { minimumFractionDigits: 2 }), 190, y, { align: 'right' });
-        subtotal += cuenta.valor;
-        y += 6;
-        if (y >= 270) {
-          doc.addPage();
-          y = 20;
+      doc.text(seccion.grupo.toUpperCase(), 20, y);
+      y += 6;
+  
+      const cuerpo = seccion.cuentas.map(cuenta => {
+        if (seccion.grupo.toUpperCase() === 'INGRESOS') totalIngresos += cuenta.valor;
+        if (seccion.grupo.toUpperCase() === 'GASTOS') totalGastos += cuenta.valor;
+        return [
+          cuenta.codigo,
+          cuenta.nombre,
+          cuenta.valor.toLocaleString('es-EC', { minimumFractionDigits: 2 }),
+        ];
+      });
+  
+      autoTable(doc, {
+        startY: y,
+        head: [['Código', 'Cuenta', 'Valor']],
+        body: cuerpo,
+        foot: [[
+          { content: `TOTAL ${seccion.grupo.toUpperCase()}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
+          {
+            content: (seccion.cuentas.reduce((s, c) => s + c.valor, 0)).toLocaleString('es-EC', { minimumFractionDigits: 2 }),
+            styles: { fontStyle: 'bold' }
+          }
+        ]],
+        styles: {
+          halign: 'center',
+          fontSize: 9,
+          cellPadding: 4,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [180, 180, 180],
+          textColor: 20,
+          fontStyle: 'bold'
+        },
+        footStyles: {
+          fillColor: [50, 130, 200],
+          textColor: 255,
+          fontStyle: 'bold'
         }
       });
-
-      doc.setFont('Courier', 'bold');
-      doc.setFontSize(10);
-      doc.text(`TOTAL ${seccion.grupo}`, 70, y);
-      doc.text(subtotal.toLocaleString('es-EC', { minimumFractionDigits: 2 }), 190, y, { align: 'right' });
-      y += 10;
+  
+      const lastY = (doc as any).lastAutoTable?.finalY || y;
+y = lastY + 10;
+    }
+  
+    // Resultado Neto
+    const resultado = totalIngresos - totalGastos;
+    autoTable(doc, {
+      startY: y,
+      body: [[
+        { content: 'RESULTADO NETO', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
+        {
+          content: resultado.toLocaleString('es-EC', { minimumFractionDigits: 2 }),
+          styles: { fontStyle: 'bold' }
+        }
+      ]],
+      styles: {
+        halign: 'center',
+        fontSize: 10,
+        cellPadding: 4
+      },
+      footStyles: {
+        fillColor: [30, 100, 180],
+        textColor: 255,
+        fontStyle: 'bold'
+      }
     });
-
+  
     const nombreArchivo = `estado_resultados_${this.fechaInicio}_a_${this.fechaFin}.pdf`;
-    doc.save(nombreArchivo);
-
     const pdfBlob = doc.output('blob');
+    doc.save(nombreArchivo);
+  
     const storage = getStorage();
     const pdfRef = ref(storage, `estados-resultados/${nombreArchivo}`);
     await uploadBytes(pdfRef, pdfBlob);
     const url = await getDownloadURL(pdfRef);
-
+  
     const firestore = getFirestore();
     await addDoc(collection(firestore, 'estados-resultados'), {
       nombreArchivo,
       url,
       fechaInicio: this.fechaInicio,
       fechaFin: this.fechaFin,
+      totalIngresos,
+      totalGastos,
+      resultadoNeto: resultado,
       timestamp: serverTimestamp(),
     });
-
+  
     alert('📄 Estado de Resultados generado y guardado exitosamente.');
   }
 

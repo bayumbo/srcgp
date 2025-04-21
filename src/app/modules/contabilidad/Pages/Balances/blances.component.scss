@@ -49,6 +49,7 @@ header {
     font-size: 26px;
     cursor: pointer;
     margin-left: auto;
+    width: 160px;
   }
 }
 
@@ -210,10 +211,11 @@ nav {
 /* Estilo general para el contenedor del balance */
 .balance-container {
   padding: 120px 40px 40px;
+  width: 774px;
   max-width: 1200px;
   margin: 120px auto 40px auto;
   background-color: #ffffff;
-  color: white;
+  color: rgb(0, 0, 0);
   border-radius: 10px;
   padding: 30px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
@@ -312,7 +314,10 @@ nav {
       color: white;
       
     }
+td{
+  color: white;
 
+}
     tfoot th {
       background-color: #333;
       font-weight: bold;
@@ -421,9 +426,10 @@ nav {
   padding: 15px;
   border-radius: 10px;
 
-  p {
+  .p {
     margin: 0 0 10px 0;
     font-weight: bold;
+    color: #000000;
   }
 
   .acciones-modal {
