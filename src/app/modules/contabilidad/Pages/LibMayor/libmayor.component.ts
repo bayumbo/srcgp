@@ -6,13 +6,14 @@ import { jsPDF } from 'jspdf';
 import { LibroMayorService } from '../../Services/comprobante.service';
 import { RouterModule } from '@angular/router';
 import { Storage } from '@angular/fire/storage';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-libmayor',
   standalone: true,
   templateUrl: './libmayor.component.html',
   styleUrls: ['./libmayor.component.scss'],
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule],
+  imports: [CommonModule, ReactiveFormsModule, MatIconModule,FormsModule, RouterModule],
 })
 export class LibroMayorComponent implements OnInit {
   formFiltro!: FormGroup;
@@ -62,6 +63,7 @@ export class LibroMayorComponent implements OnInit {
       if (preloader) preloader.style.display = 'none';
     }, 600);
   }
+  menuAbierto: boolean = false;
 
   async filtrarLibros(): Promise<void> {
     if (this.formFiltro.invalid) {

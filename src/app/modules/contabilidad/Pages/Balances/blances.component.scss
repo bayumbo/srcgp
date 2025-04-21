@@ -1,57 +1,136 @@
-
-/* NO TOCAR, AQUI CONFIGURACION BASICA DEL MENU -🔥📌 */
-html,body {
-  margin: 0;
-  padding: 0;
-  height: 100vw;
-  width: 140vw;
-  font-family: Arial, sans-serif, 12px;
-  background-color: #474646;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-
+/* ========== HEADER RESPONSIVO ========== */
 header {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw; // Ocupa todo el ancho de la pantalla
+  width: 98vw;
   z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #37474f;
+  padding: 6px 23px;
+  height: 61px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  font-family: tahoma;
+}
+
+.navbar-brand {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: black;
-  padding: 3px 30px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); // sombra sutil
-  .logo {
-    img {
-      height: 50px;
-    }
-  }
-}
+  flex: 1;
 
-.menu {
-  list-style: none;
-  display: flex;
-  gap: 20px;
-
-  li {
-    position: relative;
-  }
-
-  a {
+  .home-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     text-decoration: none;
-    color: white;
+    color: rgb(248, 241, 241);
+    font-weight: bold;
     font-size: 16px;
-    padding: 10px;
-    transition: color 0.3s ease;
 
     &:hover {
       color: #1E90FF;
-      border-bottom: 2px solid #1E90FF;
+    }
+
+    mat-icon {
+      font-size: 25px;
+      transition: color 0.3s ease;
+    }
+  }
+
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 26px;
+    cursor: pointer;
+    margin-left: auto;
+  }
+}
+
+nav {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+
+  .menu {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+    padding: 0;
+    margin: 0;
+    font-family: tahoma;
+
+    li {
+      a {
+        text-decoration: none;
+        color: white;
+        font-size: 16px;
+        padding: 10px;
+        display: inline-block;
+        transition: color 0.3s ease;
+
+        &:hover {
+          color: #1E90FF;
+          border-bottom: 2px solid #1E90FF;
+        }
+      }
+    }
+  }
+
+  &.abierto {
+    display: block;
+
+    .menu {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 10px 0;
+      gap: 10px;
+      font-family: tahoma;
     }
   }
 }
+
+/* ========== RESPONSIVE BREAKPOINTS ========== */
+@media (max-width: 768px) {
+  .navbar-brand {
+    .menu-toggle {
+      display: block;
+    }
+  }
+
+  nav {
+    display: none;
+    width: 100%;
+
+    &.abierto {
+      display: block;
+    }
+  }
+
+  nav .menu {
+    flex-direction: column;
+    background-color: #37474f;
+    width: 100%;
+    padding: 10px 20px;
+  }
+
+  nav .menu li a {
+    padding: 10px;
+    font-size: 16px;
+  }
+}
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
 /* Submenú */
 .submenu {
   display: none;
@@ -132,16 +211,18 @@ header {
 .balance-container {
   padding: 120px 40px 40px;
   max-width: 1200px;
-  margin: 0 auto;
-  background-color: #1f1f1f;
+  margin: 120px auto 40px auto;
+  background-color: #ffffff;
   color: white;
-  border-radius: 12px;
+  border-radius: 10px;
+  padding: 30px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
 
-  h2 {
+
+  h5 {
     text-align: center;
     margin-bottom: 30px;
-    color: #ffffff;
+    color: #000000;
   }
 }
 
@@ -159,7 +240,7 @@ header {
     label {
       margin-bottom: 5px;
       font-weight: 500;
-      color: #ccc;
+      color: #9c9999;
     }
     input, select {
       background-color: #f0f0f0;
@@ -172,7 +253,7 @@ header {
   }
 
   button {
-    background-color: #28a745;
+    background-color: #2f8071;
     color: white;
     font-weight: bold;
     padding: 10px 20px;
@@ -182,7 +263,7 @@ header {
     align-self: end;
     height: 42px;
     &:hover {
-      background-color: #218838;
+      background-color: #26534b;
     }
   }
 }
@@ -194,7 +275,7 @@ header {
   margin: 20px 0;
 
   button {
-    background-color: #3498db;
+    background-color: #79c2f3;
     color: white;
     font-weight: bold;
     padding: 10px 24px;
@@ -203,7 +284,7 @@ header {
     font-size: 15px;
     cursor: pointer;
     &:hover {
-      background-color: #2980b9;
+      background-color: #529dcf;
     }
   }
 }
@@ -216,6 +297,8 @@ header {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
+    background-color: #5c5a5a;
+    border-radius: 10px;
 
     th, td {
       border: 1px solid #ccc;
@@ -225,8 +308,9 @@ header {
     }
 
     th {
-      background-color: #007bff;
+      background-color: #333;
       color: white;
+      
     }
 
     tfoot th {

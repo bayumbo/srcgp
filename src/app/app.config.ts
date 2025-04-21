@@ -17,7 +17,7 @@
     provideAuth(() => getAuth()), 
     provideFirestore(() => getFirestore()), 
     provideFunctions(() => getFunctions()), 
-    provideStorage(() => getStorage())]
+    provideStorage(() => getStorage()), provideAnimationsAsync()]
     
   };
   

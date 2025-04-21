@@ -1,57 +1,136 @@
-
-/* NO TOCAR, AQUI CONFIGURACION BASICA DEL MENU -🔥📌 */
-html,body {
-  margin: 0;
-  padding: 0;
-  height: 100vw;
-  width: 140vw;
-  font-family: Arial, sans-serif, 12px;
-  background-color: #474646;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-
+/* ========== HEADER RESPONSIVO ========== */
 header {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw; // Ocupa todo el ancho de la pantalla
+  width: 98vw;
   z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #37474f;
+  padding: 6px 23px;
+  height: 61px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  font-family: tahoma;
+}
+
+.navbar-brand {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: black;
-  padding: 3px 30px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); // sombra sutil
-  .logo {
-    img {
-      height: 50px;
-    }
-  }
-}
+  flex: 1;
 
-.menu {
-  list-style: none;
-  display: flex;
-  gap: 20px;
-
-  li {
-    position: relative;
-  }
-
-  a {
+  .home-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     text-decoration: none;
-    color: white;
+    color: rgb(248, 241, 241);
+    font-weight: bold;
     font-size: 16px;
-    padding: 10px;
-    transition: color 0.3s ease;
 
     &:hover {
       color: #1E90FF;
-      border-bottom: 2px solid #1E90FF;
+    }
+
+    mat-icon {
+      font-size: 25px;
+      transition: color 0.3s ease;
+    }
+  }
+
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 26px;
+    cursor: pointer;
+    margin-left: auto;
+  }
+}
+
+nav {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+
+  .menu {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+    padding: 0;
+    margin: 0;
+    font-family: tahoma;
+
+    li {
+      a {
+        text-decoration: none;
+        color: white;
+        font-size: 16px;
+        padding: 10px;
+        display: inline-block;
+        transition: color 0.3s ease;
+
+        &:hover {
+          color: #1E90FF;
+          border-bottom: 2px solid #1E90FF;
+        }
+      }
+    }
+  }
+
+  &.abierto {
+    display: block;
+
+    .menu {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 10px 0;
+      gap: 10px;
+      font-family: tahoma;
     }
   }
 }
+
+/* ========== RESPONSIVE BREAKPOINTS ========== */
+@media (max-width: 768px) {
+  .navbar-brand {
+    .menu-toggle {
+      display: block;
+    }
+  }
+
+  nav {
+    display: none;
+    width: 100%;
+
+    &.abierto {
+      display: block;
+    }
+  }
+
+  nav .menu {
+    flex-direction: column;
+    background-color: #37474f;
+    width: 100%;
+    padding: 10px 20px;
+  }
+
+  nav .menu li a {
+    padding: 10px;
+    font-size: 16px;
+  }
+}
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
 /* Submenú */
 .submenu {
   display: none;
@@ -136,11 +215,12 @@ header {
 }
 
 .libro-diario-container, .libros-generados-panel {
-  background-color: #1f1f1f;
+  background-color: #ffffff;
   color: white;
   border-radius: 10px;
   padding: 25px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+  margin-top: 300px;
 }
 
 .form-cabecera input {
@@ -150,9 +230,10 @@ header {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-right: 10px;
   margin-bottom: 12px;
   label {
-    color: #ccc;
+    color: #aca7a7;
     font-size: 13px;
   }
   input, select {
@@ -171,7 +252,11 @@ header {
   border: none;
   border-radius: 8px;
   padding: 10px;
+  width: 219px;
+  position:center;
+  align-self: center;
   cursor: pointer;}
+
 
 .acciones {
   display: flex;
@@ -183,41 +268,44 @@ header {
     border: none;
     border-radius: 8px;
     font-weight: bold;
+    width: 230px;
     cursor: pointer;
     font-size: 14px;
-   
+    align-self: center;
   }
    // 🔴 Botón Eliminar
    button:nth-child(1) {
-    background-color: #28a745;
+    background-color: #2f8071;
     color: white;
 
     &:hover {
-      background-color: #218838;
+      background-color: #2c574f;
     }
   }
 
   // ✅ Botón Agregar Cuenta
   button:nth-child(2) {
-    background-color: #28a745;
+    background-color: #2f8071;
     color: white;
 
     &:hover {
-      background-color: #218838;
+      background-color: #2c574f;
     }
   }
 
   // ✅ Botón Guardar PDF
   button:nth-child(3) {
     background-color: #28a745;
-    color: white;
+    color: rgb(0, 0, 0);
 
     &:hover {
       background-color: #218838;
     }
   }
 }
-
+.alerta {
+  color: #000000;
+}
 
 .grid-libros {
   display: grid;
@@ -225,11 +313,11 @@ header {
 }
 
 .card-libro {
-  background-color: #2c2c2c;
+  background-color: #37474f;
   padding: 10px 15px;
   border-radius: 8px;
-  color: white;
-  font-size: 13px;
+  color: rgb(255, 255, 255);
+  font-size: 10px;
   margin-bottom: 10px;
   box-shadow: 0 0 10px #00000050;
   p {
@@ -239,31 +327,42 @@ header {
  
   .acciones {
     display: flex;
+    flex-direction: row;       // 👈 Alineación horizontal
+    justify-content: center;   // 👈 Centrado horizontal
     gap: 10px;
-    justify-content: flex-end;
-    margin-top: 6px;
+    margin-top: 10px;
+  
     a, button {
-      padding: 4px 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 15px;
       border-radius: 6px;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: bold;
-      border: none;
-      cursor: pointer;
-    }
-    a {
-      background-color: #007bff;
-      color: white;
       text-decoration: none;
+      white-space: nowrap;
     }
+  
+    a {
+      background-color: #2f8071;
+      color: white;
+    }
+  
     button {
       background-color: #dc3545;
-      border: n0;
       color: white;
+      border: none;
+      cursor: pointer;
+      width: 103px;
+  height: 39px;
+  
       &:hover {
         background-color: #c82333;
       }
     }
   }
+  
 }
 
 @media (max-width: 900px) {
@@ -277,14 +376,14 @@ header {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgb(255, 255, 255);
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
 
   .modal-content {
-    background: #1f1f1f;
+    background: #ffffff;
     padding: 20px;
     border-radius: 10px;
     width: 400px;
@@ -335,7 +434,7 @@ header {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #1f1f1f;
+  background-color: #ffffff;
   padding: 20px 25px;
   border-radius: 12px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
@@ -347,21 +446,22 @@ header {
 
   h3 {
     margin-top: 0;
-    font-size: 22px;
     text-align: center;
     margin-bottom: 20px;
+    font-family: TAHOMA;
+    color: #000000;
   }
 
   input[type="text"] {
-    width: 100%;
+    width: 75%;
     padding: 10px;
     font-size: 14px;
     border: none;
     border-radius: 6px;
     margin-bottom: 15px;
-    background-color: #ffffff;
+    background-color: #f1f1f1;
     color: #000000;
-    box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.2);
   }
 
   ul {
@@ -370,19 +470,19 @@ header {
     margin: 0;
     max-height: 240px;
     overflow-y: auto;
-    border: 1px solid #333;
+    border: 1px solid #ffffff;
     border-radius: 6px;
 
     li {
       padding: 10px 12px;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid #ffffff;
       cursor: pointer;
       transition: all 0.2s ease;
       font-size: 14px;
-      color: #ddd;
+      color: #413f3f;
 
       &:hover {
-        background-color: #007bff;
+        background-color: #59b8a8;
         color: white;
       }
 
@@ -405,13 +505,13 @@ header {
     font-weight: bold;
     border: none;
     border-radius: 6px;
-    background-color: #dc3545;
+    background-color: #2f8071;
     color: white;
     cursor: pointer;
     transition: background-color 0.2s ease;
 
     &:hover {
-      background-color: #c82333;
+      background-color: #316158;
     }
   }
 }
@@ -457,4 +557,10 @@ header {
     color: #ccc;
     padding: 6px 10px;
   }
+}
+h5 {
+  margin-top: 0;
+  text-align: center;
+font-family: TAHOMA;
+color: #000000;
 }

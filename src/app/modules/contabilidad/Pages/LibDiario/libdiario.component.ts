@@ -13,13 +13,14 @@ import { CatalogoService } from '../../Services/comprobante.service';
 import { jsPDF } from 'jspdf';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-libdiario',
   standalone: true,
   templateUrl: './libdiario.component.html',
   styleUrls: ['./libdiario.component.scss'],
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule],
+  imports: [CommonModule, ReactiveFormsModule,MatIconModule, FormsModule, RouterModule],
 })
 export class LibroDiarioComponent implements OnInit {
   formAsiento!: FormGroup;
@@ -59,6 +60,7 @@ export class LibroDiarioComponent implements OnInit {
       if (preloader) preloader.style.display = 'none';
     }, 600);
   }
+  menuAbierto: boolean = false;
 
   get detalles(): FormArray {
     return this.formAsiento.get('detalles') as FormArray;

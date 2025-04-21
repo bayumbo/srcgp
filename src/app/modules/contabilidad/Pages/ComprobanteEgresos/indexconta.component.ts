@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogoService } from '../../Services/comprobante.service';
+import { MatIconModule } from '@angular/material/icon';
 
 
 interface Transaccion {
@@ -23,7 +24,7 @@ interface Transaccion {
   standalone: true,
   templateUrl: './indexconta.component.html',
   styleUrls: ['./stylescontacom.scss'],
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, FormsModule]
+  imports: [CommonModule, ReactiveFormsModule, MatIconModule,RouterModule, FormsModule]
 })
 export class IndexContaComponent implements OnInit {
   egresoForm!: FormGroup;
@@ -40,6 +41,7 @@ export class IndexContaComponent implements OnInit {
   filtroFin: string = '';
   paginaActual: number = 1;
   registrosPorPagina: number = 5;
+  
 
   constructor(private fb: FormBuilder, private firebaseService: FirebaseService,  private catalogoService: CatalogoService) {}
 
@@ -50,7 +52,10 @@ export class IndexContaComponent implements OnInit {
       const preloader = document.getElementById('preloader');
       if (preloader) preloader.style.display = 'none';
     }, 600);
+    
   }
+  menuAbierto: boolean = false;
+
 
   initFormulario(): void {
     this.egresoForm = this.fb.group({
