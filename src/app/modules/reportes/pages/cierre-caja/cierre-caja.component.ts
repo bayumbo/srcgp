@@ -89,57 +89,115 @@ export class CierreCajaComponent implements OnInit {
   calcularSaldoNeto(): number {
     return this.calcularTotalGeneral() - this.calcularTotalEgresos();
   }
-
+ 
+  /*---------------------------Lógica generación PDF-----------------------------------------*/
+  
   async generarPDF() {
     const pdfDoc = new jsPDF();
     const fechaTexto = this.fechaSeleccionada.toLocaleDateString();
-
+  
+    // 🖼️ Cargar logos
+    const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
+    const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
+  
+    pdfDoc.addImage(logoPintag, 'PNG', 10, 10, 30, 30);
+    pdfDoc.addImage(logoExpress, 'PNG', 170, 10, 30, 30);
+  
+    // 🟦 Encabezado entre los logos
     pdfDoc.setFontSize(16);
-    pdfDoc.text(`CIERRE DE CAJA - ${fechaTexto}`, 14, 20);
-
+    pdfDoc.setTextColor(40, 40, 40);
+    pdfDoc.text('Consorcio Pintag Express', 75, 20);
+    pdfDoc.setFontSize(12);
+    pdfDoc.text(`CIERRE DE CAJA - ${fechaTexto}`, 80, 28);
+  
+    const startY = 45;
+  
+    // 🧾 Tabla ingresos
     const body = this.cierreItems.map(item => [
       item.modulo,
       item.unidad,
       new Date(item.fecha).toLocaleDateString(),
       `$${item.valor.toFixed(2)}`
     ]);
-
+  
     (pdfDoc as any).autoTable({
       head: [['Módulo', 'Unidad', 'Fecha', 'Valor']],
       body,
-      startY: 30
+      startY,
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        halign: 'center'
+      },
+      headStyles: {
+        fillColor: [63, 81, 181],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      margin: { left: 14, right: 14 }
     });
-
+  
     const total = this.calcularTotalGeneral();
-    const lastY = (pdfDoc as any).lastAutoTable.finalY || 60;
-
+    const lastY = (pdfDoc as any).lastAutoTable.finalY || startY + 30;
+  
+    // 💰 Total ingresos
+    pdfDoc.setFontSize(12);
+    pdfDoc.setTextColor(0, 0, 0);
     pdfDoc.text(`Total Ingresos: $${total.toFixed(2)}`, 14, lastY + 10);
-
+  
     if (this.egresos.length > 0) {
       (pdfDoc as any).autoTable({
         head: [['Detalle del Egreso', 'Valor']],
         body: this.egresos.map(e => [e.modulo, `$${e.valor.toFixed(2)}`]),
-        startY: lastY + 20
+        startY: lastY + 20,
+        styles: {
+          fontSize: 10,
+          cellPadding: 3,
+          halign: 'center'
+        },
+        headStyles: {
+          fillColor: [244, 67, 54],
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [253, 236, 234]
+        },
+        margin: { left: 14, right: 14 }
       });
-
+  
       const egresosY = (pdfDoc as any).lastAutoTable.finalY || lastY + 40;
       const totalEgresos = this.calcularTotalEgresos();
       const saldoNeto = this.calcularSaldoNeto();
-
+  
+      pdfDoc.setTextColor(0, 0, 0);
       pdfDoc.text(`Total Egresos: $${totalEgresos.toFixed(2)}`, 14, egresosY + 10);
+  
+      pdfDoc.setFontSize(13);
+      pdfDoc.setTextColor(33, 150, 83);
       pdfDoc.text(`Saldo Neto del Día: $${saldoNeto.toFixed(2)}`, 14, egresosY + 20);
+  
+      // ✍️ Línea de firma opcional
+      pdfDoc.setDrawColor(150);
+      pdfDoc.line(14, egresosY + 40, 100, egresosY + 40);
+      pdfDoc.setFontSize(10);
+      pdfDoc.setTextColor(100);
+      pdfDoc.text('Firma Responsable', 14, egresosY + 45);
     }
-
-    // Descargar localmente
+  
+    // Descargar
     const fechaId = this.fechaSeleccionada.toISOString().split('T')[0];
     pdfDoc.save(`CierreCaja-${fechaId}.pdf`);
-
+  
     // Subir a Firebase
     const pdfBlob = pdfDoc.output('blob');
     const archivoRef = ref(this.storage, `cierres/${fechaId}.pdf`);
     await uploadBytes(archivoRef, pdfBlob);
     const pdfUrl = await getDownloadURL(archivoRef);
-
+  
     await setDoc(doc(this.firestore, `cierresCaja/${fechaId}`), {
       fecha: this.fechaSeleccionada,
       total,
@@ -150,10 +208,33 @@ export class CierreCajaComponent implements OnInit {
       pdfUrl,
       creadoEn: serverTimestamp()
     });
-
+  
     alert('✅ PDF generado, guardado y descargado con éxito');
     this.cargarHistorial();
+
   }
+
+  cargarImagenBase64(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.src = url;
+  
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
+        const dataURL = canvas.toDataURL('image/png');
+        resolve(dataURL);
+      };
+  
+      img.onerror = (err) => reject(err);
+    });
+  }
+  
+ /*---------------------------Fin diseño PDF-----------------------------------------*/
   egresoEnEdicion: number | null = null;
   egresoEditado: { modulo: string; valor: number } = { modulo: '', valor: 0 };
 

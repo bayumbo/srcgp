@@ -12,7 +12,7 @@
   flex-wrap: wrap; // para mejor responsividad
   gap: 2rem; // espacio entre secciones
 }
-
+ 
 .perfil-container {
   background-color: #ffffff;
   padding: 20px 24px;
@@ -201,6 +201,20 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   max-height: 90vh;
  
+}
+.tabla-scroll-horizontal {
+  overflow-x: auto;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 1rem;
+
+  table {
+    min-width: 900px; // Ajusta según la cantidad de columnas
+  }
+
+  th, td {
+    white-space: nowrap;
+  }
 }
 
 .tabla-reportes-usuario h3 {
