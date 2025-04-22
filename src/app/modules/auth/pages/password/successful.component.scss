@@ -1,0 +1,123 @@
+/* Fondo y centrado total */
+body, :host {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  background-color: #ffffff;
+  font-family: 'Segoe UI', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Contenedor principal */
+.container {
+  background-color: #fefefe;
+  padding: 2.5rem 2rem;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  max-width: 460px;
+  width: 100%;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Mensaje central */
+.mensaje-confirmacion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #2e2e2e;
+
+  .icono-estado {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e8f5e9;
+    border-radius: 50%;
+    width: 90px;
+    height: 90px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  
+    .icono-check {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      width: 40px;
+      height: 40px;
+      color: #2e7d32;
+      line-height: 1;
+    }
+  }
+  
+
+  h2 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: #2e7d32;
+    margin: 0.3rem 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    mat-icon {
+      font-size: 22px;
+      color: #2e7d32;
+    }
+  }
+
+  p {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    color: #444;
+  }
+
+  .mensaje-secundario {
+    font-size: 0.95rem;
+    color: #777;
+    margin-bottom: 1.2rem;
+  }
+
+  .spinner {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  button {
+    padding: 0.65rem 1.5rem;
+    font-size: 0.95rem;
+    background-color: #2f8071;
+    color: #ffffff;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    mat-icon {
+      font-size: 20px;
+    }
+
+    &:hover {
+      background-color: #25665a;
+    }
+  }
+}
+
+/* Animación suave */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,15 +1,28 @@
 <div class="container">
-    <h5>Nueva contraseña</h5>
-    <form (ngSubmit)="cambiarContrasena()">
-      <label for="password">Escribe tu nueva contraseña</label>
+  <h5>
+    <mat-icon>lock</mat-icon>
+    Nueva contraseña
+  </h5>
+
+  <form (ngSubmit)="cambiarContrasena()" class="formulario">
+    <div class="campo-contrasena">
+      <mat-icon class="icono-campo">vpn_key</mat-icon>
       <input
-        type="password"
+        [type]="mostrarContrasena ? 'text' : 'password'"
         id="password"
         name="password"
         [(ngModel)]="nuevaContrasena"
         required
+        placeholder="Escribe tu nueva contraseña"
       />
-      <button type="submit">Aceptar</button>
-    </form>
-  </div>
-  
+      <button type="button" class="toggle-ver" (click)="mostrarContrasena = !mostrarContrasena">
+        <mat-icon>{{ mostrarContrasena ? 'visibility_off' : 'visibility' }}</mat-icon>
+      </button>
+    </div>
+
+    <button type="submit" class="btn-aceptar">
+      <mat-icon>check_circle</mat-icon>
+      Aceptar
+    </button>
+  </form>
+</div>
