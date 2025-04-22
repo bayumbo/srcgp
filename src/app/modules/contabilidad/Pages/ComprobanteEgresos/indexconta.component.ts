@@ -7,6 +7,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogoService } from '../../Services/comprobante.service';
 import { MatIconModule } from '@angular/material/icon';
+import { HostListener } from '@angular/core';
 
 
 interface Transaccion {
@@ -55,7 +56,17 @@ export class IndexContaComponent implements OnInit {
     
   }
   menuAbierto: boolean = false;
-
+  toggleMenu() {
+  this.menuAbierto = !this.menuAbierto;
+}
+// Cierra si hace clic fuera del menú
+@HostListener('document:click', ['$event'])
+cerrarSiClickFuera(event: MouseEvent) {
+ const target = event.target as HTMLElement;
+ if (!target.closest('nav') && !target.closest('.menu-toggle')) {
+   this.menuAbierto = false;
+ }
+}
 
   initFormulario(): void {
     this.egresoForm = this.fb.group({

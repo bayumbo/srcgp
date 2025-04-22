@@ -1,4 +1,8 @@
 
+
+
+
+
 /* ========== HEADER RESPONSIVO ========== */
 header {
   position: fixed;
@@ -107,7 +111,15 @@ nav {
 
   nav {
     display: none;
-    width: 100%;
+    position: absolute;
+    right: 0;
+    width: 240px; // ancho del panel
+    top: 61px; // justo debajo del header
+    left: 177px;
+    flex-direction: column;
+    box-shadow: -2px 0 6px rgba(0, 0, 0, 0.3);
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
 
     &.abierto {
       display: block;
@@ -131,41 +143,7 @@ nav {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-}
-
-/* Submenú */
-.submenu {
-  display: none;
-  position: absolute;
-  top: 40px; /* Ajusta la distancia del menú principal */
-  left: 0;
-  background-color: #333;
-  list-style: none;
-  padding: 10px 0;
-  border-radius: 5px;
-  width: 150px; /* Aumenta el ancho para que los elementos no estén tan juntos */
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3); /* Agrega sombra para mejor visualización */
-}
-.submenu li {
-    padding: 10px 15px; /* Aumenta el espaciado interno */
-}
-
-.submenu a {
-    color: white;
-    display: block;
-    font-size: 16px; /* Aumenta el tamaño del texto */
-    padding: 10px; /* Asegura buen espaciado */
-    text-align: left;
-}
-
-.submenu a:hover {
-    background-color: #1E90FF;
-    border-radius: 3px;
-}
-
-/* Asegura que el submenú no afecte el layout */
-.submenu-container {
-  position: relative;
+  flex-wrap: nowrap;
 }
 
 
@@ -206,7 +184,6 @@ nav {
   50% { transform: scale(1); }
   100% { transform: scale(0); }
 }
-
 
 .comprobante-seccion {
   display: flex;

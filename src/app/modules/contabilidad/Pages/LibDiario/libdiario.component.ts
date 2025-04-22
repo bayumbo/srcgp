@@ -15,7 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import autoTable from 'jspdf-autotable';
-
+import { HostListener } from '@angular/core';
 @Component({
   selector: 'app-libdiario',
   standalone: true,
@@ -62,7 +62,17 @@ export class LibroDiarioComponent implements OnInit {
     }, 600);
   }
   menuAbierto: boolean = false;
-
+    toggleMenu() {
+    this.menuAbierto = !this.menuAbierto;
+  }
+ // Cierra si hace clic fuera del menú
+ @HostListener('document:click', ['$event'])
+ cerrarSiClickFuera(event: MouseEvent) {
+   const target = event.target as HTMLElement;
+   if (!target.closest('nav') && !target.closest('.menu-toggle')) {
+     this.menuAbierto = false;
+   }
+ }
   get detalles(): FormArray {
     return this.formAsiento.get('detalles') as FormArray;
   }
