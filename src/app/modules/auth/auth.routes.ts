@@ -18,7 +18,7 @@ export const AUTH_ROUTES: Routes = [
   {
     path: 'password-confirmed',
     loadComponent: () =>
-      import('./pages/password/password-confirmed.component').then(m => m.PasswordConfirmedComponent)
+      import('./pages/password/successful.component').then(m => m.PasswordConfirmedComponent)
   },
   
   

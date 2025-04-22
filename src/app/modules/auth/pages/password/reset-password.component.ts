@@ -4,11 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from 'src/app/core/auth/services/auth.service';
 import { Router } from '@angular/router';
-
+import { MatIconModule } from '@angular/material/icon';
 @Component({
   standalone: true,
   selector: 'app-reset-password',
-  imports: [CommonModule, FormsModule, MatSnackBarModule],
+  imports: [CommonModule, FormsModule, MatSnackBarModule,MatIconModule],
   templateUrl: './reset-password.component.html',
   styleUrl:'./reset-password.component.scss'
 
