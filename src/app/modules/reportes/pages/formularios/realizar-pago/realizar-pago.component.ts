@@ -22,6 +22,7 @@ import { DocumentoPago } from 'src/app/core/interfaces/documentoPago.interface';
 import { ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Storage } from '@angular/fire/storage';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 
 
@@ -121,7 +122,7 @@ export class RealizarPagoComponent implements OnInit {
           .flatMap(p => {
             const cantidad = p.detalles?.[campo] ?? 0;
             return cantidad > 0
-              ? [{ id: p.id, cantidad, fecha: p.fecha, reporteId }]
+              ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
               : [];
           });
   
@@ -156,12 +157,10 @@ export class RealizarPagoComponent implements OnInit {
         nombre: registro.nombre,
         apellido: registro.apellido,
         unidad: registro.unidad,
-        administracion: detalles['administracion'] || 0,
-        minutosBase: detalles['minutosBase'] || 0,
-        minutosAtraso: detalles['minutosAtraso'] || 0,
-        multas: detalles['multas'] || 0,
-        total
+        total,
+        detalles // 👈 aquí se envían directo
       });
+      
   
       // 2️⃣ Guardar el documento en Firestore (UNA sola vez)
       const ref = collection(
@@ -180,48 +179,187 @@ export class RealizarPagoComponent implements OnInit {
     alert('✅ Pagos registrados y recibos generados correctamente.');
     this.router.navigate(['/reportes/lista-reportes']);
   }
+
   
-  async generarReciboYSubirPDF(uid: string, reporteId: string, datos: {
-    nombre: string;
-    apellido: string;
-    unidad: string;
-    administracion: number;
-    minutosBase: number;
-    minutosAtraso: number;
-    multas: number;
-    total: number;
-  }): Promise<string> {
+  /*---------------------------------- Lógica generar recibo y formato----------------------*/
+  
+  async generarReciboYSubirPDF(
+    uid: string,
+    reporteId: string,
+    datos: {
+      nombre: string;
+      apellido: string;
+      unidad: string;
+      total: number;
+      detalles: Partial<Record<CampoClave, number>>;
+    }
+  ): Promise<string> {
     const fechaActual = new Date();
-    const fechaTexto = fechaActual.toLocaleString();
+    const fechaTexto = fechaActual.toLocaleDateString('es-EC', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const horaTexto = fechaActual.toLocaleTimeString('es-EC', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   
-    const docPDF = new jsPDF();
-    docPDF.setFontSize(16);
-    docPDF.text('RECIBO DE PAGO', 80, 20);
-    docPDF.setFontSize(12);
-    docPDF.text(`Fecha: ${fechaTexto}`, 20, 30);
-    docPDF.text(`Nombre: ${datos.nombre}`, 20, 40);
-    docPDF.text(`Unidad: ${datos.unidad}`, 20, 50);
+    const campos: CampoClave[] = ['administracion', 'minutosBase', 'minutosAtraso', 'multas'];
   
-    docPDF.text('Detalle del pago:', 20, 70);
-    docPDF.text(`- Administración: $${datos.administracion.toFixed(2)}`, 30, 80);
-    docPDF.text(`- Minutos Base: $${datos.minutosBase.toFixed(2)}`, 30, 90);
-    docPDF.text(`- Minutos Atraso: $${datos.minutosAtraso.toFixed(2)}`, 30, 100);
-    docPDF.text(`- Multas: $${datos.multas.toFixed(2)}`, 30, 110);
+    const pagados: Record<CampoClave, number> = {
+      administracion: 0,
+      minutosBase: 0,
+      minutosAtraso: 0,
+      multas: 0
+    };
   
-    docPDF.setFontSize(14);
-    docPDF.text(`TOTAL PAGADO: $${datos.total.toFixed(2)}`, 20, 130);
+    const pendientes: Record<CampoClave, number> = {
+      administracion: 0,
+      minutosBase: 0,
+      minutosAtraso: 0,
+      multas: 0
+    };
+  
+    const registro = this.registros.find(r => r.id === reporteId);
+    if (!registro) throw new Error('Registro no encontrado en memoria');
+      
+    for (const campo of campos) {
+      const totalCampo = registro[campo] ?? 0;
+  
+      const pagadoAnterior = this.calcularTotalPagado(campo, reporteId);
+      const pagadoNuevo = datos.detalles?.[campo] ?? 0;
+  
+      pagados[campo] = pagadoNuevo;
+      pendientes[campo] = Math.max(totalCampo - (pagadoAnterior + pagadoNuevo), 0);
+    }
+  
+    // Cargar logos
+    const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
+    const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
+
+    const pdfDoc = new jsPDF();
+
+    // 🖼 Logos
+    pdfDoc.addImage(logoPintag, 'PNG', 10, 10, 30, 30);
+    pdfDoc.addImage(logoExpress, 'PNG', 170, 10, 30, 30);
+
+    // 🧾 Encabezado
+    pdfDoc.setFontSize(18);
+    pdfDoc.text('Consorcio Pintag Expresso', 60, 20);
+    pdfDoc.setFontSize(10);
+    pdfDoc.text('Pintag, Antisana S2-138', 80, 26);
+    pdfDoc.text('consorciopinxpres@hotmail.com', 70, 31);
+    pdfDoc.text(``, 20, 45);
+    // 🚍 Datos principales
+    pdfDoc.setFontSize(18);
+    pdfDoc.text(`BUS ${datos.unidad}`, 20, 45);
     
-    // PDF como blob
-    const pdfBlob = docPDF.output('blob');
+    pdfDoc.setFontSize(11);
+    pdfDoc.text(`Fecha de emisión: ${fechaTexto}`, 130, 45);
+    pdfDoc.text(`Hora de emisión: ${horaTexto}`, 130, 51);
+
+    // 🧾 Tabla de pagos realizados
+    const fechaReporte = registro.fechaModificacion
+  ? registro.fechaModificacion.toDate().toLocaleDateString('es-EC', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  : 'Sin fecha';
+
+    autoTable(pdfDoc, {
+      startY: 60,
+      head: [['Descripción', 'Fecha', 'Valor']],
+      body: [
+        ['Administración', fechaReporte, `$${pagados.administracion.toFixed(2)}`],
+        ['Minutos Base', fechaReporte, `$${pagados.minutosBase.toFixed(2)}`],
+        ['Minutos Atraso', fechaReporte, `$${pagados.minutosAtraso.toFixed(2)}`],
+        ['Multas', fechaReporte, `$${pagados.multas.toFixed(2)}`],
+        ['TOTAL', '', `$${datos.total.toFixed(2)}`]
+      ],
+      styles: { fontSize: 11, halign: 'right' },
+      headStyles: { fillColor: [30, 144, 255], halign: 'center' }
+    });
+
+        const yFinal = (pdfDoc as any).lastAutoTable?.finalY || 100;
+
+    // 📊 Tabla de valores pendientes
+    autoTable(pdfDoc, {
+      startY: yFinal + 15,
+      head: [['Descripción', 'Pendiente']],
+      body: [
+        ['Administración', `$${pendientes.administracion.toFixed(2)}`],
+        ['Minutos Base', `$${pendientes.minutosBase.toFixed(2)}`],
+        ['Minutos Atraso', `$${pendientes.minutosAtraso.toFixed(2)}`],
+        ['Multas', `$${pendientes.multas.toFixed(2)}`]
+      ],
+      styles: { fontSize: 11, halign: 'right', textColor: 'black' },
+      headStyles: { halign: 'center', fillColor: [240, 240, 240] }
+    });
+
+    const yFinal2 = (pdfDoc as any).lastAutoTable?.finalY || yFinal + 40;
+
+    // 🚌 Imagen del bus con proporción original y centrado
+    const busImage = await this.cargarImagenBase64('/assets/img/Bus.png');
+    const busImg = new Image();
+    busImg.src = busImage;
+    await new Promise(resolve => (busImg.onload = resolve));
+    const originalWidth = busImg.width;
+    const originalHeight = busImg.height;
+    const displayWidth = 30;
+    const displayHeight = (originalHeight / originalWidth) * displayWidth;
+    const centerX = (210 - displayWidth) / 2;
+    pdfDoc.addImage(busImage, 'PNG', centerX, yFinal2 + 10, displayWidth, displayHeight);
+
+    // 📄 Texto de QR centrado
+    const texto = 'Escanea el código para descargar tu recibo';
+    pdfDoc.setFontSize(10);
+    pdfDoc.setTextColor(0);
+    const textWidth = pdfDoc.getTextWidth(texto);
+    pdfDoc.text(texto, (210 - textWidth) / 2, yFinal2 + displayHeight + 25);
+
+    // 🔳 Código QR centrado
+    const pdfBlob = pdfDoc.output('blob');
     const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
-  
-    // Subida a Firebase Storage
     const storageRef = ref(this.storage, fileName);
     await uploadBytes(storageRef, pdfBlob);
     const pdfUrl = await getDownloadURL(storageRef);
-    docPDF.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
+    const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(pdfUrl)}`;
+    const qrBase64 = await this.cargarImagenBase64(qrURL);
+    const qrSize = 30;
+    pdfDoc.addImage(qrBase64, 'PNG', (210 - qrSize) / 2, yFinal2 + displayHeight + 30, qrSize, qrSize);
+
+    // 💾 Guardar localmente
+    pdfDoc.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
     return pdfUrl;
   }
+  
+  
+  
+  cargarImagenBase64(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.src = url;
+  
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
+        const dataURL = canvas.toDataURL('image/png');
+        resolve(dataURL);
+      };
+  
+      img.onerror = (err) => reject(err);
+    });
+  }
+  
+
+  /*-------------------------------Fin recibo pdf----------------------------*/
+
 
   calcularDeuda(registro: NuevoRegistro, campo: CampoClave): number {
     const total = registro[campo as keyof NuevoRegistro] as number;
@@ -326,5 +464,6 @@ export class RealizarPagoComponent implements OnInit {
 
   
 }
+
 
 

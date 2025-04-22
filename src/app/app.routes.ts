@@ -54,19 +54,20 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/administracion/pages/GestionRoles/gestionroles.component').then(m => m.GestionRolesComponent),
       },
-      {
-        path: 'contabilidad',
-        canActivate: [authGuard],
-        children: CONTABILIDAD_ROUTES,
-      },
+      
       {
         path: 'reportes',
         canActivate: [authGuard],
         children: REPORTES_ROUTES,
       },
     ],
+    
   },
-
+  {
+    path: 'contabilidad',
+    canActivate: [authGuard],
+    children: CONTABILIDAD_ROUTES,
+  },
   // Redirección
   {
     path: '**',
