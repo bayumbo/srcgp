@@ -16,6 +16,8 @@ import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Pago } from 'src/app/core/interfaces/pago.interface';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   selector: 'app-reporte-lista',
@@ -202,7 +204,161 @@ export class ReporteListaComponent implements OnInit {
     await this.consultarReportesEnRango(fechaInicio, fechaFin);
   }
 
-  irANuevoRegistro(): void {
+  imprimirPDFMinutosDesdeVista() {
+    if (!this.fechaPersonalizada) {
+      alert('Selecciona una fecha primero');
+      return;
+    }
+
+    const fecha = new Date(this.fechaPersonalizada);
+    this.generarPDFMinutos(this.reportes, fecha);
+  }
+
+  imprimirPDFAdministracionDesdeVista() {
+    if (!this.fechaPersonalizada) {
+      alert('Selecciona una fecha primero');
+      return;
+    }
+
+    const fecha = new Date(this.fechaPersonalizada);
+    this.generarPDFAdministracion(this.reportes, fecha);
+  }
+
+  /*--------------------GENERAR PDF -------------------*/
+
+generarPDFMinutos(data: ReporteConPagos[], fecha: Date) {
+  const doc = new jsPDF();
+  const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const logo1 = new Image();
+  logo1.src = '/assets/img/LogoPintag.png';
+  const logo2 = new Image();
+  logo2.src = '/assets/img/LogoAntisana.png';
+
+  doc.addImage(logo1, 'PNG', 15, 10, 25, 25);
+  doc.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+  doc.setFontSize(16);
+  doc.text('Minutos', 105, 45, { align: 'center' });
+
+  doc.setFontSize(11);
+  doc.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+  doc.setFontSize(10);
+  doc.text('Consorcio Píntag Expresso', 135, 55);
+  doc.text('Píntag, Antisana S2-138', 135, 60);
+  doc.text('consorciopinexpres@hotmail.com', 135, 65);
+
+  const cuerpo = data.map(item => [
+    item.unidad || '',
+    item.nombre || '',
+    `$ ${item.minutosAtraso?.toFixed(2) || '0.00'}`,
+    ''
+  ]);
+
+  const totalMinutos = data.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
+
+  autoTable(doc, {
+    head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
+    body: cuerpo,
+    startY: 75,
+    styles: { fontSize: 10 }
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(11);
+  doc.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, 15, finalY);
+
+  doc.save(`Minutos_${this.fechaPersonalizada}.pdf`);
+}
+
+generarPDFAdministracion(data: ReporteConPagos[], fecha: Date) {
+  const doc = new jsPDF();
+  const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const logo1 = new Image();
+  logo1.src = '/assets/img/LogoPintag.png';
+  const logo2 = new Image();
+  logo2.src = '/assets/img/LogoAntisana.png';
+
+  doc.addImage(logo1, 'PNG', 15, 10, 25, 25);
+  doc.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+  doc.setFontSize(16);
+  doc.text('Administración', 105, 45, { align: 'center' });
+
+  doc.setFontSize(11);
+  doc.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+  doc.setFontSize(10);
+  doc.text('Consorcio Píntag Expresso', 135, 55);
+  doc.text('Píntag, Antisana S2-138', 135, 60);
+  doc.text('consorciopinexpres@hotmail.com', 135, 65);
+
+  const cuerpo = data.map(item => [
+    item.unidad || '',
+    item.nombre || '',
+    `$ ${item.administracion?.toFixed(2) || '0.00'}`,
+    ''
+  ]);
+
+  const totalAdministracion = data.reduce((sum, item) => sum + (item.administracion || 0), 0);
+
+  autoTable(doc, {
+    head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
+    body: cuerpo,
+    startY: 75,
+    styles: { fontSize: 10 }
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(11);
+  doc.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, 15, finalY);
+
+  doc.save(`Administracion_${this.fechaPersonalizada}.pdf`);
+}
+
+/*--------------------GENERAR PDF FIN -------------------*/
+
+/*------------------GENERAR REPORTE POR EMPRESA------------- */
+mostrarOpcionesEmpresa = false;
+empresaSeleccionada: string | null = null;
+fechaInicio: string = '';
+fechaFin: string = '';
+errorFecha: string = '';
+
+seleccionarEmpresa(empresa: string) {
+  this.empresaSeleccionada = empresa;
+  this.fechaInicio = '';
+  this.fechaFin = '';
+  this.errorFecha = '';
+}
+
+validarRangoFechas() {
+  if (this.fechaInicio && this.fechaFin) {
+    const inicio = new Date(this.fechaInicio);
+    const fin = new Date(this.fechaFin);
+    const diferenciaDias = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (diferenciaDias < 0) {
+      this.errorFecha = 'La fecha de inicio no puede ser mayor que la de fin.';
+    } else if (diferenciaDias > 31) {
+      this.errorFecha = 'El rango no debe superar los 31 días.';
+    } else {
+      this.errorFecha = '';
+    }
+  }
+}
+
+generarReporteEmpresasPDF() {
+  if (!this.empresaSeleccionada || this.errorFecha) return;
+  // Aquí se conectará con la lógica del servicio y generación PDF
+  console.log('Generar reporte PDF para:', this.empresaSeleccionada, this.fechaInicio, this.fechaFin);
+}
+
+/*------------------GENERAR REPORTE POR EMPRESA------------- */
+
+irANuevoRegistro(): void {
     this.router.navigate(['/reportes/nuevo-registro']);
   }
 

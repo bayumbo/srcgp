@@ -5,22 +5,60 @@
     <p>Cargando reportes...</p>
   </div>
 
-
-
   <!-- Contenido principal -->
   <div class="tabla-container" *ngIf="!cargando">
     <h5>NÓMINA DE RECAUDACIÓN</h5>
     <button class="boton-volver" (click)="volver()">← Volver</button>
-    <!-- Acciones -->
+
+   
+    <!-- Contenedor de acciones superior -->
     <div class="acciones-globales">
-          
-      <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
-        <span class="material-icons">filter_alt</span>
-      </button>
-      <button class="nuevo-registro" (click)="irANuevoRegistro()">
-        <span class="material-icons">add</span>
-        Nuevo Registro
-      </button>
+      <!-- Izquierda: Reporte Empresas -->
+      <div class="acciones-empresas">
+        <button (click)="mostrarOpcionesEmpresa = !mostrarOpcionesEmpresa">
+          <span class="material-icons">business</span>
+          Generar Reporte Empresas
+        </button>
+      </div>
+
+      <!-- Derecha: Filtros y nuevo registro -->
+      <div class="acciones-secundarias">
+        <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
+          <span class="material-icons">filter_alt</span>
+        </button>
+        <button class="nuevo-registro" (click)="irANuevoRegistro()">
+          <span class="material-icons">add</span>
+          Nuevo Registro
+        </button>
+      </div>
+    </div>
+    
+    <div *ngIf="mostrarOpcionesEmpresa" class="panel-empresa">
+      <!-- Botones de empresas -->
+      <div class="botones-empresa">
+        <button (click)="seleccionarEmpresa('Pintag')" [class.activa]="empresaSeleccionada === 'Pintag'">Pintag</button>
+        <button (click)="seleccionarEmpresa('Antisana')" [class.activa]="empresaSeleccionada === 'Antisana'">Antisana</button>
+      </div>
+    
+      <!-- Fechas -->
+      <div *ngIf="empresaSeleccionada" class="filtros-fecha">
+        <label>Fecha de inicio:</label>
+        <input type="date" [(ngModel)]="fechaInicio" (change)="validarRangoFechas()" />
+    
+        <label>Fecha de fin:</label>
+        <input type="date" [(ngModel)]="fechaFin" (change)="validarRangoFechas()" />
+    
+        <p class="error" *ngIf="errorFecha">{{ errorFecha }}</p>
+    
+        <button
+          class="generar-reporte"
+          (click)="generarReporteEmpresasPDF()"
+          [disabled]="!fechaInicio || !fechaFin || !!errorFecha"
+        >
+          <span class="material-icons">picture_as_pdf</span>
+          Generar PDF
+        </button>
+      </div>
     </div>
 
     <!-- Panel de filtros -->
@@ -33,11 +71,21 @@
         <label for="fecha">Fecha personalizada:</label>
         <input type="date" [(ngModel)]="fechaPersonalizada" id="fecha" />
         <button (click)="filtrarPorFechaPersonalizada()">Buscar</button>
+        <div class="acciones-imprimir">
+          <button class="boton-imprimir" (click)="imprimirPDFMinutosDesdeVista()">
+            <span class="material-icons">schedule</span>
+            Imprimir Minutos 
+          </button>
+          <button class="boton-imprimir" (click)="imprimirPDFAdministracionDesdeVista()">
+            <span class="material-icons">receipt_long</span>
+            Imprimir Administración
+          </button>
+        </div>
       </div>
 
       <button class="limpiar" (click)="cargarTodosLosReportes()">Limpiar filtros</button>
     </div>
-
+    
     <!-- Tabla -->
     <table *ngIf="reportes.length > 0">
       <thead>
@@ -59,19 +107,14 @@
         <tr *ngFor="let reporte of reportesPaginados">
           <td data-label="Nombre">{{ reporte.nombre + ' ' + reporte.apellido }}</td>
           <td data-label="Unidad">{{ reporte.unidad }}</td>
-
           <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
           <td data-label="Min. Pagados">{{ reporte.minutosPagados }}</td>
-
           <td data-label="Administración">{{ reporte.administracion }}</td>
           <td data-label="Admin Pagada">{{ reporte.adminPagada }}</td>
-
           <td data-label="Min. Base">{{ reporte.minutosBase }}</td>
           <td data-label="Min. Base Pagados">{{ reporte.minBasePagados }}</td>
-
           <td data-label="Multas">{{ reporte.multas }}</td>
           <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
-
           <td class="acciones" data-label="Acciones">
             <div class="acciones-contenedor">
               <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)">
@@ -85,14 +128,9 @@
         </tr>
       </tbody>
     </table>
+
     <div class="paginacion" *ngIf="totalPaginas > 1">
-      <button
-        (click)="cambiarPagina(paginaActual - 1)"
-        [disabled]="paginaActual === 1"
-      >
-        ← Anterior
-      </button>
-    
+      <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">← Anterior</button>
       <button
         *ngFor="let pagina of [].constructor(totalPaginas); let i = index"
         (click)="cambiarPagina(i + 1)"
@@ -100,14 +138,9 @@
       >
         {{ i + 1 }}
       </button>
-    
-      <button
-        (click)="cambiarPagina(paginaActual + 1)"
-        [disabled]="paginaActual === totalPaginas"
-      >
-        Siguiente →
-      </button>
+      <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">Siguiente →</button>
     </div>
+
     <!-- Botones inferiores -->
     <div class="botones-inferiores">
       <button (click)="irACuentasPorCobrar()">

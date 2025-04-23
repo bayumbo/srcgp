@@ -78,10 +78,10 @@ h5 {
 
   .acciones-globales {
     display: flex;
-    justify-content: flex-end;
-    align-items: flex-start;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;;
 
     .filtro,
     .nuevo-registro {
@@ -122,6 +122,139 @@ h5 {
     .material-icons {
       font-size: 18px;
     }
+    /*------------ACCIONES EMPRESAS--------------*/
+    .acciones-empresas {
+      button {
+        background-color: #2f8071;
+        color: white;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+  
+        &:hover {
+          background-color: #37474f;
+        }
+  
+        .material-icons {
+          font-size: 18px;
+        }
+      }
+    }
+    .acciones-secundarias {
+      display: flex;
+      gap: 0.75rem;
+  
+      .filtro, .nuevo-registro {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .filtro {
+        background-color: #546e7a;
+        color: white;
+  
+        &:hover {
+          background-color: #455a64;
+        }
+      }
+      .nuevo-registro {
+        background-color: #2f8071;
+        color: white;
+  
+        &:hover {
+          background-color: #455a64;
+        }
+      }
+    }  
+    
+  }
+  .panel-empresa {
+    margin: 1rem 0;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+  .botones-empresa {
+    display: flex;
+    gap: 1rem;
+
+    button {
+      padding: 0.5rem 1.2rem;
+      border: none;
+      border-radius: 4px;
+      background-color: #455a64;
+      color: white;
+      cursor: pointer;
+      font-weight: 500;
+
+      &:hover {
+        background-color: #2f8071;
+      }
+
+      &.activa {
+        background-color: #2f8071;
+      }
+    }
+  }
+
+  .filtros-fecha {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+
+    label {
+      font-weight: 500;
+    }
+
+    input[type='date'] {
+      padding: 0.4rem 0.6rem;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    .generar-reporte {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 5px;
+      background-color: #1e88e5;
+      color: white;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #1565c0;
+      }
+
+      &:disabled {
+        background-color: #90a4ae;
+        cursor: not-allowed;
+      }
+
+          }
+
+    .error {
+      color: red;
+      font-size: 13px;
+      font-weight: 500;
+    }
+  }
   }
 
   table {
@@ -248,6 +381,26 @@ h5 {
       border-radius: 5px;
       font-size: 14px;
     }
+  }
+}
+.acciones-imprimir{
+
+  display: flex;
+  justify-content: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 5px;
+  cursor: pointer;
+
+    .material-icons {
+    font-size: 16px;
+    vertical-align: middle;
   }
 }
 
