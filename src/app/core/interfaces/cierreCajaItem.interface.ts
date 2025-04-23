@@ -1,4 +1,5 @@
 export interface CierreCajaItem {
+    empresa: string;
     modulo: string;       
     unidad: string;       
     fecha: Date;          

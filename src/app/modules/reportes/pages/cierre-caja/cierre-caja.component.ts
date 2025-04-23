@@ -103,7 +103,7 @@ export class CierreCajaComponent implements OnInit {
     pdfDoc.addImage(logoPintag, 'PNG', 10, 10, 30, 30);
     pdfDoc.addImage(logoExpress, 'PNG', 170, 10, 30, 30);
   
-    // 🟦 Encabezado entre los logos
+    // 🟦 Encabezado
     pdfDoc.setFontSize(16);
     pdfDoc.setTextColor(40, 40, 40);
     pdfDoc.text('Consorcio Pintag Express', 75, 20);
@@ -111,8 +111,6 @@ export class CierreCajaComponent implements OnInit {
     pdfDoc.text(`CIERRE DE CAJA - ${fechaTexto}`, 80, 28);
   
     const startY = 45;
-  
-    // 🧾 Tabla ingresos
     const body = this.cierreItems.map(item => [
       item.modulo,
       item.unidad,
@@ -124,54 +122,35 @@ export class CierreCajaComponent implements OnInit {
       head: [['Módulo', 'Unidad', 'Fecha', 'Valor']],
       body,
       startY,
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-        halign: 'center'
-      },
-      headStyles: {
-        fillColor: [63, 81, 181],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
-      },
+      styles: { fontSize: 10, cellPadding: 3, halign: 'center' },
+      headStyles: { fillColor: [63, 81, 181], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
       margin: { left: 14, right: 14 }
     });
   
     const total = this.calcularTotalGeneral();
     const lastY = (pdfDoc as any).lastAutoTable.finalY || startY + 30;
   
-    // 💰 Total ingresos
     pdfDoc.setFontSize(12);
     pdfDoc.setTextColor(0, 0, 0);
     pdfDoc.text(`Total Ingresos: $${total.toFixed(2)}`, 14, lastY + 10);
   
+    let egresosY = lastY + 10;
     if (this.egresos.length > 0) {
       (pdfDoc as any).autoTable({
         head: [['Detalle del Egreso', 'Valor']],
         body: this.egresos.map(e => [e.modulo, `$${e.valor.toFixed(2)}`]),
         startY: lastY + 20,
-        styles: {
-          fontSize: 10,
-          cellPadding: 3,
-          halign: 'center'
-        },
-        headStyles: {
-          fillColor: [244, 67, 54],
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [253, 236, 234]
-        },
+        styles: { fontSize: 10, cellPadding: 3, halign: 'center' },
+        headStyles: { fillColor: [244, 67, 54], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [253, 236, 234] },
         margin: { left: 14, right: 14 }
       });
   
-      const egresosY = (pdfDoc as any).lastAutoTable.finalY || lastY + 40;
+      egresosY = (pdfDoc as any).lastAutoTable.finalY || lastY + 40;
       const totalEgresos = this.calcularTotalEgresos();
       const saldoNeto = this.calcularSaldoNeto();
+      const resumenY = this.agregarResumenPorEmpresa(pdfDoc, this.cierreItems, egresosY + 30);
   
       pdfDoc.setTextColor(0, 0, 0);
       pdfDoc.text(`Total Egresos: $${totalEgresos.toFixed(2)}`, 14, egresosY + 10);
@@ -180,19 +159,16 @@ export class CierreCajaComponent implements OnInit {
       pdfDoc.setTextColor(33, 150, 83);
       pdfDoc.text(`Saldo Neto del Día: $${saldoNeto.toFixed(2)}`, 14, egresosY + 20);
   
-      // ✍️ Línea de firma opcional
       pdfDoc.setDrawColor(150);
-      pdfDoc.line(14, egresosY + 40, 100, egresosY + 40);
+      pdfDoc.line(14, resumenY + 20, 100, resumenY + 20);
       pdfDoc.setFontSize(10);
       pdfDoc.setTextColor(100);
-      pdfDoc.text('Firma Responsable', 14, egresosY + 45);
+      pdfDoc.text('Firma Responsable', 14, resumenY + 25);
     }
   
-    // Descargar
     const fechaId = this.fechaSeleccionada.toISOString().split('T')[0];
     pdfDoc.save(`CierreCaja-${fechaId}.pdf`);
   
-    // Subir a Firebase
     const pdfBlob = pdfDoc.output('blob');
     const archivoRef = ref(this.storage, `cierres/${fechaId}.pdf`);
     await uploadBytes(archivoRef, pdfBlob);
@@ -211,9 +187,37 @@ export class CierreCajaComponent implements OnInit {
   
     alert('✅ PDF generado, guardado y descargado con éxito');
     this.cargarHistorial();
-
   }
-
+  
+  agregarResumenPorEmpresa(pdfDoc: jsPDF, cierreItems: CierreCajaItem[], startY: number): number {
+    const empresas = ['General Píntag', 'Expreso Antisana'];
+    const modulos = ['Administración', 'Minutos', 'Minutos Base', 'Multas'];
+  
+    let currentY = startY;
+  
+    pdfDoc.setFontSize(12);
+    pdfDoc.setTextColor(0);
+    pdfDoc.setFont('helvetica', 'bold');
+  
+    modulos.forEach(modulo => {
+      pdfDoc.text(`TOTAL ${modulo.toUpperCase()}`, 14, currentY);
+      currentY += 6;
+  
+      empresas.forEach(empresa => {
+        const valor = cierreItems
+          .filter(i => i.modulo === modulo && i.empresa === empresa)
+          .reduce((acc, i) => acc + i.valor, 0);
+  
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.text(`➡ ${modulo.toUpperCase()} COOP. ${empresa.toUpperCase()}`, 20, currentY);
+        pdfDoc.text(`$ ${valor.toFixed(2)}`, 170, currentY, { align: 'right' });
+        currentY += 6;
+      });
+    });
+  
+    return currentY;
+  }
+  
   cargarImagenBase64(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();

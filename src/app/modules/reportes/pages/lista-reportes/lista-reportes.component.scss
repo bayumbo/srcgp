@@ -138,8 +138,11 @@ h5 {
   
         &:hover {
           background-color: #37474f;
+          
         }
-  
+        &.activa {
+          background-color: #2f8071;
+        }
         .material-icons {
           font-size: 18px;
         }

@@ -45,8 +45,11 @@ export class CierreCajaService {
   
         const reporteRef = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}`);
         const reporteSnap = await getDoc(reporteRef);
+        const usuarioRef = doc(this.firestore, `usuarios/${uid}`);
+        const usuarioSnap = await getDoc(usuarioRef);
         const unidad = reporteSnap.exists() ? reporteSnap.data()['unidad'] : '---';
-  
+        const empresa = usuarioSnap.exists() ? usuarioSnap.data()['empresa'] || 'Sin empresa' : 'Sin empresa';
+
         for (const modulo in detalles) {
           const valor = detalles[modulo];
           if (valor && valor > 0) {
@@ -54,7 +57,8 @@ export class CierreCajaService {
               modulo,
               unidad,
               fecha: data['fecha']?.toDate?.() || new Date(),
-              valor
+              valor,
+              empresa
             });
           }
         }
