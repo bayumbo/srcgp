@@ -9,6 +9,7 @@ import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc
 import { jsPDF } from 'jspdf';
 import { MatIconModule } from '@angular/material/icon';
 import autoTable from 'jspdf-autotable';
+import { HostListener } from '@angular/core';
 declare module 'jspdf' {
   interface jsPDF {
     lastAutoTable?: {
@@ -44,6 +45,17 @@ export class EstadosResultadosComponent implements OnInit {
     }
   }
   menuAbierto: boolean = false;
+  toggleMenu() {
+  this.menuAbierto = !this.menuAbierto;
+}
+// Cierra si hace clic fuera del menú
+@HostListener('document:click', ['$event'])
+cerrarSiClickFuera(event: MouseEvent) {
+ const target = event.target as HTMLElement;
+ if (!target.closest('nav') && !target.closest('.menu-toggle')) {
+   this.menuAbierto = false;
+ }
+}
 
   async generarEstado(): Promise<void> {
     if (!this.fechaInicio || !this.fechaFin) return;

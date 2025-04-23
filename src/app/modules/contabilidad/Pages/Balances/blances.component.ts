@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { LibroMayorService } from '../../Services/comprobante.service';
 import { MatIconModule } from '@angular/material/icon';
+import { HostListener } from '@angular/core';
 
 @Component({
   selector: 'app-blances',
@@ -39,6 +40,17 @@ export class BalanceComponent implements OnInit {
   }
 
   menuAbierto: boolean = false;
+    toggleMenu() {
+    this.menuAbierto = !this.menuAbierto;
+  }
+ // Cierra si hace clic fuera del menú
+ @HostListener('document:click', ['$event'])
+ cerrarSiClickFuera(event: MouseEvent) {
+   const target = event.target as HTMLElement;
+   if (!target.closest('nav') && !target.closest('.menu-toggle')) {
+     this.menuAbierto = false;
+   }
+ }
 
   async generarBalance(): Promise<void> {
     const { inicio, fin, tipoBalance } = this.formFiltro.value;

@@ -8,6 +8,7 @@ import { RouterModule } from '@angular/router';
 import { Storage } from '@angular/fire/storage';
 import { MatIconModule } from '@angular/material/icon';
 import autoTable from 'jspdf-autotable'; 
+
 @Component({
   selector: 'app-libmayor',
   standalone: true,
@@ -64,6 +65,17 @@ export class LibroMayorComponent implements OnInit {
     }, 600);
   }
   menuAbierto: boolean = false;
+    toggleMenu() {
+    this.menuAbierto = !this.menuAbierto;
+  }
+ // Cierra si hace clic fuera del menú
+ @HostListener('document:click', ['$event'])
+ cerrarSiClickFuera(event: MouseEvent) {
+   const target = event.target as HTMLElement;
+   if (!target.closest('nav') && !target.closest('.menu-toggle')) {
+     this.menuAbierto = false;
+   }
+ }
 
   async filtrarLibros(): Promise<void> {
     if (this.formFiltro.invalid) {
