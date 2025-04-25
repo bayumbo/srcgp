@@ -93,8 +93,11 @@
     <button class="volver" (click)="volver()">
       <span class="material-icons">arrow_back_ios_new</span> Volver
     </button>
-    <button class="guardar" (click)="guardarPagosGenerales()">
-      <span class="material-icons">task_alt</span> Guardar pagos
+    <button class="guardar" (click)="guardarPagosGenerales()" [disabled]="cargandoPago">
+      <span class="material-icons">
+        {{ cargandoPago ? 'hourglass_top' : 'task_alt' }}
+      </span>
+      {{ cargandoPago ? 'Procesando...' : 'Guardar pagos' }}
     </button>
   </div>
 </div>

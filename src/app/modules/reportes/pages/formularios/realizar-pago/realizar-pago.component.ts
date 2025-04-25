@@ -133,52 +133,64 @@ export class RealizarPagoComponent implements OnInit {
     console.log('💰 Pagos cargados:', this.pagosTotales);
   }
 
+  cargandoPago: boolean = false;
+
   async guardarPagosGenerales() {
+    if (this.cargandoPago) return;
+  
+    this.cargandoPago = true;
     const fecha = Timestamp.fromDate(new Date());
   
-    for (const registro of this.registros) {
-      const detalles: Partial<Record<CampoClave, number>> = {};
-      let tienePago = false;
-      let total = 0;
+    try {
+      for (const registro of this.registros) {
+        const detalles: Partial<Record<CampoClave, number>> = {};
+        let tienePago = false;
+        let total = 0;
   
-      for (const campo of this.campos) {
-        const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
-        if (monto > 0) {
-          detalles[campo] = monto;
-          total += monto;
-          tienePago = true;
+        for (const campo of this.campos) {
+          const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
+          if (monto > 0) {
+            detalles[campo] = monto;
+            total += monto;
+            tienePago = true;
+          }
         }
+  
+        if (!tienePago) continue;
+  
+        // 1️⃣ Generar PDF y obtener URL
+        const urlPDF = await this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
+          nombre: registro.nombre,
+          apellido: registro.apellido,
+          unidad: registro.unidad,
+          total,
+          detalles
+        });
+  
+        // 2️⃣ Guardar el documento en Firestore (UNA sola vez)
+        const ref = collection(
+          this.firestore,
+          `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
+        );
+  
+        await addDoc(ref, {
+          fecha,
+          detalles,
+          total,
+          urlPDF
+        });
       }
   
-      if (!tienePago) continue;
-  
-      // 1️⃣ Generar PDF y obtener URL
-      const urlPDF = await this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
-        nombre: registro.nombre,
-        apellido: registro.apellido,
-        unidad: registro.unidad,
-        total,
-        detalles // 👈 aquí se envían directo
-      });
-      
-  
-      // 2️⃣ Guardar el documento en Firestore (UNA sola vez)
-      const ref = collection(
-        this.firestore,
-        `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
-      );
-  
-      await addDoc(ref, {
-        fecha,
-        detalles,
-        total,
-        urlPDF
-      });
+      alert('✅ Pagos registrados y recibos generados correctamente.');
+      this.router.navigate(['/reportes/lista-reportes']);
+    } catch (error) {
+      console.error('❌ Error al guardar los pagos:', error);
+      alert('Ocurrió un error al guardar los pagos. Intenta nuevamente.');
+    } finally {
+      this.cargandoPago = false;
     }
-  
-    alert('✅ Pagos registrados y recibos generados correctamente.');
-    this.router.navigate(['/reportes/lista-reportes']);
   }
+  
 
   
   /*---------------------------------- Lógica generar recibo y formato----------------------*/
