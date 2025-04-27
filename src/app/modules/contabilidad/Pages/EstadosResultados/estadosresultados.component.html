@@ -12,10 +12,38 @@
 
     <nav [class.abierto]="menuAbierto">
       <ul class="menu">
-        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a >Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
         <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
         <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
         <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
@@ -24,93 +52,92 @@
   </div>
 </header>
 
-<div id="preloader">
-  <div class="preloader">
-    <span></span><span></span><span></span><span></span>
+
+
+
+
+
+
+
+
+<div class="estado-resultados-container">
+  <h5>Estado de Resultados</h5>
+
+  <form [formGroup]="formFiltro" (ngSubmit)="generarEstado()" class="form-filtros">
+    <div class="form-group">
+      <label>📅 Fecha Inicio:</label>
+      <input type="date" formControlName="fechaInicio">
+    </div>
+
+    <div class="form-group">
+      <label>📅 Fecha Fin:</label>
+      <input type="date" formControlName="fechaFin">
+    </div>
+
+    <button type="submit" [disabled]="formFiltro.invalid">Generar Estado</button>
+  </form>
+
+  <div class="acciones">
+    <button (click)="generarPDF()" [disabled]="ingresos.length === 0 && gastos.length === 0">
+      📄 Generar PDF
+    </button>
   </div>
+
+  <!-- Ingresos -->
+<div class="tabla-ingresos">
+  <h3>Ingresos</h3>
+  <table *ngIf="ingresos.length > 0">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Cuenta</th>
+        <th>Valor</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let registro of ingresos">
+        <td>{{ registro.codigo }}</td>
+        <td>{{ registro.descripcion }}</td>
+        <td>{{ registro.valor | number: '1.2-2' }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" style="text-align: right; font-weight: bold;">Total Ingresos:</td>
+        <td style="font-weight: bold;">{{ totalIngresos | number: '1.2-2' }}</td>
+      </tr>
+    </tfoot>
+  </table>
 </div>
 
-<div class="estado-wrapper">
-  <div class="estado-card">
-    <h5>Estado de Resultados</h5>
-
-    <div class="filtros">
-      <label for="fechaInicio">Desde:</label>
-      <input type="date" id="fechaInicio" [(ngModel)]="fechaInicio" />
-
-      <label for="fechaFin">Hasta:</label>
-      <input type="date" id="fechaFin" [(ngModel)]="fechaFin" />
-
-      <button class="btn-generar" (click)="generarEstado()">Generar</button>
-    </div>
-
-    <div *ngIf="resultados.length > 0">
-
-      <div class="estado-listado" *ngIf="resultados.length > 0">
-        <div class="grupo" *ngFor="let grupo of resultados">
-        <h5>{{ grupo.grupo }}</h5>
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Cuenta</th>
-              <th class="valor">Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let cuenta of grupo.cuentas">
-              <td>{{ cuenta.codigo }}</td>
-              <td>{{ cuenta.nombre }}</td>
-              <td class="valor">{{ cuenta.valor | number: '1.2-2' }}</td>
-            </tr>
-            <tr class="total-row">
-              <td colspan="2"><strong>Total {{ grupo.grupo }}</strong></td>
-              <td class="valor"><strong>{{ obtenerTotal(grupo.cuentas) | number: '1.2-2' }}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-      <button class="btn-pdf1" (click)="generarPDF()">
-        📄 Descargar y Guardar PDF
-      </button>
-    </div>
-
-    <button class="btn-ver-modal" (click)="abrirModal()">📁 Ver Documentos</button>
-  </div>
+<!-- Gastos -->
+<div class="tabla-gastos" style="margin-top: 2rem;">
+  <h3>Gastos</h3>
+  <table *ngIf="gastos.length > 0">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Cuenta</th>
+        <th>Valor</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let registro of gastos">
+        <td>{{ registro.codigo }}</td>
+        <td>{{ registro.descripcion }}</td>
+        <td>{{ registro.valor | number: '1.2-2' }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" style="text-align: right; font-weight: bold;">Total Gastos:</td>
+        <td style="font-weight: bold;">{{ totalGastos | number: '1.2-2' }}</td>
+      </tr>
+    </tfoot>
+  </table>
 </div>
 
-<!-- MODAL -->
-<div class="modal-overlay" *ngIf="modalAbierto">
-  <div class="modal-contenido">
-    <button class="cerrar" (click)="cerrarModal()">✖</button>
-    <h5>📂 Resultados Generados</h5>
-
-    <div class="filtros-modal">
-      <label>Desde:</label>
-      <input type="date" [(ngModel)]="filtroInicio">
-      <label>Hasta:</label>
-      <input type="date" [(ngModel)]="filtroFin" />
-      <button (click)="filtrarResultados()">Filtrar</button>
-    </div>
-
-    <div class="lista-balances" *ngIf="resultadosFiltrados.length > 0">
-      <div class="balance-card" *ngFor="let r of paginaActual">
-        <p><strong>📄 {{ r.nombreArchivo }}</strong></p>
-        <p>{{ r.fechaInicio }} al {{ r.fechaFin }}</p>
-        <a [href]="r.url" target="_blank" style="color: #4fc3f7">📥 Descargar</a>
-        <button (click)="eliminarResultado(r)">🗑️ Eliminar</button>
-      </div>
-
-      <!-- Paginación -->
-      <div class="paginacion" *ngIf="totalPaginas > 1">
-        <button (click)="cambiarPagina(pagina - 1)" [disabled]="pagina === 1">←</button>
-        <span *ngFor="let p of [].constructor(totalPaginas); let i = index">
-          <button (click)="cambiarPagina(i + 1)" [disabled]="pagina === (i + 1)">{{ i + 1 }}</button>
-        </span>
-        <button (click)="cambiarPagina(pagina + 1)" [disabled]="pagina === totalPaginas">→</button>
-      </div>
-    </div>
-  </div>
+<!-- Resultado Neto -->
+<div class="resultado-neto" style="margin-top: 2rem; text-align: center;">
+  <h4>Resultado Neto: {{ totalNeto | number: '1.2-2' }}</h4>
 </div>

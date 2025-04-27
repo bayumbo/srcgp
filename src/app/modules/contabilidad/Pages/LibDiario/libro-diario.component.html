@@ -1,0 +1,136 @@
+<header>
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+
+  <div class="contenedor-libro-diario">
+
+    <div class="libro-diario-wrapper-grid">
+      <!-- Filtro de fechas -->
+      <div class="libro-diario-container">
+        <h5>📆 Buscar Libros de Diario</h5>
+    
+        <div class="form-cabecera">
+          <div class="form-group">
+            <label for="fechaInicio">Fecha Inicio</label>
+            <input type="date" id="fechaInicio" [(ngModel)]="fechaInicio" name="fechaInicio">
+          </div>
+    
+          <div class="form-group">
+            <label for="fechaFin">Fecha Fin</label>
+            <input type="date" id="fechaFin" [(ngModel)]="fechaFin" name="fechaFin">
+          </div>
+    
+          <div class="acciones">
+            <button (click)="buscarLibroDiario()">🔍 Buscar</button>
+          </div>
+        </div>
+      </div>
+    
+      <!-- Resultados -->
+      <div class="libros-generados-panel">
+        <h5>📚 Resultados de Libros Diario</h5>
+        <button (click)="imprimirTodo()" class="boton-imprimir">🖨️ Imprimir Todo</button>
+        <div id="contenido-impresion">
+        <div *ngIf="libroDiario.length > 0; else sinResultados">
+          <div class="grid-libros">
+            <div class="card-libro" *ngFor="let libro of librosDiario">
+              <p><strong>No. Transacción:</strong> {{ libro.numeroTransaccion }}</p>
+              <p><strong>Fecha:</strong> {{ libro.fecha | date:'shortDate' }}</p>
+              <p><strong>Concepto General:</strong> {{ libro.conceptoGeneral }}</p>
+    
+              <table class="tabla-libro">
+                <thead>
+                  <tr>
+                    <th>Cuenta</th>
+                    <th>Descripción</th>
+                    <th>C. Costos</th>
+                    <th>Débito</th>
+                    <th>Crédito</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let transaccion of libro.transacciones">
+                    <td>{{ transaccion.cuenta }}</td>
+                    <td>{{ transaccion.descripcion }}</td>
+                    <td>{{ transaccion.centroCostos || '-' }}</td>
+                    <td>{{ transaccion.debe !== 0 ? (transaccion.debe | number:'1.2-2') : '-' }}</td>
+                    <td>{{ transaccion.haber !== 0 ? (transaccion.haber | number:'1.2-2') : '-' }}</td>
+                  </tr>
+                </tbody>
+                
+              </table>
+    
+              <!-- Totales -->
+              <div class="totales-libro">
+                <p><strong>Total Débito:</strong> {{ calcularTotalDebe(libro.transacciones) | number:'1.2-2' }}</p>
+                <p><strong>Total Crédito:</strong> {{ calcularTotalHaber(libro.transacciones) | number:'1.2-2' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+        <ng-template #sinResultados>
+          <p class="alerta">🔎 Delimita fechas para ver libros disponibles.</p>
+        </ng-template>
+      </div>
+    </div>
+    

@@ -6,8 +6,12 @@ import { jsPDF } from 'jspdf';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogoService } from '../../Services/comprobante.service';
+import { CentroCostosService } from '../../Services/comprobante.service';
 import { MatIconModule } from '@angular/material/icon';
 import { HostListener } from '@angular/core';
+type SubmenuKeys = 'codificacion' | 'transacciones' | 'libros';
+
+
 
 
 interface Transaccion {
@@ -18,7 +22,9 @@ interface Transaccion {
   monto: number;
   debe: number;
   haber: number;
+  centroCostos?: { codigo: string; nombre: string }; // ✅ agregar esto
 }
+
 
 @Component({
   selector: 'app-indexconta',
@@ -43,31 +49,65 @@ export class IndexContaComponent implements OnInit {
   paginaActual: number = 1;
   registrosPorPagina: number = 5;
   
-
-  constructor(private fb: FormBuilder, private firebaseService: FirebaseService,  private catalogoService: CatalogoService) {}
+  numeroComprobante: string = '';
+  ultimoNumero: number = 0;
+  
+  constructor(private fb: FormBuilder, private firebaseService: FirebaseService,  private catalogoService: CatalogoService, private centroCostosService: CentroCostosService) {}
 
   ngOnInit() {
     this.initFormulario();
-
+  
+    this.firebaseService.obtenerUltimoNumeroComprobante().then(numero => {
+      this.ultimoNumero = numero; // 0 si no hay registros
+      this.numeroComprobante = this.generarCodigoComprobante(this.ultimoNumero + 1);
+    });
+  
     setTimeout(() => {
       const preloader = document.getElementById('preloader');
       if (preloader) preloader.style.display = 'none';
     }, 600);
-    
   }
-  menuAbierto: boolean = false;
-  toggleMenu() {
-  this.menuAbierto = !this.menuAbierto;
-}
-// Cierra si hace clic fuera del menú
-@HostListener('document:click', ['$event'])
-cerrarSiClickFuera(event: MouseEvent) {
- const target = event.target as HTMLElement;
- if (!target.closest('nav') && !target.closest('.menu-toggle')) {
-   this.menuAbierto = false;
- }
-}
 
+
+
+
+
+   submenuCuentas = false;
+  subCodificacion = false;
+  subTransacciones = false;
+  subLibros = false;
+  
+  submenus: Record<SubmenuKeys, boolean> = {
+    codificacion: false,
+    transacciones: false,
+    libros: false
+  };
+    menuAbierto: boolean = false;
+    
+  
+    toggleSubmenu(nombre: SubmenuKeys, event: Event): void {
+      event.preventDefault();
+      this.submenus[nombre] = !this.submenus[nombre];
+    }
+  
+  
+  
+      toggleMenu() {
+      this.menuAbierto = !this.menuAbierto;
+    }
+   // Cierra si hace clic fuera del menú
+   @HostListener('document:click', ['$event'])
+   cerrarSiClickFuera(event: MouseEvent) {
+     const target = event.target as HTMLElement;
+     if (!target.closest('nav') && !target.closest('.menu-toggle')) {
+       this.menuAbierto = false;
+     }
+   }
+  
+
+generarCodigoComprobante(numero: number): string {
+  return 'EGR' + numero.toString().padStart(8, '0');
+}
   initFormulario(): void {
     this.egresoForm = this.fb.group({
       beneficiario: ['', Validators.required],
@@ -77,7 +117,8 @@ cerrarSiClickFuera(event: MouseEvent) {
       descripcion: ['', Validators.required],
       tipo: ['Debe'],
       monto: ['', Validators.required],
-      numeroCheque: ['']
+      numeroCheque: [''],
+      concepto: ['', Validators.required]
     });
   }
 
@@ -92,10 +133,17 @@ cerrarSiClickFuera(event: MouseEvent) {
       tipo,
       monto: montoNum,
       debe: tipo === 'Debe' ? montoNum : 0,
-      haber: tipo === 'Haber' ? montoNum : 0
+      haber: tipo === 'Haber' ? montoNum : 0,
+      centroCostos: this.centroSeleccionado ? { ...this.centroSeleccionado } : undefined
     });
+
+
     this.actualizarTotales();
     this.egresoForm.patchValue({ descripcion: '', monto: '' });
+    if (!this.centroSeleccionado) {
+      alert('⚠️ Debes seleccionar un Centro de Costos antes de agregar la transacción.');
+      return;
+    }
   }
   convertirNumeroALetras(num: number): string {
     // Aquí puedes usar una librería como numero-a-letras si deseas algo más complejo
@@ -114,20 +162,21 @@ cerrarSiClickFuera(event: MouseEvent) {
 
   async generarPDF(): Promise<void> {
     const doc = new jsPDF();
-    const id = 'CE-' + String(Date.now()).slice(-6);
-    const { beneficiario, cedula, fecha, numeroCheque } = this.egresoForm.value;
+    const id = this.numeroComprobante;
+    const { beneficiario, cedula, fecha, numeroCheque, concepto } = this.egresoForm.value;
   
-    const totalHaber = this.totalHaber.toFixed(2);
     const totalDebe = this.totalDebe.toFixed(2);
+    const totalHaber = this.totalHaber.toFixed(2);
+    const valorLetras = this.convertirNumeroALetras(this.totalHaber);
   
     let y = 20;
   
     // 🧾 ENCABEZADO
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text('CONSORCIO PINTAG EXPRESS', 15, y);
-    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
     doc.text('PINTAG, ANTISANA S2-138', 15, y + 5);
     doc.text('consorciopintagexpress@hotmail.com', 15, y + 10);
   
@@ -140,76 +189,101 @@ cerrarSiClickFuera(event: MouseEvent) {
   
     y += 25;
   
-    // 📄 DATOS GENERALES
+    // 📄 DATOS
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Fecha: ${fecha}`, 15, y);
-    doc.text(`Pagado a: ${beneficiario}`, 75, y);
-    doc.text(`Cédula/RUC: ${cedula}`, 150, y);
-    y += 10;
-    doc.text(`Cheque: ${numeroCheque || '-'}`, 15, y);
-  
-    // 📋 TABLA
-    y += 15;
-    doc.setFont('helvetica', 'bold');
-    doc.text('DESCRIPCIÓN', 15, y);
-    doc.text('VALOR', 195, y, { align: 'right' });
-  
-    doc.setLineWidth(0.1);
-    doc.line(15, y + 2, 195, y + 2);
+    doc.text(`FECHA: ${fecha}`, 15, y);
+    doc.text(`PAGADO A: ${beneficiario}`, 90, y);
+    doc.text(`CÉDULA/RUC: ${cedula}`, 155, y);
     y += 8;
+    doc.text(`CHEQUE: ${numeroCheque || '-'}`, 15, y);
+    y += 8;
+    doc.text(`CONCEPTO: ${concepto}`, 15, y);
+    y += 10;
+  
+    // 🧾 TABLA
+    doc.setFont('helvetica', 'bold');
+    doc.text('CUENTA', 15, y);
+    doc.text('CONCEPTO', 45, y);
+    doc.text('CC', 120, y);
+    doc.text('DEBITO', 150, y);
+    doc.text('CREDITO', 180, y);
+    doc.setLineWidth(0.3);
+    doc.line(15, y + 2, 195, y + 2);
+    y += 7;
   
     doc.setFont('helvetica', 'normal');
-    this.transacciones.forEach((item) => {
-      doc.text(item.descripcion, 15, y);
-      const valor = (item.haber || item.debe).toFixed(2);
-      doc.text(`$${valor}`, 195, y, { align: 'right' });
-      y += 7;
+    doc.setFontSize(9);
+  
+    const transaccionesConCC = this.transacciones.map(t => ({
+      cuenta: t.codigo,
+      concepto: t.descripcion,
+      cc: t.centroCostos?.codigo || '-',
+      debe: t.tipo === 'Debe' ? t.monto : 0,
+      haber: t.tipo === 'Haber' ? t.monto : 0,
+      tipo: t.tipo,
+      monto: t.monto,
+      fecha: t.fecha
+    }));
+  
+    transaccionesConCC.forEach((item) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+  
+      doc.text(item.cuenta, 15, y);
+      doc.text(item.concepto, 45, y);
+      doc.text(item.cc, 120, y);
+      doc.text(item.debe > 0 ? `$${item.debe.toFixed(2)}` : '-', 150, y);
+      doc.text(item.haber > 0 ? `$${item.haber.toFixed(2)}` : '-', 180, y);
+      y += 6;
     });
   
     // 🔢 TOTALES
-    y += 10;
+    y += 5;
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL', 15, y);
-    doc.text(`$${totalHaber}`, 195, y, { align: 'right' });
+    doc.text('TOTALES:', 120, y);
+    doc.text(`$${totalDebe}`, 150, y);
+    doc.text(`$${totalHaber}`, 180, y);
   
     // 🔠 VALOR EN LETRAS
     y += 10;
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
-    doc.text('VALOR (en letras):', 15, y);
-    doc.text(this.convertirNumeroALetras(Number(this.totalHaber)), 60, y);
+    doc.text(`VALOR (en letras): ${valorLetras}`, 15, y);
   
     // ✍️ FIRMAS
     y += 25;
     doc.setFont('helvetica', 'normal');
-    doc.line(20, y, 70, y);
-    doc.text('APROBADO', 30, y + 5);
+    doc.line(30, y, 80, y);
+    doc.text('Elaborado: Usuario', 35, y + 5);
+    doc.line(130, y, 180, y);
+    doc.text('Autorizado:', 145, y + 5);
   
-    doc.line(80, y, 130, y);
-    doc.text('CONTABILIZADO', 90, y + 5);
-  
-    doc.line(140, y, 190, y);
-    doc.text('REVISADO', 155, y + 5);
-  
-    // 💾 GUARDAR Y SUBIR
+    // 💾 GUARDAR EN FIREBASE
     const pdfBlob = doc.output('blob');
     await this.firebaseService.guardarComprobante({
       comprobanteId: id,
       beneficiario,
       cedula,
       fecha,
+      concepto,
+      numeroCheque,
       totalDebe: this.totalDebe,
       totalHaber: this.totalHaber,
-      numeroCheque,
-      transacciones: this.transacciones
+      transacciones: transaccionesConCC // ✅ ya incluye CC
     }, pdfBlob);
+  
     doc.save(`${id}.pdf`);
     alert('✅ Comprobante guardado y PDF generado.');
+  
     this.transacciones = [];
     this.actualizarTotales();
     this.mostrarPDFs();
   }
+  
+  
 
   toggleListaComprobantes(): void {
     this.mostrarLista = !this.mostrarLista;
@@ -281,18 +355,17 @@ cerrarSiClickFuera(event: MouseEvent) {
     this.paginasVisibles = paginas;
   }
 
-  eliminarComprobante(id: string, comprobanteId: string): void {
-    this.firebaseService.eliminarComprobantePorId(id, comprobanteId)
-      .then(() => {
+  async eliminarComprobante(id: string, comprobanteId: string): Promise<void> {
+    const fueUltimo = await this.firebaseService.eliminarComprobantePorId(id, comprobanteId);
         this.comprobantes = this.comprobantes.filter(c => c.id !== id);
-        this.aplicarFiltros();
-        alert('✅ Comprobante eliminado correctamente.');
-      })
-      .catch(err => {
-        console.error('❌ Error al eliminar:', err);
-        alert('Error al eliminar comprobante.');
-      });
-  }
+this.aplicarFiltros();
+if (fueUltimo) {
+  this.ultimoNumero -= 1;
+  this.numeroComprobante = this.generarCodigoComprobante(this.ultimoNumero + 1);
+}
+
+alert('✅ Comprobante eliminado correctamente.');}
+
 
   cuentasDisponibles: any[] = [];
   busquedaCuenta: string = '';
@@ -324,6 +397,34 @@ cerrarSiClickFuera(event: MouseEvent) {
     this.cerrarSelectorCuentas();
   }
   
+centrosDisponibles: any[] = [];
+centroSeleccionado: { codigo: string; nombre: string } | null = null;
+busquedaCentro: string = '';
+mostrarSelectorCentro: boolean = false;
+
+async abrirSelectorCentroCostos(): Promise<void> {
+ // ✅ Esto es correcto si usas tu injectable real
+this.centrosDisponibles = await this.centroCostosService.obtenerCentros();
+  this.mostrarSelectorCentro = true;
+}
+
+cerrarSelectorCentro(): void {
+  this.mostrarSelectorCentro = false;
+  this.busquedaCentro = '';
+}
+
+get centrosFiltradosModal(): any[] {
+  const filtro = this.busquedaCentro.toLowerCase();
+  return this.centrosDisponibles.filter(c =>
+    c.codigo.toLowerCase().includes(filtro) || c.descripcion.toLowerCase().includes(filtro)
+  );
+}
+
+
+seleccionarCentro(centro: any): void {
+  this.centroSeleccionado = centro;
+  this.cerrarSelectorCentro();
+}
 
 
 

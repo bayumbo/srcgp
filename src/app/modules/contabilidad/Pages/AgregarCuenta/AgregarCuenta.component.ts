@@ -6,7 +6,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { HostListener } from '@angular/core';
-
+type SubmenuKeys = 'codificacion' | 'transacciones' | 'libros';
 
 
 @Component({
@@ -17,6 +17,7 @@ import { HostListener } from '@angular/core';
   imports: [CommonModule, ReactiveFormsModule, MatIconModule, RouterModule, FormsModule]
   
 })
+
 export class AgregarCuentaComponent implements OnInit {
   formCuenta!: FormGroup;
   cuentasOriginal: any[] = [];
@@ -31,6 +32,7 @@ export class AgregarCuentaComponent implements OnInit {
   paginaActual: number = 1;
   registrosPorPagina: number = 10;
   totalPaginas: number = 1;
+  
 
 
   constructor(private fb: FormBuilder, private catalogoService: CatalogoService) {}
@@ -51,7 +53,27 @@ export class AgregarCuentaComponent implements OnInit {
   const body = document.querySelector('body');
   if (body) body.setAttribute('style', 'padding-top: 55px');
   }
+  
+  submenuCuentas = false;
+subCodificacion = false;
+subTransacciones = false;
+subLibros = false;
+
+submenus: Record<SubmenuKeys, boolean> = {
+  codificacion: false,
+  transacciones: false,
+  libros: false
+};
   menuAbierto: boolean = false;
+  
+
+  toggleSubmenu(nombre: SubmenuKeys, event: Event): void {
+    event.preventDefault();
+    this.submenus[nombre] = !this.submenus[nombre];
+  }
+
+
+
     toggleMenu() {
     this.menuAbierto = !this.menuAbierto;
   }

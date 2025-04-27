@@ -1,0 +1,251 @@
+<header>
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+<div class="comprobante-flex-container">
+
+  <!-- Formulario principal -->
+  <div class="form-card">
+    <h5>Compras Varias</h5>
+    <form [formGroup]="compraForm" (ngSubmit)="agregarProducto()">
+
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label>Proveedor</label>
+          <input formControlName="proveedor" type="text" />
+        </div>
+
+        <div class="form-group">
+          <label>RUC</label>
+          <input formControlName="ruc" maxlength="13" type="text" />
+        </div>
+
+        <div class="form-group">
+          <label>Tipo Documento</label>
+          <select formControlName="tipoDocumento">
+            <option value="Factura">Factura</option>
+            <option value="Nota de Venta">Nota de Venta</option>
+            <option value="Liquidación">Liquidación</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>No. Documento</label>
+          <input formControlName="numeroDocumento" readonly />
+        </div>
+        <div class="form-group">
+          <label>Forma de Pago</label>
+          <select formControlName="formaPago">
+            <option value="Efectivo">Efectivo</option>
+            <option value="Transferencia">Transferencia</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Concepto</label>
+          <textarea formControlName="concepto"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Cuenta</label>
+          <input formControlName="cuenta" (focus)="abrirSelectorCuenta()" readonly />
+        </div>
+
+        <div class="form-group">
+          <label>Centro Costos</label>
+          <input formControlName="centroCostos" (focus)="abrirSelectorCentro()" readonly />
+        </div>
+
+        <div class="form-group">
+          <label>Tipo</label>
+          <select formControlName="tipo">
+            <option value="Debe">Debe</option>
+            <option value="Haber">Haber</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Valor</label>
+          <input formControlName="valor" type="number" step="0.01" />
+        </div>
+
+        <div class="form-group full-width">
+          <button type="submit">Agregar Producto</button>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <!-- Tabla de productos -->
+  <div class="tabla-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Cuenta</th>
+          <th>Centro Costos</th>
+          <th>Descripción</th>
+          <th>Debe</th>
+          <th>Haber</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of productos; let i = index">
+          <td>{{ p.cuenta }}</td>
+          <td>{{ p.centroCostos }}</td>
+          <td>{{ p.descripcion }}</td>
+          <td>{{ p.tipo === 'Debe' ? (p.valor | number:'1.2-2') : '-' }}</td>
+          <td>{{ p.tipo === 'Haber' ? (p.valor | number:'1.2-2') : '-' }}</td>
+          <td><button (click)="eliminarProducto(i)">Eliminar</button></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align: right; font-weight: bold;">Total:</td>
+          <td>{{ totalDebe | number:'1.2-2' }}</td>
+          <td>{{ totalHaber | number:'1.2-2' }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="boton-generar">
+      <button (click)="generarPDF()">Generar PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Selección Cuenta -->
+<div class="modal-cuentas" *ngIf="mostrarSelectorCuenta">
+  <div class="modal-contenido">
+    <input type="text" placeholder="🔍 Buscar cuenta" [(ngModel)]="busquedaCuenta" class="buscador-cuenta" />
+    <div class="lista-cuentas">
+      <div *ngFor="let cuenta of cuentasFiltradas" (dblclick)="seleccionarCuenta(cuenta)" class="item-cuenta">
+        <strong>{{ cuenta.codigo }}</strong> - {{ cuenta.nombre }}
+      </div>
+    </div>
+    <button (click)="cerrarSelectorCuenta()">Cerrar</button>
+  </div>
+</div>
+
+<!-- Modal Selección Centro de Costos -->
+<div class="modal-centros" *ngIf="mostrarSelectorCentro">
+  <div class="modal-contenido">
+    <input type="text" placeholder="🔍 Buscar centro" [(ngModel)]="busquedaCentro" class="buscador-cuenta" />
+    <div class="lista-cuentas">
+      <div *ngFor="let centro of centrosFiltrados" (dblclick)="seleccionarCentro(centro)" class="item-cuenta">
+        <strong>{{ centro.codigo }}</strong> - {{ centro.descripcion }}
+      </div>
+    </div>
+    <button (click)="cerrarSelectorCentro()">Cerrar</button>
+  </div>
+</div>
+
+<div style="margin-top: 1rem;">
+  <button (click)="mostrarComprasGuardadas = !mostrarComprasGuardadas; cargarComprasGuardadas()" class="btn-ver">
+    {{ mostrarComprasGuardadas ? '📁 Ocultar compras guardadas' : '📁 Ver compras guardadas' }}
+  </button>
+</div>
+
+<div *ngIf="mostrarComprasGuardadas" class="contenedor-comprobantes">
+  <h3>📄 Compras Varias Guardadas</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>No.</th>
+        <th>Proveedor</th>
+        <th>RUC</th>
+        <th>Total</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let compra of comprasGuardadas">
+        <td>{{ compra.numero }}</td>
+        <td>{{ compra.proveedor }}</td>
+        <td>{{ compra.ruc }}</td>
+        <td>${{ compra.total | number:'1.2-2' }}</td>
+        <td>
+          <a [href]="compra.pdfURL" target="_blank" class="btn-ver">📄 Ver PDF</a>
+          <button (click)="eliminarCompra(compra.id, compra.numeroFormateado)" class="btn-eliminar">
+            🗑️ Eliminar
+          </button>
+          
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

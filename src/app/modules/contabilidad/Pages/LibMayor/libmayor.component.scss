@@ -1,4 +1,53 @@
 
+.submenu-container {
+  position: relative;
+
+  &:hover .submenu {
+    display: block;
+  }
+
+  > a::after {
+    content: ' ▼';
+    font-size: 12px;
+    padding-left: 5px;
+  }
+}
+
+/* Submenú común */
+.submenu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: #37474f;
+  list-style: none;
+  padding: 0;
+  min-width: 200px;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+
+  li a {
+    display: block;
+    padding: 12px 20px;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 15px;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background-color: #2a3b45;
+      color: #1e90ff;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+}
+
+/* Mostrar submenu al pasar el mouse (solo en desktop) */
+nav .menu li:hover .submenu {
+  display: block;
+}
 
 
 
