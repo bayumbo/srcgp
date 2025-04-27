@@ -12,10 +12,38 @@
 
     <nav [class.abierto]="menuAbierto">
       <ul class="menu">
-        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
         <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
         <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
         <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
@@ -23,91 +51,89 @@
     </nav>
   </div>
 </header>
-<div id="preloader">
-  <div class="preloader">
-    <span></span><span></span><span></span><span></span>
-  </div>
+
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
 </div>
-<div class="estado-wrapper">
-  <div class="estado-card">
-    <h5>Estado de Situación Financiera</h5>
+<div class="estado-financiero-container">
+  <h5>Estado de Situación Financiera</h5>
 
-    <div class="filtros">
-      <label for="fechaInicio">Desde:</label>
-      <input type="date" id="fechaInicio" [(ngModel)]="fechaInicio" />
-
-      <label for="fechaFin">Hasta:</label>
-      <input type="date" id="fechaFin" [(ngModel)]="fechaFin" />
-
-      <button class="btn-generar1" (click)="generarEstado()">Generar</button>
+  <form [formGroup]="formFecha" (ngSubmit)="generarEstado()">
+    <div class="form-fecha">
+      <label>📅 Fecha de Corte:</label>
+      <input type="date" formControlName="fechaCorte" />
+      <button type="submit" [disabled]="formFecha.invalid">Generar Estado</button>
     </div>
+  </form>
 
-    <div *ngIf="estadoJerarquico.length > 0" class="estado-listado">
-      <div *ngFor="let grupo of estadoJerarquico" class="grupo">
-        <h5>{{ grupo.grupo }}</h5>
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Cuenta</th>
-              <th class="valor">Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let cuenta of grupo.cuentas">
-              <td>{{ cuenta.codigo }}</td>
-              <td>{{ cuenta.nombre }}</td>
-              <td class="valor">{{ cuenta.valor | number: '1.2-2' }}</td>
-            </tr>
-            <tr class="total-row">
-              <td colspan="2"><strong>TOTAL {{ grupo.grupo }}</strong></td>
-              <td class="valor"><strong>{{ obtenerSubtotal(grupo.cuentas) | number: '1.2-2' }}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
 
-      <button class="btn-pdf" (click)="generarPDF()">📄 Descargar y Guardar PDF</button>
+
+  <div *ngIf="activos.length > 0 || pasivos.length > 0 || patrimonio.length > 0" class="resultado-estado">
+    
+    <div class="acciones">
+      <button (click)="generarPDF()" [disabled]="activos.length === 0 && pasivos.length === 0 && patrimonio.length === 0">
+        📄 Generar PDF
+      </button>
     </div>
+    
+    
+    
+    <h6>ACTIVOS</h6>
+    <table>
+      <thead>
+        <tr><th>Cuenta</th><th>Descripción</th><th>Saldo</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of activos">
+          <td>{{ item.codigo }}</td>
+          <td>{{ item.nombre }}</td>
+          <td>{{ item.saldo | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr><td colspan="2" style="text-align:right;">Total Activos:</td><td>{{ totalActivos | number:'1.2-2' }}</td></tr>
+      </tfoot>
+    </table>
 
-    <button class="btn-generar" (click)="abrirModal()">📂 Ver Balances Generados</button>
+   
 
-    <!-- Modal -->
-    <div class="modal-overlay" *ngIf="modalAbierto">
-      <div class="modal-contenido">
-        <button class="cerrar" (click)="cerrarModal()">&times;</button>
 
-        <h5>📁 Balances Generados</h5>
+    <h6>PASIVOS</h6>
+    <table>
+      <thead>
+        <tr><th>Cuenta</th><th>Descripción</th><th>Saldo</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of pasivos">
+          <td>{{ item.codigo }}</td>
+          <td>{{ item.nombre }}</td>
+          <td>{{ item.saldo | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr><td colspan="2" style="text-align:right;">Total Pasivos:</td><td>{{ totalPasivos | number:'1.2-2' }}</td></tr>
+      </tfoot>
+    </table>
 
-        <div class="filtros-modal">
-          <label>Desde:</label>
-          <input type="date" [(ngModel)]="filtroInicio">
-
-          <label>Hasta:</label>
-          <input type="date" [(ngModel)]="filtroFin">
-
-          <button (click)="filtrarBalances()">Filtrar</button>
-        </div>
-
-        <div class="lista-balances">
-          <div *ngFor="let balance of paginaActual" class="balance-card">
-            <strong>📄 {{ balance.nombreArchivo }}</strong>
-            <div>{{ balance.fechaInicio }} a {{ balance.fechaFin }}</div>
-            <div style="margin-top: 5px;">
-              <a [href]="balance.url" target="_blank">🔽 Descargar</a>
-              <button (click)="eliminarBalance(balance)">🗑️ Eliminar</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="paginacion" *ngIf="totalPaginas > 1">
-          <button (click)="cambiarPagina(pagina - 1)">⭠</button>
-          <span *ngFor="let p of [].constructor(totalPaginas); let i = index">
-            <button [disabled]="pagina === i + 1" (click)="cambiarPagina(i + 1)">{{ i + 1 }}</button>
-          </span>
-          <button (click)="cambiarPagina(pagina + 1)">⭢</button>
-        </div>
-      </div>
-    </div>
+    <h6>PATRIMONIO</h6>
+    <table>
+      <thead>
+        <tr><th>Cuenta</th><th>Descripción</th><th>Saldo</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of patrimonio">
+          <td>{{ item.codigo }}</td>
+          <td>{{ item.nombre }}</td>
+          <td>{{ item.saldo | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr><td colspan="2" style="text-align:right;">Total Patrimonio:</td><td>{{ totalPatrimonio | number:'1.2-2' }}</td></tr>
+      </tfoot>
+    </table>
   </div>
 </div>

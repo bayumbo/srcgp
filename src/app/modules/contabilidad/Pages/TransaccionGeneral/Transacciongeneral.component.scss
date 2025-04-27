@@ -1,6 +1,4 @@
 
-
-
 .submenu-container {
   position: relative;
 
@@ -50,6 +48,8 @@
 nav .menu li:hover .submenu {
   display: block;
 }
+
+
 
 
 /* ========== HEADER RESPONSIVO ========== */
@@ -239,8 +239,8 @@ nav {
   flex-direction: column;
   gap: 30px;
   padding: 30px;
-  max-width: 1200px;
-  margin: 100px auto 0 auto;
+  max-width: 1280px;
+  margin: 0px auto 0 auto;
 }
 
 .tabla-wrapper {
@@ -250,7 +250,6 @@ nav {
   padding: 15px;
   border-radius: 10px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
-  
 }
 
 
@@ -396,8 +395,7 @@ label {
     flex: 1;
     min-width: 0;
     width: 100%;
-    
-    max-width: 66%;
+    max-width: 50%;
   }
 }
 
@@ -446,6 +444,8 @@ label {
       border: 1px solid #ccc;
       border-radius: 6px;
       padding: 0.4rem;
+      width: 125px;
+      
       
     }
   }
@@ -567,6 +567,56 @@ label {
 }
 
 .modal-cuentas {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  max-height: 400px;
+  background-color: #ffffff;
+  border: 2px solid #a8a9aa;
+  border-radius: 10px;
+  z-index: 9999;
+  padding: 20px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  overflow-y: auto;
+
+  .buscador-cuenta {
+    width: 75%;
+    padding: 10px;
+    border-radius: 6px;
+    border: none;
+    margin-bottom: 15px;
+    font-size: 16px;
+  }
+
+  .lista-cuentas {
+    max-height: 250px;
+    overflow-y: auto;
+
+    .item-cuenta {
+      padding: 10px;
+      border-bottom: 1px solid #444;
+      color: rgb(73, 73, 73);
+      cursor: pointer;
+
+      &:hover {
+        background-color:#76c4b5;
+        color: white;
+      }
+    }
+  }
+
+  button {
+    margin-top: 10px;
+    background-color: #2f8071;
+    &:hover {
+      background-color: #2b534c;
+    }
+  }
+}
+
+.modal-centros {
   position: fixed;
   top: 80px;
   left: 50%;

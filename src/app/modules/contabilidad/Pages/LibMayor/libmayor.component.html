@@ -12,10 +12,38 @@
 
     <nav [class.abierto]="menuAbierto">
       <ul class="menu">
-        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
         <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
         <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
         <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
@@ -25,133 +53,81 @@
 </header>
 
 
-    <div id="preloader">
-		<div class="preloader">
-			<span></span>
-			<span></span>
-			<span></span>
-			<span></span>
-		</div>
-	</div>
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
  <!-- NO TOCAR, HASTA AQUI CONFIGURACION BASICA DEL MENU 🔥📌-->
 
 
  <div class="libro-mayor-container">
-    <h5>Libro Mayor</h5>
-  
-    <!-- FORMULARIO DE FILTRO -->
-    <form [formGroup]="formFiltro" (ngSubmit)="filtrarLibros()">
-      <div class="filtros">
-        <div class="form-group">
-          <label>📅 Fecha de inicio:</label>
-          <input type="date" formControlName="fechaInicio" />
-          <div *ngIf="formFiltro.get('fechaInicio')?.invalid && formFiltro.get('fechaInicio')?.touched" class="alerta-campo">
-            ⚠️ Fecha de inicio requerida.
-          </div>
-          
-        </div>
-  
-        <div class="form-group">
-          <label>📅 Fecha de finalización:</label>
-          <input type="date" formControlName="fechaFin" />
-        </div>
-        <div *ngIf="formFiltro.get('fechaFin')?.invalid && formFiltro.get('fechaFin')?.touched" class="alerta-campo">
-            ⚠️ Fecha de finalizaciónrequerida.
-          </div>
-  
-        <div class="form-group">
-          <label>📂 Cuenta contable:</label>
-          <select formControlName="cuenta">
-            <option value="">Todas</option>
-            <option *ngFor="let cuenta of cuentasUnicas" [value]="cuenta">{{ cuenta }}</option>
-          </select>
-        </div>
-  <div *ngIf="formFiltro.get('fechaInicio')?.invalid && formFiltro.get('fechaInicio')?.touched" class="alerta-campo">
-  ⚠️ Fecha de inicio requerida.
-</div>
+  <h5>Libro Mayor</h5>
 
-        <button type="submit" [disabled]="formFiltro.invalid" class="btn-filtrar">Filtrar</button>
+  <form [formGroup]="formFiltro" (ngSubmit)="filtrarLibroMayor()">
+    <div class="filtros">
+      <div class="form-group">
+        <label>📅 Fecha de inicio:</label>
+        <input type="date" formControlName="fechaInicio" />
       </div>
-    </form>
-
-    <!-- Botón para abrir el modal -->
-<div class="contenedor-btn-libros">
-  <button class="btn-ver-libros" (click)="abrirModalLibros()"> 📚 Ver Libros Guardados</button>
-</div>
-<div class="modal-libros-mayores" *ngIf="mostrarModalLibros">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h5> 📚 Libros Mayores</h5>
-      <button class="cerrar-modal" (click)="cerrarModalLibros()">✖</button>
-    </div>
-
-    <div class="filtro-fechas-modal">
-      <input type="date" [(ngModel)]="filtroInicioModal" (change)="filtrarLibrosModal()" placeholder="Desde" />
-      <input type="date" [(ngModel)]="filtroFinModal" (change)="filtrarLibrosModal()" placeholder="Hasta" />
-    </div>
-
-    <div class="libros-lista">
-      <div class="libro-card" *ngFor="let libro of librosFiltrados">
-        <strong>{{ libro.nombre }}</strong>
-        <div class="acciones-modal">
-          <a [href]="libro.url" target="_blank" class="btn-ver">📄 Ver PDF</a>
-          <button (click)="eliminarLibroMayor(libro)" class="btn-eliminar">🗑 Eliminar</button>
-        </div>
+      <div class="form-group">
+        <label>📅 Fecha de finalización:</label>
+        <input type="date" formControlName="fechaFin" />
       </div>
+      <div class="form-group">
+        <label>📂 Cuenta contable:</label>
+        <select formControlName="cuenta">
+          <option value="">Todas</option>
+          <option *ngFor="let cuenta of cuentasUnicas" [value]="cuenta">{{ cuenta }}</option>
+        </select>
+      </div>
+      <button type="submit" [disabled]="formFiltro.invalid">Filtrar</button>
     </div>
+  </form>
+
+  <div class="acciones">
+    <button (click)="generarPDF()" [disabled]="datosLibroMayor.length === 0">
+      📄 Generar PDF
+    </button>
+  </div>
+
+  <div class="tabla-libro">
+    <table *ngIf="datosLibroMayor.length > 0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>N° Documento</th>
+          <th>Cuenta</th>
+          <th>Concepto</th>
+          <th>Débito</th>
+          <th>Crédito</th>
+          <th>Saldo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of datosLibroMayor">
+          <td>{{ item.fecha }}</td>
+          <td>{{ item.numero }}</td>
+          <td>{{ item.cuenta }}</td>
+          <td>{{ item.concepto }}</td>
+          <td>{{ item.debe | number:'1.2-2' }}</td>
+          <td>{{ item.haber | number:'1.2-2' }}</td>
+          <td>{{ item.saldo | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="font-weight: bold;">
+          <td colspan="4" style="text-align: right;">Totales:</td>
+          <td>{{ totalDebe | number:'1.2-2' }}</td>
+          <td>{{ totalHaber | number:'1.2-2' }}</td>
+          <td>{{ totalSaldo | number:'1.2-2' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <p *ngIf="datosLibroMayor.length === 0" class="mensaje">
+      🔍 No hay resultados para los filtros seleccionados.
+    </p>
   </div>
 </div>
-
-  
-    <!-- BOTÓN GENERAR PDF -->
-    <div class="acciones">
-      <button (click)="generarPDF()" [disabled]="librosMayoresGenerados.length === 0">
-        📄 Generar PDF
-      </button>
-    </div>
-  
-    <!-- TABLA DE RESULTADOS -->
-    
-    <!-- TABLA DE RESULTADOS -->
-<div class="tabla-libro">
-  <table *ngIf="librosMayoresGenerados.length > 0">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>N° Documento</th>
-        <th>N° Cheque</th>
-        <th>Cuenta</th>
-        <th>Concepto</th>
-        <th>Débito</th>
-        <th>Crédito</th>
-        <th>Saldo</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let item of librosMayoresGenerados">
-        <td>{{ item.fecha }}</td>
-        <td>{{ item.numero }}</td>
-        <td>{{ item.cheque || '-' }}</td>
-        <td>{{ item.cuenta }}</td>
-        <td>{{ item.concepto }}</td>
-        <td>{{ item.debe | number: '1.2-2' }}</td>
-        <td>{{ item.haber | number: '1.2-2' }}</td>
-        <td>{{ item.saldo | number: '1.2-2' }}</td>
-      </tr>
-    </tbody>
-    <tfoot>
-      <tr style="font-weight: bold;">
-        <td colspan="5" style="text-align: right;">Totales:</td>
-        <td>{{ totalDebe | number: '1.2-2' }}</td>
-        <td>{{ totalHaber | number: '1.2-2' }}</td>
-        <td>{{ totalSaldo | number: '1.2-2' }}</td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <p *ngIf="librosMayoresGenerados.length === 0" class="mensaje">
-    🔍 No hay resultados para los filtros seleccionados.
-  </p>
-</div>
-
-  </div>

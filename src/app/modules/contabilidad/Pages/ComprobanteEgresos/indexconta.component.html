@@ -12,10 +12,38 @@
 
     <nav [class.abierto]="menuAbierto">
       <ul class="menu">
-        <li><a routerLink="/contabilidad/agregar-cuenta">Cuentas</a></li>
-        <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
-        <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
-        <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
         <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
         <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
         <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
@@ -23,25 +51,49 @@
     </nav>
   </div>
 </header>
-<!-- PRELOADER -->
-<div id="preloader">
-  <div class="preloader">
-    <span></span><span></span><span></span><span></span>
+
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
   </div>
-</div>
 
 <!-- FORMULARIO + TABLA -->
 <div class="comprobante-flex-container">
   <!-- FORMULARIO -->
   <div class="form-card">
-    <h5>Nuevo Comprobante de Egreso</h5>
+    <h5>Comprobante de Egreso</h5>
     <form [formGroup]="egresoForm" (ngSubmit)="agregarTransaccion()">
       <div class="form-grid">
+        <div class="form-group">
+          <label for="numeroComprobante">N° Comprobante</label>
+          <input type="text" [value]="numeroComprobante" disabled class="readonly-input" />
+        </div>
+        
         <div class="form-group"><label>Beneficiario</label><input formControlName="beneficiario" /></div>
         <div class="form-group"><label>Cédula o RUC</label><input formControlName="cedula" maxlength="13" /></div>
+       
+        <div class="form-group"><label>Fecha</label><input type="date" formControlName="fecha" /></div>
+        <div class="form-group full-width">
+          <label for="concepto">📝 Concepto General</label>
+          <textarea
+            formControlName="concepto"
+            id="concepto"
+            rows="3"
+            placeholder="">
+          </textarea>
+          
+        </div>
+       
+       <div class="form-group">
+        <label>🏷️Centro de Costos</label>
+        <input type="text" readonly placeholder="Seleccionar centro" (click)="abrirSelectorCentroCostos()" [value]="centroSeleccionado?.codigo || ''" />
+      </div>
+      
         <div class="form-group"><label>Código</label><input formControlName="codigo" (focus)="abrirSelectorCuentas()" readonly />
         </div>
-        <div class="form-group"><label>Fecha</label><input type="date" formControlName="fecha" /></div>
         <div class="form-group"><label>Descripción</label><input formControlName="descripcion" /></div>
         <div class="form-group">
           <label>Tipo</label>
@@ -75,6 +127,21 @@
     <button (click)="cerrarSelectorCuentas()">Cerrar</button>
   </div>
 </div>
+<!-- Modal de selección de centro de costos -->
+<div class="modal-cuentas" *ngIf="mostrarSelectorCentro">
+  <div class="modal-contenido">
+    <input type="text" placeholder="🔍 Buscar centro" [(ngModel)]="busquedaCentro" class="buscador-cuenta" />
+
+    <div class="lista-cuentas">
+      <div *ngFor="let centro of centrosFiltradosModal" (dblclick)="seleccionarCentro(centro)" class="item-cuenta">
+        <strong>{{ centro.codigo }}</strong> - {{ centro.descripcion }}
+      </div>
+      
+    </div>
+
+    <button (click)="cerrarSelectorCentro()">Cerrar</button>
+  </div>
+</div>
 
 
 
@@ -85,14 +152,14 @@
     <table>
       <thead>
         <tr>
-          <th>#</th><th>Código</th><th>Fecha</th><th>Descripción</th><th>Debe</th><th>Haber</th><th>Acción</th>
+          <th>#</th><th>Código</th><th>C.C</th><th>Descripción</th><th>Debe</th><th>Haber</th><th>Acción</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let t of transacciones; let i = index">
           <td>{{ i + 1 }}</td>
           <td>{{ t.codigo }}</td>
-          <td>{{ t.fecha }}</td>
+          <td>{{ t.centroCostos?.codigo || '-' }}</td> <!-- ✅ nuevo dato -->
           <td>{{ t.descripcion }}</td>
           <td>{{ t.tipo === 'Debe' ? t.monto.toFixed(2) : '-' }}</td>
           <td>{{ t.tipo === 'Haber' ? t.monto.toFixed(2) : '-' }}</td>

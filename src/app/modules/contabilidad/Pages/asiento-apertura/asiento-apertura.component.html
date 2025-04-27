@@ -1,0 +1,207 @@
+<header>
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+  <div class="comprobante-flex-container">
+    <!-- Formulario -->
+    <div class="form-card">
+      <h5>📘 Asiento de Apertura</h5>
+  
+      <form [formGroup]="aperturaForm" (ngSubmit)="agregarCuenta()">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>No. Asiento</label>
+            <input type="text" [value]="numeroFormateado" disabled />
+          </div>
+          <div class="form-group">
+            <label>Ejercicio Contable</label>
+            <input type="number" formControlName="ejercicio" />
+          </div>
+          <div class="form-group full-width">
+            <label>Descripción General</label>
+            <textarea formControlName="descripcionGeneral"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Cuenta</label>
+            <input formControlName="cuenta" (focus)="abrirSelectorCuenta()" readonly />
+          </div>
+          <div class="form-group">
+            <label>Descripción</label>
+            <input formControlName="descripcion" readonly />
+          </div>
+          <div class="form-group">
+            <label>Centro Costos (opcional)</label>
+            <input formControlName="centroCostos" (focus)="abrirSelectorCentro()" readonly />
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select formControlName="tipo">
+              <option value="Debe">Debe</option>
+              <option value="Haber">Haber</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Valor</label>
+            <input formControlName="valor" type="number" step="0.01" />
+          </div>
+        </div>
+  
+        <button type="submit">Agregar Cuenta</button>
+      </form>
+    </div>
+  
+    <!-- Tabla -->
+    <div class="tabla-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Cuenta</th>
+            <th>Descripción</th>
+            <th>C. Costos</th>
+            <th>Debe</th>
+            <th>Haber</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of cuentas; let i = index">
+            <td>{{ c.cuenta }}</td>
+            <td>{{ c.descripcion }}</td>
+            <td>{{ c.centroCostos || '-' }}</td>
+            <td>{{ c.tipo === 'Debe' ? (c.valor | number:'1.2-2') : '-' }}</td>
+            <td>{{ c.tipo === 'Haber' ? (c.valor | number:'1.2-2') : '-' }}</td>
+            <td><button (click)="eliminarCuenta(i)">Eliminar</button></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align:right"><strong>TOTALES:</strong></td>
+            <td>{{ totalDebe | number:'1.2-2' }}</td>
+            <td>{{ totalHaber | number:'1.2-2' }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+  
+      <div class="acciones">
+        <button (click)="guardarAsiento()">Guardar Asiento</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal Cuenta -->
+  <div class="modal-cuentas" *ngIf="mostrarSelectorCuenta">
+    <div class="modal-contenido">
+      <input type="text" placeholder="Buscar cuenta" [(ngModel)]="busquedaCuenta" class="buscador-cuenta" />
+      <div class="lista-cuentas">
+        <div *ngFor="let cuenta of cuentasFiltradas" (dblclick)="seleccionarCuenta(cuenta)" class="item-cuenta">
+          <strong>{{ cuenta.codigo }}</strong> - {{ cuenta.nombre }}
+        </div>
+      </div>
+      <button (click)="cerrarSelectorCuenta()">Cerrar</button>
+    </div>
+  </div>
+  
+  <!-- Modal Centro Costos -->
+  <div class="modal-centros" *ngIf="mostrarSelectorCentro">
+    <div class="modal-contenido">
+      <input type="text" placeholder="Buscar centro" [(ngModel)]="busquedaCentro" class="buscador-cuenta" />
+      <div class="lista-cuentas">
+        <div *ngFor="let centro of centrosFiltrados" (dblclick)="seleccionarCentro(centro)" class="item-cuenta">
+          <strong>{{ centro.codigo }}</strong> - {{ centro.descripcion }}
+        </div>
+      </div>
+      <button (click)="cerrarSelectorCentro()">Cerrar</button>
+    </div>
+  </div>
+  
+    <!-- Botón para mostrar los asientos creados -->
+<div class="contenedor-comprobantes">
+  <button (click)="toggleMostrarAsientos()" class="btn-ver">
+
+    {{ mostrarAsientos ? 'Ocultar Asientos Guardados' : 'Ver Asientos Guardados' }}
+  </button>
+</div>
+
+<!-- Lista de asientos guardados -->
+<div *ngIf="mostrarAsientos" class="contenedor-comprobantes">
+  <h3>📄 Asientos de Apertura Guardados</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>No. Asiento</th>
+        <th>Ejercicio</th>
+        <th>Fecha</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let asiento of asientosGuardados">
+        <td>{{ asiento.numero }}</td>
+        <td>{{ asiento.ejercicio }}</td>
+        <td>{{ asiento.creado?.toDate() | date:'shortDate' }}</td>
+        <td>
+          <a [href]="asiento.pdfURL" target="_blank" class="btn-ver">📄 Ver PDF</a>
+          <button class="btn-eliminar" (click)="eliminarAsiento(asiento.id, asiento.numero)">🗑️ Eliminar</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
