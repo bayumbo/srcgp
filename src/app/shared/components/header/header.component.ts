@@ -1,3 +1,5 @@
+// src/app/shared/components/header/header.ts
+
 import {
   Component,
   ElementRef,
@@ -22,7 +24,7 @@ export class HeaderComponent implements OnInit {
   menuUsuarioAbierto = false;
   iniciales: string = '';
   nombreEmpresa: string = '...';
-  rolUsuario: string = ''; // <- NUEVO: para controlar visibilidad del menú lateral
+  rolUsuario: string = '';
 
   private elementRef = inject(ElementRef);
   private router = inject(Router);
@@ -42,12 +44,42 @@ export class HeaderComponent implements OnInit {
           this.iniciales =
             (nombres[0] || '').toUpperCase() + (apellidos[0] || '').toUpperCase();
           this.nombreEmpresa = data['empresa'] || 'Mi Empresa';
-          this.rolUsuario = data['rol'] || ''; // <- NUEVO: guardar rol
+          this.rolUsuario = data['rol'] || '';
+          console.log('Rol del usuario en Header:', this.rolUsuario);
         }
       }
     } catch (error) {
-      console.error('Error al obtener los datos del usuario:', error);
+      console.error('Error al obtener los datos del usuario en Header:', error);
     }
+  }
+
+  // --- NUEVA LÓGICA DE PERMISOS PARA SIDEBAR (HEADER) ---
+
+  // El sidebar completo (incluyendo el botón de toggle) es visible para admin, socio y recaudador.
+  get canAccessSidebar(): boolean {
+    return ['admin', 'socio', 'recaudador'].includes(this.rolUsuario);
+  }
+
+  // Reportes en Sidebar: admin, socio, recaudador pueden ver y entrar
+  get canSeeReportsInSidebar(): boolean {
+    return ['admin', 'socio', 'recaudador'].includes(this.rolUsuario);
+  }
+
+  // Contabilidad en Sidebar: admin, socio, recaudador pueden ver y entrar
+  get canSeeContabilidadInSidebar(): boolean {
+    return ['admin', 'socio', 'recaudador'].includes(this.rolUsuario);
+  }
+
+  // Admin en Sidebar: admin y socio pueden ver y entrar. Recaudador NO lo ve.
+  get canSeeAdminInSidebar(): boolean {
+    return ['admin', 'socio'].includes(this.rolUsuario);
+  }
+  
+  // No se necesita disableAdminInSidebar ya que el recaudador no lo verá.
+
+  // Perfil en menú de usuario (dropdown derecha): siempre visible para usuario logueado
+  get canSeeProfileOption(): boolean {
+    return !!this.rolUsuario;
   }
 
   @HostListener('document:click', ['$event'])
@@ -59,8 +91,10 @@ export class HeaderComponent implements OnInit {
   }
 
   toggleMenuLateral() {
-    this.menuLateralAbierto = !this.menuLateralAbierto;
-    this.menuUsuarioAbierto = false;
+    if (this.canAccessSidebar) { // Solo si el sidebar es accesible para el rol
+      this.menuLateralAbierto = !this.menuLateralAbierto;
+      this.menuUsuarioAbierto = false;
+    }
   }
 
   toggleMenuUsuario() {

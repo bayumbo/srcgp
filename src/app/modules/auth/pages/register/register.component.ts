@@ -7,7 +7,7 @@ import {
   ReactiveFormsModule
 } from '@angular/forms';
 
-import { AuthService} from 'src/app/core/auth/services/auth.service';
+import { AuthService, Usuario, Unidad } from 'src/app/core/auth/services/auth.service'; // Importamos Unidad también
 import { Router } from '@angular/router';
 
 @Component({
@@ -28,19 +28,17 @@ export class RegisterComponent {
   mensajeExito: string = '';
   mensajeError: string = '';
 
-
   form: FormGroup = this.fb.group({
     cedula: ['', [Validators.required, Validators.pattern(/^\d{10}$/)]],
     nombres: ['', Validators.required],
     apellidos: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
-    rol: ['usuario', Validators.required], // ✅ 
-    unidad:['', Validators.required],
+    rol: ['usuario', Validators.required],
+    unidadInput: ['', Validators.required], // Campo para la entrada de texto de las unidades
     empresa: ['General Pintag', Validators.required]
   });
-volverAlMenu: any;
-  
+  volverAlMenu: any;
 
   async signUp(): Promise<void> {
     if (this.form.invalid) {
@@ -49,8 +47,8 @@ volverAlMenu: any;
       return;
     }
 
-    const { 
-      cedula, nombres, apellidos, email, password, rol, unidad, empresa } = this.form.value;
+    const {
+      cedula, nombres, apellidos, email, password, rol, unidadInput, empresa } = this.form.value;
 
     try {
       const cedulaExiste = await this.authService.existeCedula(cedula);
@@ -59,33 +57,42 @@ volverAlMenu: any;
         return;
       }
 
+      // 1. Registrar usuario en Firebase Authentication
       const userCredential = await this.authService.signUpWithEmailAndPassword({ email, password });
       console.log('Registrado en Auth:', userCredential.user.uid);
       const uid = userCredential.user.uid;
       console.log('Guardando en Firestore...');
 
-
-      const usuario = {
-        uid,
+      // 2. Preparar el objeto de usuario principal (sin unidades)
+      const usuarioData: Omit<Usuario, 'uid'> = { // Usamos Omit para que no exija 'uid'
         cedula,
         nombres,
         apellidos,
         email,
-        rol, // ✅ guarda el rol como 'usuario' o 'admin'
-        unidad,
+        rol,
         empresa,
-        estado: true, // ✅ Se registra como activo por defecto
+        estado: true,
         creadoEn: new Date()
       };
 
-      await this.authService.guardarUsuarioEnFirestore(uid, usuario);
-      console.log('Guardado en Firestore con éxito');
+      // 3. Guardar el documento principal del usuario en Firestore
+      await this.authService.guardarUsuarioEnFirestore(uid, usuarioData);
+      console.log('Documento de usuario principal guardado con éxito');
+
+      // 4. Procesar y guardar cada unidad en la subcolección
+      const unidadesArray = unidadInput.split(',').map((u: string) => u.trim()).filter((u: string) => u !== '');
+
+      for (const unidadNombre of unidadesArray) {
+        const unidad: Unidad = { nombre: unidadNombre };
+        await this.authService.guardarUnidadEnSubcoleccion(uid, unidad);
+        console.log(`Unidad "${unidadNombre}" guardada en subcolección para usuario ${uid}`);
+      }
 
       // ✅ Mostrar mensaje de éxito
       this.mensajeExito = '✅ Registro exitoso';
       setTimeout(() => {
         this.mensajeExito = '';
-      }, 3000); // Oculta el mensaje después de 3 segundos
+      }, 3000);
 
       // ✅ Limpiar formulario
       this.form.reset();
@@ -103,13 +110,11 @@ volverAlMenu: any;
       } else {
         this.mensajeError = 'Ocurrió un error al registrar. Intenta nuevamente.';
       }
-      
+
       // 🔁 Oculta el mensaje de error luego de 3 segundos
       setTimeout(() => {
         this.mensajeError = '';
       }, 3000);
-      
-      
     }
   }
 }

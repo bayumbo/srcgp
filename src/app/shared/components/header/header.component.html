@@ -1,33 +1,33 @@
-<!-- Sidebar lateral independiente del header -->
-<div *ngIf="rolUsuario === 'admin'" class="side_menu" [ngClass]="{ 'opened': menuLateralAbierto }">
+<div *ngIf="canAccessSidebar" class="side_menu" [ngClass]="{ 'opened': menuLateralAbierto }">
   <ul>
-    <li (click)="goTo('/Menú')"><span class="material-icons">house</span> Inicio</li>
-    <li (click)="goTo('/reportes')"><span class="material-icons">insert_chart</span> Reportes</li>
-    <li (click)="goTo('/contabilidad')"><span class="material-icons">calculate</span> Contabilidad</li>
-    <li (click)="goTo('/gestionroles')"><span class="material-icons">admin_panel_settings</span> Administración</li>
+    <li (click)="goTo('/menu')"><span class="material-icons">house</span> Inicio</li>
+    
+    <li *ngIf="canSeeReportsInSidebar" (click)="goTo('/reportes')"><span class="material-icons">insert_chart</span> Reportes</li>
+    
+    <li *ngIf="canSeeContabilidadInSidebar" (click)="goTo('/contabilidad')"><span class="material-icons">calculate</span> Contabilidad</li>
+    
+    <li *ngIf="canSeeAdminInSidebar" (click)="goTo('/gestionroles')">
+        <span class="material-icons">admin_panel_settings</span> Administración
+    </li>
   </ul>
 </div>
 
-<!-- HEADER PRINCIPAL -->
-<header class="header-container" [ngStyle]="{ 'padding-left': rolUsuario === 'admin' && menuLateralAbierto ? '250px' : '0' }">
+<header class="header-container" [ngStyle]="{ 'padding-left': canAccessSidebar && menuLateralAbierto ? '250px' : '0' }">
 
-  <!-- Botón de menú para admins -->
-  <div *ngIf="rolUsuario === 'admin'" class="menu-toggle">
+  <div *ngIf="canAccessSidebar" class="menu-toggle">
     <button class="menu-btn material-icons" (click)="toggleMenuLateral()" title="Menú">
       menu
     </button>
   </div>
 
-  <!-- Nombre empresa -->
   <h5 class="titulo-app">{{ nombreEmpresa }}</h5>
 
-  <!-- Menú derecho -->
   <div class="menu-derecho">
     <button class="avatar-btn avatar-circle" (click)="toggleMenuUsuario()">
       {{ iniciales }}
     </button>
     <ul class="dropdown" [class.visible]="menuUsuarioAbierto">
-      <li *ngIf="rolUsuario === 'admin'" (click)="goTo('/perfil')">
+      <li *ngIf="canSeeProfileOption" (click)="goTo('/perfil')">
         <span class="material-icons">person</span> Perfil
       </li>
       <li (click)="salir()">
@@ -36,4 +36,4 @@
     </ul>
   </div>
 
-</header>
+</header> 

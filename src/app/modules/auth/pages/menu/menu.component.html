@@ -5,16 +5,11 @@
       <div class="container">
         <div class="row">
           <div class="col-xs-12 col-md-offset-1 col-md-10 col-lg-offset-2 col-lg-8 text-center">
-            <div class="hex-container">   
+            <div class="hex-container" *ngIf="!isLoading">
 
-              <!-- Hexagon Reportes -->
-              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goTo('/reportes')">
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
+              <div class="hexagon-item" *ngIf="canSeeReports" (click)="goTo('/reportes')">
+                <div class="hex-item"><div></div><div></div><div></div></div>
+                <div class="hex-item"><div></div><div></div><div></div></div>
                 <div class="hex-content">
                   <div class="hex-content-inner">
                     <span class="icon material-icons">insert_chart</span>
@@ -26,14 +21,9 @@
                 </div>
               </div>
 
-              <!-- Hexagon Contabilidad -->
-              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goTo('/contabilidad')">
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
+              <div class="hexagon-item" *ngIf="canSeeContabilidad" (click)="goTo('/contabilidad')">
+                <div class="hex-item"><div></div><div></div><div></div></div>
+                <div class="hex-item"><div></div><div></div><div></div></div>
                 <div class="hex-content">
                   <div class="hex-content-inner">
                     <span class="icon material-icons">calculate</span>
@@ -45,14 +35,9 @@
                 </div>
               </div>
 
-              <!-- Hexagon Administración -->
-              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goTo('/gestionroles')">
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
+              <div class="hexagon-item" *ngIf="canSeeAdmin" (click)="goTo('/gestionroles')">
+                <div class="hex-item"><div></div><div></div><div></div></div>
+                <div class="hex-item"><div></div><div></div><div></div></div>
                 <div class="hex-content">
                   <div class="hex-content-inner">
                     <span class="icon material-icons">admin_panel_settings</span>
@@ -64,14 +49,9 @@
                 </div>
               </div>
 
-              <!-- Hexagon Registro -->
-              <div class="hexagon-item" *ngIf="rol === 'admin'" (click)="goToRegister()">
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
-                <div class="hex-item">
-                  <div></div><div></div><div></div>
-                </div>
+              <div class="hexagon-item" *ngIf="canSeeRegisterUser" (click)="goToRegister()">
+                <div class="hex-item"><div></div><div></div><div></div></div>
+                <div class="hex-item"><div></div><div></div><div></div></div>
                 <div class="hex-content">
                   <div class="hex-content-inner">
                     <span class="icon material-icons">person_add</span>
@@ -82,7 +62,9 @@
                   </svg>
                 </div>
               </div>
+
             </div>
+            <div *ngIf="isLoading" class="loading-message">Cargando menú...</div>
           </div>
         </div>
       </div>

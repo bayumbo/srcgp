@@ -16,10 +16,11 @@ import {
   getDocs,
   getFirestore,
   orderBy,
-  query
+  query,
+  setDoc
 } from '@angular/fire/firestore';
 import { Router, ActivatedRoute } from '@angular/router';
-import { AuthService } from 'src/app/core/auth/services/auth.service';
+import { AuthService, Usuario, Unidad } from 'src/app/core/auth/services/auth.service'; // Importar 'Unidad'
 import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 
 @Component({
@@ -35,10 +36,10 @@ export class PerfilComponent implements OnInit {
   correo: string = '';
   nuevaContrasena: string = '';
   contrasenaActual: string = '';
-  unidad: string = '';
+  unidades: Unidad[] = []; // CAMBIO CLAVE: Ahora es un array de objetos Unidad
   cedula: string = '';
   empresa: string = '';
-  
+
   uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
@@ -46,7 +47,8 @@ export class PerfilComponent implements OnInit {
   soloLectura: boolean = false;
 
   // Para comparar cambios
-  datosOriginales: Partial<PerfilComponent> = {};
+  // Nota: Considera si necesitas comparar cambios en las unidades aquí o en otra parte
+  datosOriginales: Partial<Usuario> = {}; // CAMBIO: Usar Partial<Usuario> para tipado
   hayCambios: boolean = false;
   reportesUsuario: ReporteConPagos[] = [];
 
@@ -69,15 +71,14 @@ export class PerfilComponent implements OnInit {
 
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      unsubscribe(); // ✅ Esto evita bucles
+      // Eliminar el unsubscribe aquí, se debe llamar solo una vez o al final del flujo principal
+      // unsubscribe(); // <-- Eliminar esta línea
 
       if (user) {
         this.correo = user.email || '';
 
-
         if (uidParam) {
           this.uid = uidParam;
-
 
           // Ver si el perfil es de otro usuario
           if (uidParam !== user.uid) {
@@ -87,16 +88,16 @@ export class PerfilComponent implements OnInit {
           this.uid = user.uid;
         }
 
-
         await this.cargarDatosUsuario();
-
         await this.obtenerReportesUsuario();
         await this.cargarPagosUsuario();
         const rol = await this.authService.cargarRolActual();
         this.esAdmin = rol === 'admin';
       }
 
-      unsubscribe(); // detiene el listener
+      // Mover unsubscribe aquí para que se ejecute después de toda la lógica de carga inicial
+      // o manejar con Observables como se sugirió en la respuesta anterior para un mejor flujo.
+      unsubscribe();
     });
   }
 
@@ -114,57 +115,62 @@ export class PerfilComponent implements OnInit {
         this.nombres = data['nombres'] || '';
         this.apellidos = data['apellidos'] || '';
         this.cedula = data['cedula'] || '';
-        this.unidad = data['unidad'] || '';
         this.empresa = data['empresa'] || '';
         this.correo = data['email'] || this.correo;
+
+        // **CAMBIO CLAVE AQUÍ: Cargar unidades de la subcolección**
+        this.unidades = await this.authService.obtenerUnidadesDeUsuario(this.uid);
+
 
         // Guardar estado original para detección de cambios
         this.datosOriginales = {
           nombres: this.nombres,
           apellidos: this.apellidos,
           cedula: this.cedula,
-          unidad: this.unidad,
+          // Las unidades no se comparan directamente aquí si son una subcolección,
+          // ya que no son parte del documento principal del usuario para esta comparación simple.
+          // Si necesitas comparar cambios en unidades, sería una lógica más compleja.
           empresa: this.empresa,
-          correo: this.correo,
+          email: this.correo, // Usa 'email' para que coincida con la interfaz Usuario
         };
       }
     } catch (error) {
-      console.error('Error al cargar usuario:', error);
+      console.error('Error al cargar usuario o sus unidades:', error);
     }
   }
 
   async obtenerReportesUsuario() {
     if (!this.uid) return;
-  
+
     const firestore = getFirestore();
     const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
     const q = query(reportesRef, orderBy('fechaModificacion', 'desc'));
-  
+
     const snapshot = await getDocs(q);
     const tempReportes: ReporteConPagos[] = [];
-  
+
     for (const docSnap of snapshot.docs) {
       const data = docSnap.data() as NuevoRegistro;
       const id = docSnap.id;
-  
+
       const pagosRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios/${id}/pagosTotales`);
       const pagosSnap = await getDocs(pagosRef);
-  
+
       let minutosPagados = 0;
       let adminPagada = 0;
       let minBasePagados = 0;
       let multasPagadas = 0;
-  
+
       pagosSnap.forEach(pagoDoc => {
         const pago = pagoDoc.data();
         const detalles = pago['detalles'] ?? {};
-  
+
         minutosPagados += detalles.minutosAtraso || 0;
         adminPagada += detalles.administracion || 0;
         minBasePagados += detalles.minutosBase || 0;
         multasPagadas += detalles.multas || 0;
       });
-  
+
       tempReportes.push({
         ...data,
         id,
@@ -175,11 +181,11 @@ export class PerfilComponent implements OnInit {
         multasPagadas
       });
     }
-  
+
     this.reportesUsuario = tempReportes;
   }
-  
- 
+
+
 
   get passwordStrength(): string {
     const pass = this.nuevaContrasena;
@@ -189,14 +195,16 @@ export class PerfilComponent implements OnInit {
     return 'Media';
   }
 
+  // Modificar verificarCambios para que no intente comparar `unidad`
   verificarCambios(): void {
+    // Si 'datosOriginales' fue tipado como Partial<Usuario>, 'unidad' ya no es una propiedad directa.
+    // Si necesitas comparar las unidades, sería una lógica más compleja (ej. serializar los arrays, etc.)
     this.hayCambios =
       this.nombres !== this.datosOriginales.nombres ||
       this.apellidos !== this.datosOriginales.apellidos ||
       this.cedula !== this.datosOriginales.cedula ||
-      this.unidad !== this.datosOriginales.unidad ||
-      this.empresa !== this.datosOriginales.empresa ||
-      this.correo !== this.datosOriginales.correo ||
+      this.empresa !== this.datosOriginales.empresa || // 'empresa' es correcto
+      this.correo !== this.datosOriginales.email || // 'email' es correcto
       !!this.nuevaContrasena;
   }
 
@@ -209,10 +217,16 @@ export class PerfilComponent implements OnInit {
       const email = user.email;
       if (!email) return alert('❌ Email no disponible');
 
+      // Actualizar email en Auth si ha cambiado
       if (this.correo !== email) {
         await updateEmail(user, this.correo);
+        // Si el email cambia en Auth, también actualiza en Firestore para consistencia
+        const firestore = getFirestore();
+        const userDocRef = doc(firestore, 'usuarios', user.uid);
+        await setDoc(userDocRef, { email: this.correo }, { merge: true });
       }
 
+      // Actualizar contraseña si se ha proporcionado una nueva
       if (this.nuevaContrasena) {
         if (this.nuevaContrasena.length < 6) {
           return alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres');
@@ -226,18 +240,22 @@ export class PerfilComponent implements OnInit {
         await updatePassword(user, this.nuevaContrasena);
       }
 
-      alert('✅ Cambios guardados correctamente');
-      this.cancelarCambioContrasena();
-
-      // Resetear comparación
-      this.datosOriginales = {
+      // **Actualizar los otros datos del perfil en Firestore (nombres, apellidos, cedula, empresa)**
+      const firestore = getFirestore();
+      const userDocRef = doc(firestore, 'usuarios', user.uid);
+      await setDoc(userDocRef, {
         nombres: this.nombres,
         apellidos: this.apellidos,
         cedula: this.cedula,
-        unidad: this.unidad,
-        empresa: this.empresa,
-        correo: this.correo,
-      };
+        // No se actualizan las unidades directamente aquí, ya que están en una subcolección
+        empresa: this.empresa
+      }, { merge: true }); // Usar merge: true para no sobrescribir todo el documento
+
+      alert('✅ Cambios guardados correctamente');
+      this.cancelarCambioContrasena();
+
+      // Recargar datos originales después de guardar cambios exitosamente
+      await this.cargarDatosUsuario(); // Esto actualizará datosOriginales y las unidades
       this.hayCambios = false;
 
     } catch (error: any) {
@@ -268,17 +286,17 @@ export class PerfilComponent implements OnInit {
 
   async cargarPagosUsuario() {
     if (!this.uid) return;
-  
+
     const firestore = getFirestore();
     const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
     const reportesSnap = await getDocs(reportesRef);
-  
+
     const pagosTotales: any[] = [];
-  
+
     for (const reporte of reportesSnap.docs) {
       const pagosRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios/${reporte.id}/pagosTotales`);
       const pagosSnap = await getDocs(pagosRef);
-  
+
       pagosSnap.forEach(pagoDoc => {
         const pagoData = pagoDoc.data();
         pagosTotales.push({
@@ -288,7 +306,7 @@ export class PerfilComponent implements OnInit {
         });
       });
     }
-  
+
     this.pagos = pagosTotales.sort((a, b) => (b.fecha as any) - (a.fecha as any));
     this.totalPaginasPagos = Math.ceil(this.pagos.length / this.pagosPorPagina);
     this.actualizarPagosPaginados();
@@ -299,7 +317,7 @@ export class PerfilComponent implements OnInit {
     const fin = inicio + this.pagosPorPagina;
     this.pagosPaginados = this.pagos.slice(inicio, fin);
   }
-  
+
   cambiarPaginaPagos(valor: number) {
     const nuevaPagina = this.paginaActualPagos + valor;
     if (nuevaPagina >= 1 && nuevaPagina <= this.totalPaginasPagos) {
@@ -307,7 +325,7 @@ export class PerfilComponent implements OnInit {
       this.actualizarPagosPaginados();
     }
   }
-  
+
   descargarPDF(url: string) {
     window.open(url, '_blank');
   }
@@ -315,6 +333,4 @@ export class PerfilComponent implements OnInit {
   volverAlMenu(): void {
     this.router.navigate(['/menu']);
   }
-  
-  
 }

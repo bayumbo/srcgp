@@ -1,3 +1,5 @@
+// src/app/pages/gestionroles/gestionroles.ts
+
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -16,14 +18,14 @@ export class GestionRolesComponent implements OnInit {
   usuariosFiltrados: Usuario[] = [];
   usuariosPaginados: Usuario[] = [];
 
-  rolesDisponibles = ['usuario', 'admin'];
+  // AÑADE 'socio' y 'recaudador' aquí
+  rolesDisponibles = ['usuario', 'admin', 'socio', 'recaudador']; // <-- MODIFICADO
   mostrarSoloActivos = false;
   mostrarToast = false;
   cargando = true;
   busquedaActiva = false;
   cedulaBuscada = '';
   mostrarMensajeNoCoincidencias = false;
-
 
   // 🔢 Paginación
   paginaActual = 1;
@@ -85,8 +87,9 @@ export class GestionRolesComponent implements OnInit {
 
   async guardarNuevoRol(uid: string, nuevoRol: string): Promise<void> {
     await this.usuariosService.actualizarRol(uid, nuevoRol);
+    // Asegurarse de que el usuario en todosLosUsuarios también tenga el nuevoRol
     this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
-      usuario.uid === uid ? { ...usuario, rol: nuevoRol, nuevoRol } : usuario
+      usuario.uid === uid ? { ...usuario, rol: nuevoRol, nuevoRol: nuevoRol } : usuario
     );
     this.filtrarUsuarios(this.todosLosUsuarios);
 
@@ -103,28 +106,33 @@ export class GestionRolesComponent implements OnInit {
   buscarPorCedula(): void {
     const termino = this.cedulaBuscada.trim().toLowerCase();
     this.busquedaActiva = termino.length > 0;
-  
+
     if (this.busquedaActiva) {
       const coincidencias = this.todosLosUsuarios.filter(usuario =>
         usuario.cedula.toLowerCase().includes(termino) ||
         `${usuario.nombres} ${usuario.apellidos}`.toLowerCase().includes(termino)
       );
-  
+
       if (coincidencias.length > 0) {
         this.filtrarUsuarios(coincidencias);
       } else {
-        // ⚠️ No se encontraron resultados
         this.mostrarMensajeNoCoincidencias = true;
         setTimeout(() => {
           this.mostrarMensajeNoCoincidencias = false;
         }, 3000);
-        this.filtrarUsuarios(this.todosLosUsuarios); // Mostrar todos como respaldo
+        // Si no hay coincidencias, limpia la lista paginada
+        this.usuariosFiltrados = [];
+        this.usuariosPaginados = [];
+        this.totalPaginas = 0;
+        this.paginaActual = 0;
+        return; // Evita que se recarguen todos los usuarios
       }
     } else {
+      this.mostrarMensajeNoCoincidencias = false; // Oculta el mensaje si se borra la búsqueda
       this.filtrarUsuarios(this.todosLosUsuarios);
     }
   }
-  
+
   verPerfil(uid: string): void {
     this.router.navigate(['/perfil', uid]);
   }

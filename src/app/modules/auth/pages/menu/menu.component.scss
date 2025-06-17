@@ -15,10 +15,11 @@ body {
 
 .overlay {
   position: absolute;
-  top: 0; left: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.97);
+  background-color: rgba(255, 255, 255, 0.97); /* Nota: tu overlay es blanco semi-transparente, lo que es inusual para un fondo oscuro. Si el fondo se ve blanco, este es el motivo. */
   background-size: cover;
   background-position: center;
   z-index: 0;
@@ -80,11 +81,21 @@ body {
   background-color: #1e2530;
 }
 
-.hex-item div:before { top: 0; }
-.hex-item div:after { bottom: 0; }
-.hex-item div:nth-child(1) { transform: rotate(0deg); }
-.hex-item div:nth-child(2) { transform: rotate(60deg); }
-.hex-item div:nth-child(3) { transform: rotate(120deg); }
+.hex-item div:before {
+  top: 0;
+}
+.hex-item div:after {
+  bottom: 0;
+}
+.hex-item div:nth-child(1) {
+  transform: rotate(0deg);
+}
+.hex-item div:nth-child(2) {
+  transform: rotate(60deg);
+}
+.hex-item div:nth-child(3) {
+  transform: rotate(120deg);
+}
 
 .hex-content {
   color: #fff;
@@ -130,12 +141,19 @@ body {
 }
 
 /* EFECTOS */
-.hexagon-item:hover .hex-item:first-child { transform: scale(1.2); }
-.hexagon-item:hover .hex-item:last-child { opacity: 1; transform: scale(1.3); }
+.hexagon-item:hover .hex-item:first-child {
+  transform: scale(1.2);
+}
+.hexagon-item:hover .hex-item:last-child {
+  opacity: 1;
+  transform: scale(1.3);
+}
 .hexagon-item:hover .title {
   animation: focus-in-contract 0.5s ease both;
 }
-.hexagon-item:hover .icon { color: #64ccca; }
+.hexagon-item:hover .icon {
+  color: #64ccca;
+}
 
 @keyframes focus-in-contract {
   0% {
@@ -147,6 +165,34 @@ body {
     filter: blur(0px);
     opacity: 1;
   }
+}
+
+/* ESTILOS PARA BOTONES DESHABILITADOS */
+.hexagon-item.disabled {
+  opacity: 0.5; /* Hace el botón semitransparente */
+  cursor: not-allowed; /* Cambia el cursor para indicar que no se puede hacer clic */
+  pointer-events: none; /* Deshabilita los eventos de ratón para que no se active el click */
+  filter: grayscale(100%); /* Opcional: lo hace en blanco y negro para indicar inactividad */
+  transform: rotate(30deg) scale(1) !important; /* Anula el efecto hover de escalado */
+}
+
+/* Opcional: Si quieres que el título y el ícono de los botones deshabilitados también cambien */
+.hexagon-item.disabled .hex-content .title,
+.hexagon-item.disabled .hex-content .icon {
+  color: #a0a0a0; /* Un gris más claro */
+}
+
+.hexagon-item.disabled .hex-item div:before,
+.hexagon-item.disabled .hex-item div:after {
+  background-color: #505050; /* Bordes más oscuros */
+}
+
+/* Mensaje de carga */
+.loading-message {
+  text-align: center;
+  color: #fff; /* Asegúrate de que se vea bien sobre tu fondo */
+  font-size: 1.2em;
+  margin-top: 50px;
 }
 
 
