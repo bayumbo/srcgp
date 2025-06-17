@@ -135,7 +135,10 @@ export class CierreCajaComponent implements OnInit {
     pdfDoc.setTextColor(0, 0, 0);
     pdfDoc.text(`Total Ingresos: $${total.toFixed(2)}`, 14, lastY + 10);
   
+    const totalEgresos = this.calcularTotalEgresos();
+    const saldoNeto = this.calcularSaldoNeto();
     let egresosY = lastY + 10;
+  
     if (this.egresos.length > 0) {
       (pdfDoc as any).autoTable({
         head: [['Detalle del Egreso', 'Valor']],
@@ -148,24 +151,28 @@ export class CierreCajaComponent implements OnInit {
       });
   
       egresosY = (pdfDoc as any).lastAutoTable.finalY || lastY + 40;
-      const totalEgresos = this.calcularTotalEgresos();
-      const saldoNeto = this.calcularSaldoNeto();
-      const resumenY = this.agregarResumenPorEmpresa(pdfDoc, this.cierreItems, egresosY + 30);
-  
-      pdfDoc.setTextColor(0, 0, 0);
-      pdfDoc.text(`Total Egresos: $${totalEgresos.toFixed(2)}`, 14, egresosY + 10);
-  
-      pdfDoc.setFontSize(13);
-      pdfDoc.setTextColor(33, 150, 83);
-      pdfDoc.text(`Saldo Neto del Día: $${saldoNeto.toFixed(2)}`, 14, egresosY + 20);
-  
-      pdfDoc.setDrawColor(150);
-      pdfDoc.line(14, resumenY + 20, 100, resumenY + 20);
-      pdfDoc.setFontSize(10);
-      pdfDoc.setTextColor(100);
-      pdfDoc.text('Firma Responsable', 14, resumenY + 25);
+    } else {
+      egresosY = lastY + 20;
     }
   
+    // Mostrar total egresos y saldo neto (siempre)
+    pdfDoc.setTextColor(0, 0, 0);
+    pdfDoc.text(`Total Egresos: $${totalEgresos.toFixed(2)}`, 14, egresosY + 10);
+  
+    pdfDoc.setFontSize(13);
+    pdfDoc.setTextColor(33, 150, 83);
+    pdfDoc.text(`Saldo Neto del Día: $${saldoNeto.toFixed(2)}`, 14, egresosY + 20);
+  
+    // Mostrar resumen por empresa (siempre)
+    const resumenY = this.agregarResumenPorEmpresa(pdfDoc, this.cierreItems, egresosY + 30);
+  
+    pdfDoc.setDrawColor(150);
+    pdfDoc.line(14, resumenY + 20, 100, resumenY + 20);
+    pdfDoc.setFontSize(10);
+    pdfDoc.setTextColor(100);
+    pdfDoc.text('Firma Responsable', 14, resumenY + 25);
+  
+    // Guardar PDF
     const fechaId = this.fechaSeleccionada.toISOString().split('T')[0];
     pdfDoc.save(`CierreCaja-${fechaId}.pdf`);
   
@@ -179,8 +186,8 @@ export class CierreCajaComponent implements OnInit {
       total,
       cantidadItems: this.cierreItems.length,
       egresos: this.egresos,
-      totalEgresos: this.calcularTotalEgresos(),
-      saldoNeto: this.calcularSaldoNeto(),
+      totalEgresos,
+      saldoNeto,
       pdfUrl,
       creadoEn: serverTimestamp()
     });
@@ -192,6 +199,16 @@ export class CierreCajaComponent implements OnInit {
   agregarResumenPorEmpresa(pdfDoc: jsPDF, cierreItems: CierreCajaItem[], startY: number): number {
     const empresas = ['General Píntag', 'Expreso Antisana'];
     const modulos = ['Administración', 'Minutos', 'Minutos Base', 'Multas'];
+  
+    // 🧠 Función auxiliar para agrupar por categoría real
+    const categorizarModulo = (nombre: string): string => {
+      const nombreLimpio = nombre.toLowerCase();
+      if (nombreLimpio.includes('administracion')) return 'Administración';
+      if (nombreLimpio.includes('minutosatraso')) return 'Minutos';
+      if (nombreLimpio.includes('minutosbase')) return 'Minutos Base';
+      if (nombreLimpio.includes('multa')) return 'Multas';
+      return 'Otros';
+    };
   
     let currentY = startY;
   
@@ -205,18 +222,22 @@ export class CierreCajaComponent implements OnInit {
   
       empresas.forEach(empresa => {
         const valor = cierreItems
-          .filter(i => i.modulo === modulo && i.empresa === empresa)
+          .filter(i =>
+            categorizarModulo(i.modulo) === modulo &&
+            i.empresa?.toLowerCase().includes(empresa.toLowerCase())
+          )
           .reduce((acc, i) => acc + i.valor, 0);
   
         pdfDoc.setFont('helvetica', 'normal');
-        pdfDoc.text(`➡ ${modulo.toUpperCase()} COOP. ${empresa.toUpperCase()}`, 20, currentY);
-        pdfDoc.text(`$ ${valor.toFixed(2)}`, 170, currentY, { align: 'right' });
+        pdfDoc.text(`  ${modulo.toUpperCase()} COOP. ${empresa.toUpperCase()}`, 20, currentY);
+        pdfDoc.text(`$${valor.toFixed(2)}`, 190, currentY, { align: 'right' });
         currentY += 6;
       });
     });
   
     return currentY;
   }
+  
   
   cargarImagenBase64(url: string): Promise<string> {
     return new Promise((resolve, reject) => {

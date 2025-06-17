@@ -1,0 +1,200 @@
+<header>
+  <div class="nav-container">
+    <div class="navbar-brand">
+      <a routerLink="/" class="home-link">
+        <mat-icon>home</mat-icon>
+        <span>Inicio</span>
+      </a>
+      <button class="menu-toggle" (click)="menuAbierto = !menuAbierto">
+        <mat-icon>menu</mat-icon>
+      </button>
+    </div>
+
+    <nav [class.abierto]="menuAbierto">
+      <ul class="menu">
+        <!-- Submenú Cuentas -->
+        <li class="submenu-container" (click)="toggleSubmenu('codificacion', $event)">
+          <a href="">Codificación</a>
+          <ul class="submenu"[class.visible]="submenus.codificacion">
+            <li><a routerLink="/contabilidad/agregar-cuenta">Catalogo de Cuentas</a></li>
+            <li><a routerLink="/contabilidad/documentos">Documentos Contabilidad</a></li>
+            <li><a routerLink="/contabilidad/centro-costos">Centro de Costos</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Comprobante -->
+        <li class="submenu-container" (click)="toggleSubmenu('transacciones', $event)">
+          <a href="">Transacciones</a>
+          <ul class="submenu"[class.visible]="submenus.transacciones">
+            <li><a routerLink="/contabilidad/asiento-apertura">Asiento de Apertura</a></li>
+            <li><a routerLink="/contabilidad/comprobante-egresos">Comprobante de Egresos</a></li>
+            <li><a routerLink="/contabilidad/comprobante-ingresos">Comprobante de Ingresos</a></li>
+            <li><a routerLink="/contabilidad/transaccion-general">Transacciones Generales</a></li>
+            <li><a routerLink="/contabilidad/compras-varias">Compras Varias</a></li>
+          </ul>
+        </li>
+
+        <!-- Submenú Libro Diario -->
+        <li class="submenu-container" (click)="toggleSubmenu('libros', $event)">
+          <a href="">Libros Contables</a>
+          <ul class="submenu"[class.visible]="submenus.libros">
+            <li><a routerLink="/contabilidad/libdiario">Libro Diario</a></li>
+            <li><a routerLink="/contabilidad/libmayor">Libro Mayor</a></li>
+          </ul>
+        </li>
+
+        <!-- Enlaces restantes -->
+        <li><a routerLink="/contabilidad/estados">Estados Financieros</a></li>
+        <li><a routerLink="/contabilidad/estado-resultados">Estado de Resultados</a></li>
+        <li><a routerLink="/contabilidad/balances">Balances de comprobación</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+
+  <div id="preloader">
+    <div class="preloader">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+<div class="comprobante-seccion">
+  <!-- FORMULARIO -->
+  <div class="comprobante-flex-container">
+    <div class="form-card">
+      <h5>Registrar Transacción General</h5>
+      <form [formGroup]="transaccionForm" (ngSubmit)="agregarTransaccion()">
+        <div class="form-grid">
+          <div class="form-group"><label>Documento</label><input readonly (click)="abrirSelectorDocumento()" [value]="documentoSeleccionado?.codigo || ''"></div>
+          <div class="form-group"><label>Número</label><input [value]="numeroDocumento" disabled class="readonly-input" />
+          </div>
+          <div class="form-group full-width"><label>Concepto General</label><textarea formControlName="concepto"></textarea></div>
+          <div class="form-group"><label>A nombre de</label><input formControlName="nombre"></div>
+          <div class="form-group"><label>Cuenta</label><input formControlName="cuenta" readonly (click)="abrirSelectorCuenta()"></div>
+          <div class="form-group"><label>Descripción</label><input formControlName="descripcion" readonly></div>
+          <div class="form-group"><label>Centro de Costos</label><input formControlName="centroCostos" readonly (click)="abrirSelectorCentro()"></div>
+          <div class="form-group"><label>Tipo</label><select formControlName="tipo">
+            <option value="Debe">Debe</option>
+            <option value="Haber">Haber</option>
+          </select></div>
+          <div class="form-group"><label>Valor</label><input formControlName="valor" type="number" step="0.01"></div>
+          <div class="form-group full-width"><button type="submit">Agregar cuenta</button></div>
+        </div>
+      </form>
+    </div>
+
+    <!-- TABLA DE TRANSACCIONES -->
+    <div class="tabla-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Cuenta</th><th>Descripción</th><th>C.C</th><th>Debe</th><th>Haber</th><th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of transacciones; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td>{{ t.cuenta }}</td>
+            <td>{{ t.descripcion }}</td>
+            <td>{{ t.centroCostos }}</td>
+            <td>{{ t.tipo === 'Debe' ? t.valor.toFixed(2) : '-' }}</td>
+            <td>{{ t.tipo === 'Haber' ? t.valor.toFixed(2) : '-' }}</td>
+            <td><button type="button" (click)="eliminarTransaccion(i)">Eliminar</button></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right; font-weight:bold;">Total:</td>
+            <td>{{ totalDebe | number:'1.2-2' }}</td>
+            <td>{{ totalHaber | number:'1.2-2' }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="boton-generar">
+        <button type="button" (click)="generarPDF()">Generar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALES -->
+  <div class="modal-cuentas" *ngIf="mostrarSelectorCuenta">
+    <input class="buscador-cuenta" placeholder="🔍 Buscar cuenta" [(ngModel)]="busquedaCuenta">
+    <div class="lista-cuentas">
+      <div *ngFor="let cuenta of cuentasFiltradas" (dblclick)="seleccionarCuenta(cuenta)" class="item-cuenta">
+
+        <strong>{{ cuenta.codigo }}</strong> - {{ cuenta.nombre }}
+      </div>
+    </div>
+    <button (click)="mostrarSelectorCuenta = false">Cerrar</button>
+  </div>
+
+  <div class="modal-centros" *ngIf="mostrarSelectorCentro">
+    <input class="buscador-cuenta" placeholder="🔍 Buscar centro" [(ngModel)]="busquedaCentro">
+    <div class="lista-cuentas">
+      <div *ngFor="let centro of centrosFiltrados" (dblclick)="seleccionarCentro(centro)" class="item-cuenta">
+        <strong>{{ centro.codigo }}</strong> - {{ centro.descripcion }}
+      </div>
+    </div>
+    <button (click)="mostrarSelectorCentro = false">Cerrar</button>
+  </div>
+
+  <div class="modal-cuentas" *ngIf="mostrarSelectorDocumento">
+    <input class="buscador-cuenta" placeholder="🔍 Buscar documento" [(ngModel)]="busquedaDocumento">
+    <div class="lista-cuentas">
+      <div *ngFor="let doc of documentosFiltrados" (dblclick)="seleccionarDocumento(doc)" class="item-cuenta">
+        <strong>{{ doc.codigo }}</strong> - {{ doc.nombre || doc.descripcion || '-' }}
+      
+
+      </div>
+    </div>
+    <button (click)="mostrarSelectorDocumento = false">Cerrar</button>
+  </div>
+
+  <!-- COMPROBANTES GUARDADOS -->
+  <div class="contenedor-comprobantes">
+    <h3>📂 Comprobantes Generales Guardados</h3>
+    <div class="filtros-fecha">
+      <label>Tipo Documento:</label>
+      <select [(ngModel)]="filtroTipoDocumento" (change)="aplicarFiltros()">
+        <option value="">Todos</option>
+        <option *ngFor="let doc of documentosDisponibles" [value]="doc.codigo">{{ doc.codigo }}</option>
+      </select>
+    </div>
+    <table>
+      <thead>
+        <tr><th>No.</th><th>Nombre</th><th>Concepto</th><th>Debe</th><th>Haber</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let comprobante of comprobantesPaginados">
+          <td>{{ comprobante.documento }}</td>
+          <td>{{ comprobante.nombre }}</td>
+          <td>{{ comprobante.concepto }}</td>
+          <td>{{ comprobante.totalDebe.toFixed(2) }}</td>
+          <td>{{ comprobante.totalHaber.toFixed(2) }}</td>
+          <td>
+            <a [href]="comprobante.pdfURL" target="_blank" class="btn-ver">📄 Ver PDF</a>
+            <button
+            class="btn-eliminar"
+            (click)="eliminarComprobante(comprobante.id, comprobante.codigoDocumento, comprobante.numeroFormateado)">
+            🗑️ Eliminar
+          </button>
+                   
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="paginacion-footer" *ngIf="totalPaginas > 1">
+      <button class="btn-paginador" (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">⏮ Anterior</button>
+      <button
+      *ngFor="let p of paginasVisibles"
+      [class.activo]="p === paginaActual"
+      (click)="cambiarPagina(+p)"
+    >
+      {{ p }}
+    </button>
+      <button class="btn-paginador" (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual >= totalPaginas">Siguiente ⏭</button>
+    </div>
+  </div>
+</div>
