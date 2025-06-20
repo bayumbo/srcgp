@@ -28,6 +28,7 @@ export class NuevoRegistroComponent {
     apellido:'',
     unidad: '',
     uid: '',
+    fechaModificacion: new Date().toISOString().split('T')[0],
   };
 
   usuarios: { uid: string; nombre: string; apellido: string; unidad: string }[] = [];
@@ -111,7 +112,7 @@ export class NuevoRegistroComponent {
       alert('⚠️ Por favor selecciona un usuario válido.');
       return;
     }
-
+  
     try {
       if (this.id) {
         await this.reportesService.actualizarReporteDiario(this.reporte.uid, this.id, this.reporte);
@@ -120,13 +121,9 @@ export class NuevoRegistroComponent {
         const docRef = await this.reportesService.guardarReporteDiario(this.reporte.uid, this.reporte);
         this.resultado = docRef.id;
       }
-
+  
       this.router.navigate(['/reportes/lista-reportes']);
     } catch (error) {
       console.error('❌ Error al guardar reporte:', error);
     }
-  }
-}
-
-
-
+  }}

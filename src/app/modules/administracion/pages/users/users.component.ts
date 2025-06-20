@@ -32,7 +32,7 @@ import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes
 })
 export class PerfilComponent implements OnInit {
   nombres: string = '';
-  apellidos: string = '';
+  apellidos: string = ''; 
   correo: string = '';
   nuevaContrasena: string = '';
   contrasenaActual: string = '';

@@ -266,7 +266,7 @@ export class ReporteListaComponent implements OnInit {
       doc.text(modulo.nombre, 15, currentY);
       currentY += 6;
   
-      const fechasSet = new Set(this.reportes.map(r => r.fechaModificacion?.toDate().toLocaleDateString() || ''));
+      const fechasSet = new Set(this.reportes.map(r => r.fechaModificacion || ''));
       const fechasArray = Array.from(fechasSet).sort();
       const unidades = [...new Set(this.reportes.map(r => r.unidad))];
   
@@ -278,7 +278,7 @@ export class ReporteListaComponent implements OnInit {
         const row: (string | number)[] = [unidad || ''];
         let total = 0;
         for (const fecha of fechasArray) {
-          const rep = this.reportes.find(r => r.unidad === unidad && r.fechaModificacion?.toDate().toLocaleDateString() === fecha);
+          const rep = this.reportes.find(r => r.unidad === unidad && r.fechaModificacion === fecha);
           const asignado = rep ? Number(rep[modulo.campo as keyof ReporteConPagos]) || 0 : 0;
           row.push(`$${asignado.toFixed(2)}`);
           total += asignado;
@@ -307,7 +307,7 @@ export class ReporteListaComponent implements OnInit {
         const row: (string | number)[] = [unidad || ''];
         let total = 0;
         for (const fecha of fechasArray) {
-          const rep = this.reportes.find(r => r.unidad === unidad && r.fechaModificacion?.toDate().toLocaleDateString() === fecha);
+          const rep = this.reportes.find(r => r.unidad === unidad && r.fechaModificacion === fecha);
           const asignado = rep ? Number(rep[modulo.campo as keyof ReporteConPagos]) || 0 : 0;
           const pagado = rep ? Number(rep[modulo.pagado as keyof ReporteConPagos]) || 0 : 0;
           const saldo = asignado - pagado;
