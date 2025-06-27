@@ -77,7 +77,7 @@
         <p class="total">TOTAL ADEUDADO: <strong>{{ total | currency:'USD' }}</strong></p>
       </div>
 
-      <button class="btn-pago" (click)="generarPago()">GENERAR PAGO</button>
+      <button class="btn-pago" (click)="generarPago()" [disabled]="esSocio">GENERAR PAGO</button>
     </div>
   </ng-container>
   <ng-template #cargandoSpinner>

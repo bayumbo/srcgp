@@ -11,7 +11,7 @@ import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
 import { Router } from '@angular/router';
- 
+import { AuthService } from 'src/app/core/auth/services/auth.service';  
 @Component({
   selector: 'app-cierre-caja',
   standalone: true,
@@ -20,6 +20,7 @@ import { Router } from '@angular/router';
   styleUrls: ['./cierre-caja.component.scss']
 })
 export class CierreCajaComponent implements OnInit {
+  esSocio: boolean = false;
   firestore = inject(Firestore);
   storage = inject(Storage);
 
@@ -37,10 +38,14 @@ export class CierreCajaComponent implements OnInit {
 
   constructor(
     private cierreCajaService: CierreCajaService,
-    private router: Router
+    private router: Router,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
+     this.authService.currentUserRole$.subscribe(role => {
+     this.esSocio = role === 'socio';
+  });
     this.actualizarTituloFecha();
     this.cargarCierre();
     this.cargarHistorial();

@@ -18,6 +18,7 @@ import { FormsModule } from '@angular/forms';
 import { Pago } from 'src/app/core/interfaces/pago.interface';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { AuthService } from 'src/app/core/auth/services/auth.service'; 
 
 @Component({
   selector: 'app-reporte-lista',
@@ -27,6 +28,8 @@ import autoTable from 'jspdf-autotable';
   styleUrls: ['./lista-reportes.component.scss']
 })
 export class ReporteListaComponent implements OnInit {
+
+  esSocio: boolean = false;
   reportes: ReporteConPagos[] = [];
   cargando: boolean = true;
   listaReportes: any[] = [];
@@ -43,6 +46,11 @@ export class ReporteListaComponent implements OnInit {
   // Paginación
   paginaActual: number = 1;
   reportesPorPagina: number = 5;
+
+
+  constructor(
+    private authService: AuthService // ⬅️ Agrega esto
+  ) {}
 
   get totalPaginas(): number {
     return Math.ceil(this.reportes.length / this.reportesPorPagina);
@@ -62,9 +70,12 @@ export class ReporteListaComponent implements OnInit {
     }}
 
   async ngOnInit(): Promise<void> {
-    await this.cargarTodosLosReportes();
-  }
+  this.authService.currentUserRole$.subscribe(role => {
+    this.esSocio = role === 'socio';
+  });
 
+  await this.cargarTodosLosReportes();
+}
  seleccionarEmpresa(nombreBoton: string) {
   if (nombreBoton === 'Pintag') {
     this.empresaSeleccionada = 'General Pintag';

@@ -54,6 +54,7 @@ export class AuthService {
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
 
+  
   readonly authState$ = authState(this.auth);
 
   // AÑADIDO: BehaviorSubject para el rol del usuario actual
@@ -128,7 +129,7 @@ export class AuthService {
   // Ahora, getUserRole() puede obtener del BehaviorSubject para ser más reactivo
   // Aunque para una carga inicial, podrías seguir usando localStorage/la propiedad.
   getUserRole(): string | null {
-    return this._currentUserRole.getValue(); // Obtiene el último valor emitido
+    return this._currentUserRole.getValue() || localStorage.getItem('userRole');
   }
 
   async obtenerDatosUsuarioActual(): Promise<Usuario | null> {

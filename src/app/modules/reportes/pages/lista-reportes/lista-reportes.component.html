@@ -14,8 +14,8 @@
     <!-- Contenedor de acciones superior -->
     <div class="acciones-globales">
       <!-- Izquierda: Reporte Empresas -->
-      <div class="acciones-empresas">
-        <button (click)="mostrarOpcionesEmpresa = !mostrarOpcionesEmpresa">
+      <div class="acciones-empresas" >
+        <button (click)="mostrarOpcionesEmpresa = !mostrarOpcionesEmpresa" >
           <span class="material-icons">business</span>
           Generar Reporte Empresas
         </button>
@@ -26,7 +26,7 @@
         <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
           <span class="material-icons">filter_alt</span>
         </button>
-        <button class="nuevo-registro" (click)="irANuevoRegistro()">
+        <button class="nuevo-registro" (click)="irANuevoRegistro()" [disabled]="esSocio">
           <span class="material-icons">add</span>
           Nuevo Registro
         </button>
@@ -117,10 +117,10 @@
           <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
           <td class="acciones" data-label="Acciones">
             <div class="acciones-contenedor">
-              <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)">
+              <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)" [disabled]="esSocio">
                 <span class="material-icons">edit</span>
               </button>
-              <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)">
+              <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)" [disabled]="esSocio">
                 <span class="material-icons">payments</span>
               </button>
             </div>

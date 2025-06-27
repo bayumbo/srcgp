@@ -24,6 +24,7 @@
         class="excel"
         (click)="descargarExcel()"
         [disabled]="cierreItems.length === 0"
+        [disabled]="esSocio"
         >
         <span class="material-icons">table_chart</span> Exportar a Excel
         </button>
@@ -65,10 +66,10 @@
   
     <!-- Registro de egresos -->
     <h3 style="margin-top: 2rem;">➖ Registrar Egresos</h3>
-    <div class="form-egreso">
-      <input type="text" placeholder="Detalle del egreso" [(ngModel)]="nuevoEgreso.modulo">
-      <input type="number" placeholder="Valor" [(ngModel)]="nuevoEgreso.valor">
-      <button (click)="agregarEgreso()"><span class="material-icons">add_circle</span> Agregar</button>
+    <div class="form-egreso" >
+      <input type="text" placeholder="Detalle del egreso" [(ngModel)]="nuevoEgreso.modulo"  [disabled]="esSocio">
+      <input type="number" placeholder="Valor" [(ngModel)]="nuevoEgreso.valor"  [disabled]="esSocio">
+      <button (click)="agregarEgreso()"[disabled]="esSocio"><span class="material-icons">add_circle</span> Agregar</button>
     </div>
   
     <table *ngIf="egresos.length > 0" class="tabla-egresos">

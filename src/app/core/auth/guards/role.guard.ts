@@ -19,7 +19,7 @@ export const roleGuard: CanActivateFn = (
 
   // Si no hay rol cargado o no está entre los permitidos
   if (!userRole || !expectedRoles.includes(userRole)) {
-    router.navigate(['/perfil']); // o cambiar a '/unauthorized' si tienes una página de acceso denegado
+    router.navigate(['']); // o cambiar a '/unauthorized' si tienes una página de acceso denegado
     return false;
   }
 

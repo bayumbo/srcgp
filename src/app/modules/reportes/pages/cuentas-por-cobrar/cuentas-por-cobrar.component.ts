@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ReportesService } from 'src/app/modules/reportes/services/reportes.service';
 import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
-
+import { AuthService } from 'src/app/core/auth/services/auth.service'; 
 @Component({
   selector: 'app-cuentas-por-cobrar',
   standalone: true,
@@ -13,6 +13,7 @@ import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
   styleUrls: ['./cuentas-por-cobrar.component.scss']
 })
 export class CuentasPorCobrarComponent implements OnInit {
+  esSocio: boolean = false;
   filtro: string = '';
   listaUnidades: { unidad: string; nombre: string }[] = [];
   unidadSeleccionada: string | null = null;
@@ -22,10 +23,14 @@ export class CuentasPorCobrarComponent implements OnInit {
 
   constructor(
     private reportesService: ReportesService,
-    private router: Router
+    private router: Router,
+    private authService: AuthService // ⬅️ Agrega esto
   ) {}
 
   async ngOnInit(): Promise<void> {
+    this.authService.currentUserRole$.subscribe(role => {
+    this.esSocio = role === 'socio';
+  });
     this.cargando = true;
     try {
       this.listaUnidades = await this.reportesService.obtenerTodasLasUnidadesConNombre();
