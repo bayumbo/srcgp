@@ -136,7 +136,7 @@
           </thead>
           <tbody>
             <tr *ngFor="let reporte of reportesUsuario">
-              <td>{{ reporte.fechaModificacion?.toDate() | date: 'shortDate' }}</td>
+              <td>{{ reporte.fechaModificacion | date: 'shortDate' }}</td>
               <td>{{ reporte.unidad }}</td>
               <td>{{ reporte.minutosAtraso }}</td>
               <td>{{ reporte.minutosPagados }}</td>

@@ -273,12 +273,13 @@ export class RealizarPagoComponent implements OnInit {
 
     // 🧾 Tabla de pagos realizados
     const fechaReporte = registro.fechaModificacion
-  ? registro.fechaModificacion.toDate().toLocaleDateString('es-EC', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  : 'Sin fecha';
+    
+    ? new Date(registro.fechaModificacion).toLocaleDateString('es-EC', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : 'Sin fecha';
 
     autoTable(pdfDoc, {
       startY: 60,

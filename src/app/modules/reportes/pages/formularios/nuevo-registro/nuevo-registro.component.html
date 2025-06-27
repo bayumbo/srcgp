@@ -23,7 +23,7 @@
 
       <div class="form-group">
         <label>Unidad</label>
-        <input type="text" [value]="usuarioSeleccionado?.unidad || ''" readonly />
+        <input type="text" [value]="usuarioSeleccionado?.unidad || ''"  />
       </div>
     </div>
 
@@ -52,7 +52,17 @@
         <input type="number" name="multas" [(ngModel)]="reporte.multas" required />
       </div>
     </div>
-
+    <div class="form-group">
+      <label for="fecha">Fecha del reporte:</label>
+      <input
+        type="date"
+        id="fecha"
+        name="fecha"
+        [(ngModel)]="reporte.fechaModificacion"
+        class="form-control"
+        required
+      />
+    </div>
     <!-- Botones -->
     <div class="acciones-formulario">
       <button type="submit" class="guardar">💾 Guardar</button>

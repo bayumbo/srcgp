@@ -60,7 +60,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let r of reportesSeleccionados">
-            <td>{{ r.fechaModificacion?.toDate() | date: 'shortDate' }}</td>
+            <td>{{ r.fechaModificacion | date: 'shortDate' }}</td>
             <td>{{ r.administracion - r.adminPagada | currency:'USD' }}</td>
             <td>{{ r.minutosBase - r.minBasePagados | currency:'USD' }}</td>
             <td>{{ r.minutosAtraso - r.minutosPagados | currency:'USD' }}</td>
