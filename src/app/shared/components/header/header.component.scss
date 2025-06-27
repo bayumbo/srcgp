@@ -1,12 +1,10 @@
-/* ================= HEADER ================= */
-
 .header-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 64px;
-  background: #37474f;
+  background: #37474f; /* Color de fondo del header */
   border-bottom: 1px solid #000;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   display: flex;
@@ -14,22 +12,47 @@
   justify-content: space-between;
   padding: 0 1rem;
   z-index: 1000;
-  font-family: Tahoma;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Fuente un poco más moderna */
   transition: padding-left 0.3s ease;
   box-sizing: border-box;
 }
 
-.titulo-app {
-  flex-grow: 1;
-  text-align: center;
-  color: #ffffff;
+/* --- INICIO DE CAMBIOS ESTÉTICOS --- */
+.main-title-wrapper {
+  flex-grow: 1; /* Permite que ocupe el espacio central */
+  display: flex;
+  flex-direction: column; /* Apila los elementos verticalmente */
+  align-items: center; /* Centra horizontalmente */
+  justify-content: center; /* Centra verticalmente */
+  margin: 0 1rem; /* Margen para no pegarse a los botones laterales */
+  min-width: 0; /* Permite que el contenido se trunque si es muy largo */
+}
+
+.global-app-title {
+  color: #f0f0f0; /* Blanco ligeramente apagado para contraste sutil */
   margin: 0;
-  letter-spacing: 0.5px;
-  font-size: 18px;
+  font-size: 18px; /* Más grande y prominente */
+  font-weight: 550; /* Más negrita */
+  letter-spacing: 1.2px; /* Mayor espaciado para un aspecto premium */
+  text-transform: uppercase; /* Todo en mayúsculas */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.user-company-subtitle {
+  color: #f5f5f5; /* Un gris claro para que sea un subtítulo */
+  margin-top: 1px; /* Pequeño espacio entre los títulos */
+  font-size: 16px; /* Pequeño, claramente un subtítulo */
+  font-weight: 450; /* Normal, no negrita */
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  //opacity: 0.8; /* Ligeramente transparente */
+}
+/* --- FIN DE CAMBIOS ESTÉTICOS --- */
+
 
 /* ================= SIDEBAR LEFT ================= */
 .side_menu {
@@ -182,11 +205,26 @@
   .header-container {
     padding-left: 0;
     width: 100%;
+    justify-content: space-between;
+  }
+
+  .main-title-wrapper {
+    margin: 0 0.5rem;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .global-app-title {
+    font-size: 18px; /* Ajuste para pantallas pequeñas */
+  }
+
+  .user-company-subtitle {
+    font-size: 11px; /* Ajuste para pantallas pequeñas */
   }
 
   .side_menu {
-    width: 250px;              
-    left: -250px;               
+    width: 250px;
+    left: -250px;
     height: 100vh;
   }
 

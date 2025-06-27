@@ -21,6 +21,7 @@ import {
   addDoc
 } from '@angular/fire/firestore';
 
+import { BehaviorSubject } from 'rxjs'; // <-- Importar BehaviorSubject
 
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth as getAuthStandalone } from 'firebase/auth';
@@ -37,17 +38,14 @@ export interface Usuario {
   nombres: string;
   apellidos: string;
   email: string;
-   rol: 'usuario' | 'admin' | 'socio' | 'recaudador';
+  rol: 'usuario' | 'admin' | 'socio' | 'recaudador';
   empresa:string;
-  // unidad: string[]; // ¡QUITAMOS ESTE CAMPO! Las unidades van en una subcolección
-  estado: boolean;     // <--- AÑADE ESTO
-  creadoEn: Date;      // <--- AÑADE ESTO (o Timestamp si usas el tipo de Firestore)
+  estado: boolean;
+  creadoEn: Date;
 }
 
-// Interfaz para la unidad dentro de la subcolección
 export interface Unidad {
   nombre: string;
-  // Puedes añadir más campos aquí si cada unidad necesita más atributos
 }
 
 @Injectable({ providedIn: 'root' })
@@ -57,19 +55,37 @@ export class AuthService {
   private firestore: Firestore = inject(Firestore);
 
   readonly authState$ = authState(this.auth);
-  currentUserRole: string | null = null;
+
+  // AÑADIDO: BehaviorSubject para el rol del usuario actual
+  private _currentUserRole = new BehaviorSubject<string | null>(null);
+  public readonly currentUserRole$ = this._currentUserRole.asObservable();
+
+  constructor() {
+    // Escuchar cambios en el estado de autenticación y actualizar el rol
+    this.authState$.subscribe(user => {
+      if (user) {
+        // Si hay un usuario logueado, cargar su rol
+        this.cargarRolActual().then(rol => {
+          this._currentUserRole.next(rol);
+        });
+      } else {
+        // Si no hay usuario, establecer el rol a null
+        this._currentUserRole.next(null);
+        localStorage.removeItem('userRole'); // Limpiar localStorage al desloguear
+      }
+    });
+  }
 
   getUser(): Promise<import('@angular/fire/auth').User | null> {
     return new Promise(resolve => {
       const unsubscribe = this.auth.onAuthStateChanged(user => {
         resolve(user);
-        unsubscribe(); // evita llamadas múltiples
+        unsubscribe();
       });
     });
   }
-  // 🔐 Registro
+
   async signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
-    // Crear instancia secundaria de Firebase para evitar cerrar sesión actual
     const secondaryApp = initializeApp(environment.firebase, 'SecondaryApp');
     const secondaryAuth = getAuthStandalone(secondaryApp);
 
@@ -81,13 +97,11 @@ export class AuthService {
       );
       return userCredential;
     } finally {
-      // Limpieza: cerrar sesión y eliminar app secundaria
       await secondaryAuth.signOut();
       await deleteApp(secondaryApp);
     }
   }
 
-  // 🔐 Login con carga de rol
   async logIn(email: string, password: string): Promise<UserCredential> {
     const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
     const uid = userCredential.user.uid;
@@ -97,36 +111,26 @@ export class AuthService {
 
     if (snap.exists()) {
       const data = snap.data();
-      this.currentUserRole = data['rol'];
-
-      if (this.currentUserRole) {
-        localStorage.setItem('userRole', this.currentUserRole); // ✅ corregido
-      }
+      const rol = data['rol'];
+      this._currentUserRole.next(rol); // <-- Actualiza el BehaviorSubject
+      localStorage.setItem('userRole', rol);
     }
 
     return userCredential;
   }
 
-  // 🔓 Logout
   async logOut(): Promise<void> {
-    this.currentUserRole = null;
-    localStorage.removeItem('userRole'); // ✅ borrar al salir
+    this._currentUserRole.next(null); // <-- Actualiza el BehaviorSubject al cerrar sesión
+    localStorage.removeItem('userRole');
     await signOut(this.auth);
   }
 
-
-  // 🔍 Obtener el rol actual
+  // Ahora, getUserRole() puede obtener del BehaviorSubject para ser más reactivo
+  // Aunque para una carga inicial, podrías seguir usando localStorage/la propiedad.
   getUserRole(): string | null {
-    if (this.currentUserRole) return this.currentUserRole;
-
-    const storedRole = localStorage.getItem('userRole');
-    if (storedRole) {
-      this.currentUserRole = storedRole;
-      return storedRole;
-    }
-
-    return null;
+    return this._currentUserRole.getValue(); // Obtiene el último valor emitido
   }
+
   async obtenerDatosUsuarioActual(): Promise<Usuario | null> {
     const user = this.auth.currentUser;
     if (!user) return null;
@@ -140,28 +144,22 @@ export class AuthService {
 
     return null;
   }
-  // 📧 Recuperar contraseña
+
   enviarCorreoRecuperacion(email: string): Promise<void> {
     this.auth.languageCode = 'es-419';
     return sendPasswordResetEmail(this.auth, email);
   }
 
-  // 📥 Guardar usuario en Firestore (documento principal del usuario)
-  // Omit<Usuario, 'uid'> significa que el objeto no necesita tener la propiedad 'uid'
-  // porque el 'uid' ya se pasa como un argumento separado para el path del documento.
   async guardarUsuarioEnFirestore(uid: string, usuario: Omit<Usuario, 'uid'>): Promise<void> {
     const userRef = doc(this.firestore, 'usuarios', uid);
     await setDoc(userRef, usuario);
   }
 
-
-  // 📥 Guardar una unidad en la subcolección 'unidades' de un usuario
   async guardarUnidadEnSubcoleccion(userId: string, unidad: Unidad): Promise<void> {
     const unidadesRef = collection(this.firestore, `usuarios/${userId}/unidades`);
-    await addDoc(unidadesRef, unidad); // addDoc genera un ID de documento automático
+    await addDoc(unidadesRef, unidad);
   }
 
-  // 🔍 Obtener las unidades de un usuario desde la subcolección
   async obtenerUnidadesDeUsuario(userId: string): Promise<Unidad[]> {
     const unidadesRef = collection(this.firestore, `usuarios/${userId}/unidades`);
     const q = query(unidadesRef);
@@ -169,7 +167,6 @@ export class AuthService {
     return querySnapshot.docs.map(doc => doc.data() as Unidad);
   }
 
-  // 🔍 Verificar si el correo ya existe
   async correoExiste(email: string): Promise<boolean> {
     const usuariosRef = collection(this.firestore, 'usuarios');
     const q = query(usuariosRef, where('email', '==', email));
@@ -177,7 +174,6 @@ export class AuthService {
     return !resultado.empty;
   }
 
-  // 🔍 Verificar si la cédula ya existe
   async existeCedula(cedula: string): Promise<boolean> {
     const usuariosRef = collection(this.firestore, 'usuarios');
     const q = query(usuariosRef, where('cedula', '==', cedula));
@@ -185,25 +181,32 @@ export class AuthService {
     return !querySnapshot.empty;
   }
 
-  // ✅ (Opcional) Obtener el UID actual
   getCurrentUserId(): string | null {
     return this.auth.currentUser?.uid ?? null;
   }
+
+  // Renombramos y adaptamos el método para cargar el rol y actualizar el BehaviorSubject
   async cargarRolActual(): Promise<string | null> {
     const user = this.auth.currentUser;
-    if (!user) return null;
+    if (!user) {
+      this._currentUserRole.next(null); // Asegura que el Subject esté en null si no hay usuario
+      return null;
+    }
 
     const docRef = doc(this.firestore, `usuarios/${user.uid}`);
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
       const data = snap.data();
-      this.currentUserRole = data['rol'];
-      return this.currentUserRole;
+      const rol = data['rol'];
+      this._currentUserRole.next(rol); // Actualiza el BehaviorSubject con el rol
+      return rol;
     }
 
+    this._currentUserRole.next(null); // Si el usuario no tiene datos de rol
     return null;
   }
+
   async obtenerCorreoPorCedula(cedula: string): Promise<string | null> {
     const usuariosRef = collection(this.firestore, 'usuarios');
     const q = query(usuariosRef, where('cedula', '==', cedula));

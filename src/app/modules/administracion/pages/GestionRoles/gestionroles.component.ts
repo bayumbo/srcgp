@@ -1,10 +1,9 @@
-// src/app/pages/gestionroles/gestionroles.ts
-
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { UsuariosService, Usuario } from 'src/app/core/auth/services/usuarios.service';
+import { AuthService } from 'src/app/core/auth/services/auth.service'; // <-- Importa AuthService
 
 @Component({
   selector: 'app-gestionroles',
@@ -18,8 +17,7 @@ export class GestionRolesComponent implements OnInit {
   usuariosFiltrados: Usuario[] = [];
   usuariosPaginados: Usuario[] = [];
 
-  // AÑADE 'socio' y 'recaudador' aquí
-  rolesDisponibles = ['usuario', 'admin', 'socio', 'recaudador']; // <-- MODIFICADO
+  rolesDisponibles = ['usuario', 'admin', 'socio', 'recaudador'];
   mostrarSoloActivos = false;
   mostrarToast = false;
   cargando = true;
@@ -32,12 +30,21 @@ export class GestionRolesComponent implements OnInit {
   itemsPorPagina = 15;
   totalPaginas = 0;
 
+  // Propiedad para verificar si el usuario logueado es socio
+  esSocio: boolean = false; // Se inicializa en false
+
   constructor(
     public usuariosService: UsuariosService,
-    private router: Router
+    private router: Router,
+    private authService: AuthService // <-- Inyecta AuthService
   ) {}
 
   ngOnInit(): void {
+    // Suscribirse para obtener el rol del usuario actual desde AuthService
+    this.authService.currentUserRole$.subscribe(role => { // <-- CAMBIO AQUÍ
+      this.esSocio = role === 'socio';
+    });
+
     this.usuariosService.usuarios$.subscribe(lista => {
       const listaConEstado = lista.map(usuario => ({
         ...usuario,
@@ -73,11 +80,16 @@ export class GestionRolesComponent implements OnInit {
   }
 
   onEstadoChange(event: Event, uid: string): void {
+    if (this.esSocio) {
+      event.preventDefault(); // Evita que se cambie el estado si es socio
+      return;
+    }
     const input = event.target as HTMLInputElement;
     this.cambiarEstado(uid, input.checked);
   }
 
   async cambiarEstado(uid: string, estado: boolean): Promise<void> {
+    if (this.esSocio) return;
     await this.usuariosService.actualizarEstado(uid, estado);
     this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
       usuario.uid === uid ? { ...usuario, estado } : usuario
@@ -86,8 +98,8 @@ export class GestionRolesComponent implements OnInit {
   }
 
   async guardarNuevoRol(uid: string, nuevoRol: string): Promise<void> {
+    if (this.esSocio) return;
     await this.usuariosService.actualizarRol(uid, nuevoRol);
-    // Asegurarse de que el usuario en todosLosUsuarios también tenga el nuevoRol
     this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
       usuario.uid === uid ? { ...usuario, rol: nuevoRol, nuevoRol: nuevoRol } : usuario
     );
@@ -98,12 +110,17 @@ export class GestionRolesComponent implements OnInit {
   }
 
   onToggleFiltro(event: Event): void {
+    if (this.esSocio) {
+      event.preventDefault(); // Evita que se cambie el filtro si es socio
+      return;
+    }
     const input = event.target as HTMLInputElement;
     this.mostrarSoloActivos = input.checked;
     this.buscarPorCedula();
   }
 
   buscarPorCedula(): void {
+    // La búsqueda se mantiene activa para socios
     const termino = this.cedulaBuscada.trim().toLowerCase();
     this.busquedaActiva = termino.length > 0;
 
@@ -120,20 +137,20 @@ export class GestionRolesComponent implements OnInit {
         setTimeout(() => {
           this.mostrarMensajeNoCoincidencias = false;
         }, 3000);
-        // Si no hay coincidencias, limpia la lista paginada
         this.usuariosFiltrados = [];
         this.usuariosPaginados = [];
         this.totalPaginas = 0;
         this.paginaActual = 0;
-        return; // Evita que se recarguen todos los usuarios
+        return;
       }
     } else {
-      this.mostrarMensajeNoCoincidencias = false; // Oculta el mensaje si se borra la búsqueda
+      this.mostrarMensajeNoCoincidencias = false;
       this.filtrarUsuarios(this.todosLosUsuarios);
     }
   }
 
   verPerfil(uid: string): void {
+    // El botón de ver perfil se mantiene activo para socios
     this.router.navigate(['/perfil', uid]);
   }
 
