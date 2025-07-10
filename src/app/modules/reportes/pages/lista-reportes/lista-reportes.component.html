@@ -123,6 +123,9 @@
               <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)" [disabled]="esSocio">
                 <span class="material-icons">payments</span>
               </button>
+               <button class="eliminar" (click)="eliminarReporte(reporte)">
+                <span class="material-icons">delete</span>
+              </button>
             </div>
           </td>
         </tr>

@@ -14,7 +14,7 @@ export interface NuevoRegistro {
     apellido: string;
     unidad: string;
     uid?: string;
-    fechaModificacion?: string;
+    fechaModificacion?: Date;
   }
   export interface ReporteConPagos extends NuevoRegistro {
     id: string;

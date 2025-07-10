@@ -19,7 +19,7 @@ export class ReportesService {
     const ref = collection(this.firestore, `usuarios/${uid}/reportesDiarios`);
     return addDoc(ref, {
       ...reporte,
-      fechaModificacion: new Date()
+      fechaModificacion: reporte.fechaModificacion
     });
   }
   

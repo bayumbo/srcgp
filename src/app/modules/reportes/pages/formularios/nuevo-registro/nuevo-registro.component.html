@@ -20,11 +20,22 @@
           <option *ngFor="let u of usuarios" [value]="u.nombre + ' ' + u.apellido"></option>
         </datalist>
       </div>
-
       <div class="form-group">
-        <label>Unidad</label>
-        <input type="text" [value]="usuarioSeleccionado?.unidad || ''"  />
+        <label for="unidad">Unidad:</label>
+        <select
+          id="unidad"
+          [(ngModel)]="reporte.unidad"
+          name="unidad"
+          required
+          class="select-unidad"
+        >
+          <option value="">-- Selecciona una unidad --</option>
+          <option *ngFor="let unidad of unidadesDisponibles" [value]="unidad">
+            {{ unidad }}
+          </option>
+        </select>
       </div>
+      
     </div>
 
     <!-- Administración y Minutos Base -->
@@ -57,8 +68,8 @@
       <input
         type="date"
         id="fecha"
+        [(ngModel)]="fechaInput"
         name="fecha"
-        [(ngModel)]="reporte.fechaModificacion"
         class="form-control"
         required
       />

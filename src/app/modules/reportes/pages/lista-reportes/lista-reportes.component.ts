@@ -10,7 +10,8 @@ import {
   where,
   Timestamp,
   orderBy,
-  collectionGroup
+  collectionGroup,
+  deleteDoc
 } from '@angular/fire/firestore';
 import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import { Router } from '@angular/router';
@@ -19,6 +20,7 @@ import { Pago } from 'src/app/core/interfaces/pago.interface';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { AuthService } from 'src/app/core/auth/services/auth.service'; 
+import {ref, deleteObject, Storage } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-reporte-lista',
@@ -46,8 +48,9 @@ export class ReporteListaComponent implements OnInit {
   // Paginación
   paginaActual: number = 1;
   reportesPorPagina: number = 5;
-
-
+  private storage = inject(Storage);
+  
+  
   constructor(
     private authService: AuthService // ⬅️ Agrega esto
   ) {}
@@ -246,6 +249,44 @@ export class ReporteListaComponent implements OnInit {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => doc.id);
   } 
+
+  async eliminarReporte(reporte: any) {
+      const fecha = reporte.fechaModificacion?.toDate?.().toLocaleDateString('es-EC', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }) || 'Sin fecha';
+   const confirmar = confirm(`¿Deseas eliminar el reporte de ${reporte.nombre} del ${fecha}?`);
+    if (!confirmar) return;
+
+    try {
+      const uid = reporte.uid;
+      const reporteId = reporte.id;
+
+      // 1. Eliminar subcolección pagosTotales
+      const pagosRef = collection(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}/pagosTotales`);
+      const pagosSnap = await getDocs(pagosRef);
+      for (const docPago of pagosSnap.docs) {
+        await deleteDoc(docPago.ref);
+      }
+
+      // 2. Eliminar el PDF en Storage si existe
+      if (reporte.urlPDF) {
+        const pdfRef = ref(this.storage, reporte.urlPDF);
+        await deleteObject(pdfRef);
+      }
+
+      // 3. Eliminar el documento principal del reporte
+      const reporteRef = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}`);
+      await deleteDoc(reporteRef);
+      await this.cargarTodosLosReportes();
+      alert('Reporte eliminado exitosamente');
+    } catch (error) {
+      console.error('Error al eliminar reporte:', error);
+      alert('Ocurrió un error al eliminar el reporte');
+    }
+  }
+
   /*---------------------------- PDF REPORTE EMPRESA------------------------- */
   generarReporteEmpresasPDF() {
     if (!this.empresaSeleccionada || this.errorFecha) return;
@@ -277,8 +318,15 @@ export class ReporteListaComponent implements OnInit {
       doc.text(modulo.nombre, 15, currentY);
       currentY += 6;
   
-      const fechasSet = new Set(this.reportes.map(r => r.fechaModificacion || ''));
-      const fechasArray = Array.from(fechasSet).sort();
+      const fechasSet = new Set(this.reportes.map(r => {
+      const fecha = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
+      if (fecha instanceof Date) {
+        return fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' }); // Ej: 09/07/2025
+      }
+      return typeof fecha === 'string' ? fecha : '';
+    }));
+
+const fechasArray = Array.from(fechasSet).filter(f => !!f).sort();
       const unidades = [...new Set(this.reportes.map(r => r.unidad))];
   
       let totalAsignadoModulo = 0;
@@ -288,12 +336,22 @@ export class ReporteListaComponent implements OnInit {
       const bodyAsignados = unidades.map(unidad => {
         const row: (string | number)[] = [unidad || ''];
         let total = 0;
+
         for (const fecha of fechasArray) {
-          const rep = this.reportes.find(r => r.unidad === unidad && r.fechaModificacion === fecha);
+          const rep = this.reportes.find(r => {
+            const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
+            const fechaFormateada = fechaRep instanceof Date
+              ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
+              : typeof fechaRep === 'string' ? fechaRep : '';
+
+            return r.unidad === unidad && fechaFormateada === fecha;
+          });
+
           const asignado = rep ? Number(rep[modulo.campo as keyof ReporteConPagos]) || 0 : 0;
           row.push(`$${asignado.toFixed(2)}`);
           total += asignado;
         }
+
         totalAsignadoModulo += total;
         row.push(`$${total.toFixed(2)}`);
         return row;
@@ -315,21 +373,32 @@ export class ReporteListaComponent implements OnInit {
   
       // TABLA 2: MONTOS POR COBRAR POR DÍA
       const bodyPorCobrar = unidades.map(unidad => {
-        const row: (string | number)[] = [unidad || ''];
-        let total = 0;
+      const row: (string | number)[] = [unidad || ''];
+      let total = 0;
+
         for (const fecha of fechasArray) {
-          const rep = this.reportes.find(r => r.unidad === unidad && r.fechaModificacion === fecha);
+          const rep = this.reportes.find(r => {
+            const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
+            const fechaFormateada = fechaRep instanceof Date
+              ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
+              : typeof fechaRep === 'string' ? fechaRep : '';
+
+            return r.unidad === unidad && fechaFormateada === fecha;
+          });
+
           const asignado = rep ? Number(rep[modulo.campo as keyof ReporteConPagos]) || 0 : 0;
           const pagado = rep ? Number(rep[modulo.pagado as keyof ReporteConPagos]) || 0 : 0;
           const saldo = asignado - pagado;
+
           row.push(`$${saldo.toFixed(2)}`);
           total += saldo;
         }
+
         totalSaldoModulo += total;
         row.push(`$${total.toFixed(2)}`);
         return row;
       });
-  
+
       autoTable(doc, {
         startY: currentY,
         head: [['UNIDAD', ...fechasArray, 'TOTAL']],

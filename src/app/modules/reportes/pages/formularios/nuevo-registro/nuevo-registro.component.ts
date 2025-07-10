@@ -28,15 +28,17 @@ export class NuevoRegistroComponent {
     apellido:'',
     unidad: '',
     uid: '',
-    fechaModificacion: new Date().toISOString().split('T')[0],
+    fechaModificacion: new Date(),
+    
   };
 
-  usuarios: { uid: string; nombre: string; apellido: string; unidad: string }[] = [];
+  usuarios: { uid: string; nombre: string; apellido: string; unidad: string[]}[] = [];
   nombreBuscado: string = '';
-  usuarioSeleccionado: any = null;
+  usuarioSeleccionado: { uid: string; nombre: string; apellido: string; unidad: string[] } | null = null;
+  unidadesDisponibles: string[] = [];
   resultado: string | null = null;
   id: string | null = null;
-
+  fechaInput: string = '';
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private firestore = inject(Firestore);
@@ -44,29 +46,41 @@ export class NuevoRegistroComponent {
   constructor(private reportesService: ReportesService) {
     this.cargarUsuarios();
     this.cargarSiEsEdicion();
+    this.fechaInput = this.reporte.fechaModificacion instanceof Date
+  ? this.reporte.fechaModificacion.toISOString().split('T')[0]
+  : '';
   }
 
   cancelar(): void {
     this.router.navigate(['/reportes/lista-reportes']);
   }
 
-  async cargarUsuarios() {
-    const ref = collection(this.firestore, 'usuarios');
-    const snapshot = await getDocs(ref);
-    this.usuarios = snapshot.docs.map(doc => ({
-      uid: doc.id,
-      nombre: doc.data()['nombres'],
-      apellido: doc.data()['apellidos'],
-      unidad: doc.data()['unidad']
-    }));
-  }
+ async cargarUsuarios() {
+  const ref = collection(this.firestore, 'usuarios');
+  const snapshot = await getDocs(ref);
+
+  const usuariosConUnidades = await Promise.all(snapshot.docs.map(async docSnap => {
+    const uid = docSnap.id;
+    const nombre = docSnap.data()['nombres'];
+    const apellido = docSnap.data()['apellidos'];
+
+    const unidadesRef = collection(this.firestore, `usuarios/${uid}/unidades`);
+    const unidadesSnap = await getDocs(unidadesRef);
+    const unidad = unidadesSnap.docs.map(u => u.data()['nombre']) || [];
+
+    return { uid, nombre, apellido, unidad };
+  }));
+
+  this.usuarios = usuariosConUnidades;
+}
+
 
     seleccionarUsuario(uid: string) {
     const usuario = this.usuarios.find(u => u.uid === uid);
     if (usuario) {
       this.reporte.nombre = usuario.nombre;
       this.reporte.apellido = usuario.apellido;
-      this.reporte.unidad = usuario.unidad;
+      this.reporte.unidad = '';
       this.reporte.uid = usuario.uid;
     }
   }
@@ -89,30 +103,42 @@ export class NuevoRegistroComponent {
     }
   }
 
-  actualizarUsuarioSeleccionado() {
-    // buscar por nombre + apellido
-    this.usuarioSeleccionado = this.usuarios.find(u =>
-      `${u.nombre} ${u.apellido}`.toLowerCase() === this.nombreBuscado.toLowerCase()
-    ) || null;
+actualizarUsuarioSeleccionado() {
+  this.usuarioSeleccionado = this.usuarios.find(u =>
+    `${u.nombre} ${u.apellido}`.toLowerCase() === this.nombreBuscado.toLowerCase()
+  ) || null;
 
-    if (this.usuarioSeleccionado) {
-      this.reporte.uid = this.usuarioSeleccionado.uid;
-      this.reporte.nombre = this.usuarioSeleccionado.nombre;
-      this.reporte.apellido = this.usuarioSeleccionado.apellido;
-      this.reporte.unidad = this.usuarioSeleccionado.unidad;
-    } else {
-      this.reporte.uid = '';
-      this.reporte.nombre = '';
-      this.reporte.apellido = '';
-      this.reporte.unidad = '';
-    }
+  if (this.usuarioSeleccionado) {
+    this.reporte.uid = this.usuarioSeleccionado.uid;
+    this.reporte.nombre = this.usuarioSeleccionado.nombre;
+    this.reporte.apellido = this.usuarioSeleccionado.apellido;
+    this.unidadesDisponibles = this.usuarioSeleccionado.unidad;
+    this.reporte.unidad = ''; // se obliga a seleccionar manualmente
+  } else {
+    this.reporte.uid = '';
+    this.reporte.nombre = '';
+    this.reporte.apellido = '';
+    this.reporte.unidad = '';
+    this.unidadesDisponibles = [];
   }
+}
+
   async enviar() {
     if (!this.reporte.uid || !this.reporte.nombre || !this.reporte.unidad) {
       alert('⚠️ Por favor selecciona un usuario válido.');
       return;
     }
-  
+    
+    if (this.fechaInput) {
+     const partes = this.fechaInput.split('-'); 
+     console.log('📅 Fecha seleccionada:', this.fechaInput);
+    this.reporte.fechaModificacion = new Date(
+      Number(partes[0]),
+      Number(partes[1]) - 1,
+      Number(partes[2]),
+      12, 0, 0 // hora fija: medio día para evitar desfases por zona horaria
+      )};
+   
     try {
       if (this.id) {
         await this.reportesService.actualizarReporteDiario(this.reporte.uid, this.id, this.reporte);
