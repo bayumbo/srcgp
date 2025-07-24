@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { UsuariosService, Usuario } from 'src/app/core/auth/services/usuarios.service';
 import { AuthService } from 'src/app/core/auth/services/auth.service'; // <-- Importa AuthService
-
+import { Functions, httpsCallable } from '@angular/fire/functions';
 @Component({
   selector: 'app-gestionroles',
   standalone: true,
@@ -36,7 +36,8 @@ export class GestionRolesComponent implements OnInit {
   constructor(
     public usuariosService: UsuariosService,
     private router: Router,
-    private authService: AuthService // <-- Inyecta AuthService
+    private authService: AuthService, // <-- Inyecta AuthService
+    private functions: Functions 
   ) {}
 
   ngOnInit(): void {
@@ -98,16 +99,29 @@ export class GestionRolesComponent implements OnInit {
   }
 
   async guardarNuevoRol(uid: string, nuevoRol: string): Promise<void> {
-    if (this.esSocio) return;
-    await this.usuariosService.actualizarRol(uid, nuevoRol);
-    this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
-      usuario.uid === uid ? { ...usuario, rol: nuevoRol, nuevoRol: nuevoRol } : usuario
-    );
-    this.filtrarUsuarios(this.todosLosUsuarios);
+  if (this.esSocio) return;
 
-    this.mostrarToast = true;
-    setTimeout(() => (this.mostrarToast = false), 3000);
+  await this.usuariosService.actualizarRol(uid, nuevoRol);
+
+  // Actualiza la lista visualmente
+  this.todosLosUsuarios = this.todosLosUsuarios.map(usuario =>
+    usuario.uid === uid ? { ...usuario, rol: nuevoRol, nuevoRol: nuevoRol } : usuario
+  );
+  this.filtrarUsuarios(this.todosLosUsuarios);
+
+  // ⬇️ LLAMAR sincronización automática del claim
+  try {
+    const asignarFn = httpsCallable(this.functions, 'asignarRolDesdeFirestore');
+    await asignarFn({ uid });
+    console.log(`✅ Claim actualizado para UID: ${uid}`);
+  } catch (error) {
+    console.error('❌ Error al sincronizar claim:', error);
+    // No detiene el proceso visual si falla
   }
+
+  this.mostrarToast = true;
+  setTimeout(() => (this.mostrarToast = false), 3000);
+}
 
   onToggleFiltro(event: Event): void {
     if (this.esSocio) {

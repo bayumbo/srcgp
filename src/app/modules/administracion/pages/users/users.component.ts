@@ -17,12 +17,14 @@ import {
   getFirestore,
   orderBy,
   query,
-  setDoc
+  setDoc,
+  Firestore, 
+  deleteDoc
 } from '@angular/fire/firestore';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService, Usuario, Unidad } from 'src/app/core/auth/services/auth.service'; // Importar 'Unidad'
 import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
-
+import { Functions, httpsCallable } from '@angular/fire/functions';
 @Component({
   standalone: true,
   selector: 'app-perfil',
@@ -39,7 +41,7 @@ export class PerfilComponent implements OnInit {
   unidades: Unidad[] = []; // CAMBIO CLAVE: Ahora es un array de objetos Unidad
   cedula: string = '';
   empresa: string = '';
-
+  uidActual: string = '';
   uid: string | undefined;
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
@@ -62,10 +64,12 @@ export class PerfilComponent implements OnInit {
   constructor(
     private router: Router,
     private authService: AuthService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private functions: Functions
   ) {}
 
   async ngOnInit(): Promise<void> {
+    
     const uidParam = this.route.snapshot.paramMap.get('uid');
     const auth = getAuth();
 
@@ -91,6 +95,7 @@ export class PerfilComponent implements OnInit {
         await this.cargarDatosUsuario();
         await this.obtenerReportesUsuario();
         await this.cargarPagosUsuario();
+        await this.authService.getCurrentUser()?.getIdToken(true); // Forzar recarga
         const rol = await this.authService.cargarRolActual();
         this.esAdmin = rol === 'admin';
       }
@@ -312,6 +317,30 @@ export class PerfilComponent implements OnInit {
     this.actualizarPagosPaginados();
   }
 
+async eliminarUsuario(): Promise<void> {
+  const confirmar = confirm('¿Eliminar este usuario completamente (Firestore + Auth)?');
+  if (!confirmar || !this.uid) return;
+
+  try {
+    // 🔁 Forzar recarga del token para asegurar que el claim esté actualizado
+    const user = getAuth().currentUser;
+    if (user) {
+      await user.getIdToken(true);
+      const tokenResult = await user.getIdTokenResult();
+      console.log('🔄 Token recargado antes de eliminar:', tokenResult.claims);
+    }
+
+    const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');
+    await eliminarFn({ uid: this.uid });
+
+    alert('✅ Usuario eliminado correctamente.');
+    this.router.navigate(['/admin/gestionroles']);
+  } catch (error) {
+    console.error('❌ Error al eliminar usuario:', error);
+    alert('❌ No se pudo eliminar completamente el usuario.');
+  }
+}
+
   actualizarPagosPaginados() {
     const inicio = (this.paginaActualPagos - 1) * this.pagosPorPagina;
     const fin = inicio + this.pagosPorPagina;
@@ -333,4 +362,5 @@ export class PerfilComponent implements OnInit {
   volverAlMenu(): void {
     this.router.navigate(['/menu']);
   }
+  
 }

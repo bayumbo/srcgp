@@ -4,6 +4,8 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router } from '@angular/router';
 
 import { AuthService } from 'src/app/core/auth/services/auth.service';
+import { httpsCallable } from 'firebase/functions';
+import { Functions } from '@angular/fire/functions';
 
 @Component({
   standalone: true,
@@ -16,6 +18,7 @@ export class LoginComponent {
   private authService = inject(AuthService);
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private functions = inject(Functions);
 
   form: FormGroup = this.fb.group({
     cedula: ['', [Validators.required, Validators.pattern(/^\d{10}$/)]],
@@ -47,6 +50,16 @@ export class LoginComponent {
 
       // Login y carga de rol en paralelo
       await this.authService.logIn(email, password);
+      const user = await this.authService.getCurrentUser();
+      if (!user) {
+        console.warn('⚠️ No hay usuario autenticado.');
+        return;
+      }
+
+        if (user) {
+        const tokenResult = await user.getIdTokenResult(true); // ← Fuerza la recarga del token
+        console.log('✅ Claims actualizados:', tokenResult.claims);
+      }
       const rol = await this.authService.cargarRolActual();
 
       // Redirección según rol

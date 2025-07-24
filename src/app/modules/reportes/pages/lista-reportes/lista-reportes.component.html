@@ -104,7 +104,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let reporte of reportesPaginados">
+        <tr *ngFor="let reporte of reportes">
           <td data-label="Nombre">{{ reporte.nombre + ' ' + reporte.apellido }}</td>
           <td data-label="Unidad">{{ reporte.unidad }}</td>
           <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
@@ -132,16 +132,14 @@
       </tbody>
     </table>
 
-    <div class="paginacion" *ngIf="totalPaginas > 1">
-      <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual === 1">← Anterior</button>
-      <button
-        *ngFor="let pagina of [].constructor(totalPaginas); let i = index"
-        (click)="cambiarPagina(i + 1)"
-        [class.activa]="paginaActual === i + 1"
-      >
-        {{ i + 1 }}
+    <div class="paginacion">
+      <button (click)="cargarTodosLosReportes('anterior')" [disabled]="paginaActual <= 1">
+        ← Anterior
       </button>
-      <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">Siguiente →</button>
+      <span>Página {{ paginaActual }}</span>
+      <button (click)="cargarTodosLosReportes('siguiente')" [disabled]="!hayMasReportes">
+        Siguiente →
+      </button>
     </div>
 
     <!-- Botones inferiores -->

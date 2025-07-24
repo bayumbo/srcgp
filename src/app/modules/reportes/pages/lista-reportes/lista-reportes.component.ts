@@ -11,7 +11,11 @@ import {
   Timestamp,
   orderBy,
   collectionGroup,
-  deleteDoc
+  deleteDoc,
+  startAfter,
+  limit,
+  startAt,
+  getDoc
 } from '@angular/fire/firestore';
 import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import { Router } from '@angular/router';
@@ -27,14 +31,14 @@ import {ref, deleteObject, Storage } from '@angular/fire/storage';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './lista-reportes.component.html',
-  styleUrls: ['./lista-reportes.component.scss']
+  styleUrls: ['./lista-reportes.component.scss'],
+  
 })
 export class ReporteListaComponent implements OnInit {
 
   esSocio: boolean = false;
   reportes: ReporteConPagos[] = [];
   cargando: boolean = true;
-  listaReportes: any[] = [];
   mostrarFiltros = false;
   fechaPersonalizada: string = '';
 
@@ -49,28 +53,19 @@ export class ReporteListaComponent implements OnInit {
   paginaActual: number = 1;
   reportesPorPagina: number = 5;
   private storage = inject(Storage);
-  
+  hayMasReportes: boolean = true;
+  private cacheUsuarios = new Map<string, any>();
   
   constructor(
     private authService: AuthService // ⬅️ Agrega esto
+    
   ) {}
 
-  get totalPaginas(): number {
-    return Math.ceil(this.reportes.length / this.reportesPorPagina);
-  }
 
-  get reportesPaginados(): ReporteConPagos[] {
-    const inicio = (this.paginaActual - 1) * this.reportesPorPagina;
-    return this.reportes.slice(inicio, inicio + this.reportesPorPagina);
-  }
+  
 
   private firestore = inject(Firestore);
   private router = inject(Router);
-
-  cambiarPagina(pagina: number) {
-    if (pagina >= 1 && pagina <= this.totalPaginas) {
-      this.paginaActual = pagina;
-    }}
 
   async ngOnInit(): Promise<void> {
   this.authService.currentUserRole$.subscribe(role => {
@@ -122,58 +117,119 @@ export class ReporteListaComponent implements OnInit {
 
 
 
-  async cargarTodosLosReportes() {
-    this.cargando = true;
-    try {
-      const ref = query(
-        collectionGroup(this.firestore, 'reportesDiarios'),
-        orderBy('fechaModificacion', 'desc')
-      );
-      const snapshot = await getDocs(ref);
-      const tempReportes = [];
 
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data() as NuevoRegistro;
-        const id = docSnap.id;
-        const pathParts = docSnap.ref.path.split('/');
-        const uid = pathParts[1];
+cursorStack: any[] = []; 
+ultimaFechaCursor: any = null; 
 
-        const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
-        const pagosSnap = await getDocs(pagosRef);
 
-        let minutosPagados = 0;
-        let adminPagada = 0;
-        let minBasePagados = 0;
-        let multasPagadas = 0;
+async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') {
+  this.cargando = true;
 
-        pagosSnap.forEach(pagoDoc => {
-          const pago = pagoDoc.data();
-          const detalles = pago['detalles'] ?? {};
+  try {
+    let baseQuery = query(
+      collectionGroup(this.firestore, 'reportesDiarios'),
+      orderBy('fechaModificacion', 'desc')
+    );
 
-          minutosPagados += detalles.minutosAtraso || 0;
-          adminPagada += detalles.administracion || 0;
-          minBasePagados += detalles.minutosBase || 0;
-          multasPagadas += detalles.multas || 0;
-        });
-
-        tempReportes.push({
-          ...data,
-          id,
-          uid,
-          minutosPagados,
-          adminPagada,
-          minBasePagados,
-          multasPagadas
-        });
-      }
-
-      this.reportes = tempReportes;
-    } catch (error) {
-      console.error('Error al cargar reportes:', error);
-    } finally {
-      this.cargando = false;
+    if (direccion === 'siguiente' && this.ultimaFechaCursor) {
+      baseQuery = query(baseQuery, startAfter(this.ultimaFechaCursor), limit(this.reportesPorPagina));
+    } else if (direccion === 'anterior' && this.cursorStack.length >= 2) {
+      this.cursorStack.pop();
+      const anteriorDoc = this.cursorStack[this.cursorStack.length - 1];
+      baseQuery = query(baseQuery, startAt(anteriorDoc), limit(this.reportesPorPagina));
+      this.ultimaFechaCursor = anteriorDoc;
+      this.paginaActual--;
+    } else {
+      baseQuery = query(baseQuery, limit(this.reportesPorPagina));
     }
+
+    const snapshot = await getDocs(baseQuery);
+    if (snapshot.empty) {
+      this.hayMasReportes = false;
+      this.cargando = false;
+      return;
+    }
+
+    const tempReportes: ReporteConPagos[] = [];
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data() as NuevoRegistro;
+      const id = docSnap.id;
+      const uid = docSnap.ref.parent.parent?.id ?? '';
+
+      // ✅ Obtener unidad directamente desde el campo del reporte
+      const unidad = data.unidad ?? '';
+
+      // Obtener datos del usuario
+      const userRef = doc(this.firestore, `usuarios/${uid}`);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : {};
+
+      // Cargar pagos
+      const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
+      const pagosSnap = await getDocs(pagosRef);
+
+      let minutosPagados = 0;
+      let adminPagada = 0;
+      let minBasePagados = 0;
+      let multasPagadas = 0;
+
+      pagosSnap.forEach(pagoDoc => {
+        const detalles = pagoDoc.data()['detalles'] ?? {};
+        minutosPagados += detalles.minutosAtraso || 0;
+        adminPagada += detalles.administracion || 0;
+        minBasePagados += detalles.minutosBase || 0;
+        multasPagadas += detalles.multas || 0;
+      });
+
+      const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
+
+      // 🧾 Log de verificación
+      console.log(`🔍 Reporte ID: ${id} | UID: ${uid} | Unidad: ${unidad}`);
+
+      tempReportes.push({
+        id,
+        uid,
+        unidad,
+        nombre: userData['nombres'] ?? '',
+        apellido: userData['apellidos'] ?? '',
+        minutosAtraso: data.minutosAtraso ?? 0,
+        administracion: data.administracion ?? 0,
+        minutosBase: data.minutosBase ?? 0,
+        multas: data.multas ?? 0,
+        minutosPagados,
+        adminPagada,
+        minBasePagados,
+        multasPagadas,
+        fechaModificacion
+      });
+    }
+
+    const firstDoc = snapshot.docs[0];
+    const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+    if (direccion === 'siguiente') {
+      if (this.cursorStack.length > 0) this.paginaActual++;
+      this.cursorStack.push(firstDoc);
+      this.ultimaFechaCursor = lastDoc;
+    } else if (direccion !== 'anterior') {
+      this.cursorStack = [firstDoc];
+      this.ultimaFechaCursor = lastDoc;
+      this.paginaActual = 1;
+    }
+
+    console.log('🧾 Página', this.paginaActual, tempReportes.map(r => r.nombre));
+
+    this.reportes = tempReportes;
+    this.hayMasReportes = snapshot.docs.length === this.reportesPorPagina;
+
+  } catch (error) {
+    console.error('❌ Error en paginación:', error);
+  } finally {
+    this.cargando = false;
   }
+}
+
 
   async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
     this.cargando = true;

@@ -14,7 +14,7 @@ import {
 } from '@angular/fire/firestore';
 import { BehaviorSubject } from 'rxjs'; // Necesario para BehaviorSubject
 import { AuthService } from './auth.service'; // <-- Importa AuthService
-
+import { Functions, httpsCallable } from '@angular/fire/functions';
 export interface Usuario {
   uid: string;
   nombres: string;
@@ -43,7 +43,7 @@ export class UsuariosService {
 
   public sinMasUsuarios: boolean = false;
 
-  constructor(private firestore: Firestore, private authService: AuthService) { // <-- Inyecta AuthService
+  constructor(private firestore: Firestore, private authService: AuthService, private functions: Functions) { // <-- Inyecta AuthService
     // No necesitamos lógica de rol aquí. El componente directamente se suscribirá a AuthService.
   }
 
@@ -114,6 +114,12 @@ export class UsuariosService {
   async actualizarRol(uid: string, nuevoRol: string): Promise<void> {
     const ref = doc(this.firestore, 'usuarios', uid);
     await updateDoc(ref, { rol: nuevoRol });
+  }
+
+  async eliminarUsuario(uid: string): Promise<any> {
+    const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');
+    const result = await eliminarFn({ uid });
+    return result.data; // aquí puedes retornar true, mensaje, etc.
   }
 
   async actualizarEstado(uid: string, estado: boolean): Promise<void> {

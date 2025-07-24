@@ -24,7 +24,7 @@ import {
 import { BehaviorSubject } from 'rxjs'; // <-- Importar BehaviorSubject
 
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth as getAuthStandalone } from 'firebase/auth';
+import { getAuth, getAuth as getAuthStandalone, User } from 'firebase/auth';
 import { environment } from 'src/environments/environment';
 
 export interface Credential {
@@ -103,17 +103,25 @@ export class AuthService {
     }
   }
 
-  async logIn(email: string, password: string): Promise<UserCredential> {
+    async logIn(email: string, password: string): Promise<UserCredential> {
     const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
-    const uid = userCredential.user.uid;
+    const user = userCredential.user;
 
+    // 🔄 Forzar recarga del token para obtener los custom claims actualizados
+    await user.getIdToken(true);
+    const token = await user.getIdTokenResult();
+    const role = token.claims['role'] as string | null;
+    this._currentUserRole.next(role);
+    localStorage.setItem('userRole', role ?? '');
+
+    const uid = user.uid;
     const docRef = doc(this.firestore, `usuarios/${uid}`);
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
       const data = snap.data();
       const rol = data['rol'];
-      this._currentUserRole.next(rol); // <-- Actualiza el BehaviorSubject
+      this._currentUserRole.next(rol);
       localStorage.setItem('userRole', rol);
     }
 
@@ -184,6 +192,10 @@ export class AuthService {
 
   getCurrentUserId(): string | null {
     return this.auth.currentUser?.uid ?? null;
+  }
+
+  getCurrentUser() {
+  return this.auth.currentUser;
   }
 
   // Renombramos y adaptamos el método para cargar el rol y actualizar el BehaviorSubject

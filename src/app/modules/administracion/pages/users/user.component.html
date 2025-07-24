@@ -111,8 +111,15 @@
         >
           <span class="material-icons">arrow_back</span> Volver al menú
         </button>
+        <div class="form-actions" >
+          <button  class="btn-eliminar" *ngIf="esAdmin" (click)="eliminarUsuario()">
+            <span class="material-icons">delete</span> Eliminar usuario
+          </button>
+        </div>
       </div>
     </form>
+
+      
   </div>
 
   <div class="perfil-derecho">
