@@ -37,6 +37,8 @@ import {ref, deleteObject, Storage } from '@angular/fire/storage';
 export class ReporteListaComponent implements OnInit {
 
   esSocio: boolean = false;
+  modoActual: 'todos' | 'filtrado' = 'todos'; // 👈 para saber si estás en modo paginado o con filtro
+
   reportes: ReporteConPagos[] = [];
   cargando: boolean = true;
   mostrarFiltros = false;
@@ -232,72 +234,86 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
 
 
   async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
-    this.cargando = true;
-    try {
-      const uidsValidos = this.empresaSeleccionada
-        ? await this.obtenerUIDsPorEmpresa(this.empresaSeleccionada)
-        : null;
-  
-      const start = Timestamp.fromDate(fechaInicio);
-      const end = Timestamp.fromDate(new Date(fechaFin.setHours(23, 59, 59, 999)));
-  
-      const ref = query(
-        collectionGroup(this.firestore, 'reportesDiarios'),
-        where('fechaModificacion', '>=', start),
-        where('fechaModificacion', '<=', end),
-        orderBy('fechaModificacion', 'desc')
-      );
-  
-      const snapshot = await getDocs(ref);
-      const tempReportes: ReporteConPagos[] = [];
-  
-      console.log('UIDs válidos para empresa:', uidsValidos);
-  
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data() as NuevoRegistro;
-        const id = docSnap.id;
-        const pathParts = docSnap.ref.path.split('/');
-        const uid = pathParts[1];
-  
-        if (uidsValidos && !uidsValidos.includes(uid)) continue;
-  
-        const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
-        const pagosSnap = await getDocs(pagosRef);
-  
-        let minutosPagados = 0;
-        let adminPagada = 0;
-        let minBasePagados = 0;
-        let multasPagadas = 0;
-  
-        pagosSnap.forEach(pagoDoc => {
-          const pago = pagoDoc.data();
-          const detalles = pago['detalles'] ?? {};
-          minutosPagados += detalles.minutosAtraso || 0;
-          adminPagada += detalles.administracion || 0;
-          minBasePagados += detalles.minutosBase || 0;
-          multasPagadas += detalles.multas || 0;
-        });
-  
-        tempReportes.push({
-          ...data,
-          id,
-          uid,
-          minutosPagados,
-          adminPagada,
-          minBasePagados,
-          multasPagadas
-        });
-      }
-  
-      this.reportes = tempReportes;
-      this.paginaActual = 1;
-  
-    } catch (error) {
-      console.error('Error al consultar por rango:', error);
-    } finally {
-      this.cargando = false;
+  this.cargando = true;
+  this.cursorStack = [];
+  this.ultimaFechaCursor = null;
+  this.paginaActual = 1;
+  this.hayMasReportes = false;
+  try {
+    const uidsValidos = this.empresaSeleccionada
+      ? await this.obtenerUIDsPorEmpresa(this.empresaSeleccionada)
+      : null;
+
+    const start = Timestamp.fromDate(fechaInicio);
+    const end = Timestamp.fromDate(new Date(fechaFin.setHours(23, 59, 59, 999)));
+
+    const ref = query(
+      collectionGroup(this.firestore, 'reportesDiarios'),
+      where('fechaModificacion', '>=', start),
+      where('fechaModificacion', '<=', end),
+      orderBy('fechaModificacion', 'desc')
+    );
+
+    const snapshot = await getDocs(ref);
+    const tempReportes: ReporteConPagos[] = [];
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data() as NuevoRegistro;
+      const id = docSnap.id;
+      const pathParts = docSnap.ref.path.split('/');
+      const uid = pathParts[1];
+
+      if (uidsValidos && !uidsValidos.includes(uid)) continue;
+
+      // Obtener datos del usuario
+      const userRef = doc(this.firestore, `usuarios/${uid}`);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : {};
+
+      // Obtener pagos
+      const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
+      const pagosSnap = await getDocs(pagosRef);
+
+      let minutosPagados = 0;
+      let adminPagada = 0;
+      let minBasePagados = 0;
+      let multasPagadas = 0;
+
+      pagosSnap.forEach(pagoDoc => {
+        const pago = pagoDoc.data();
+        const detalles = pago['detalles'] ?? {};
+        minutosPagados += detalles.minutosAtraso || 0;
+        adminPagada += detalles.administracion || 0;
+        minBasePagados += detalles.minutosBase || 0;
+        multasPagadas += detalles.multas || 0;
+      });
+
+      const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
+
+      tempReportes.push({
+        ...data,
+        id,
+        uid,
+        nombre: userData['nombres'] ?? '',
+        apellido: userData['apellidos'] ?? '',
+        unidad: data.unidad ?? userData['unidad'] ?? '',
+        minutosPagados,
+        adminPagada,
+        minBasePagados,
+        multasPagadas,
+        fechaModificacion
+      });
     }
+
+    this.reportes = tempReportes;
+    this.paginaActual = 1;
+
+  } catch (error) {
+    console.error('Error al consultar por rango:', error);
+  } finally {
+    this.cargando = false;
   }
+}
   
   async obtenerUIDsPorEmpresa(nombreEmpresa: string): Promise<string[]> {
     const usuariosRef = collection(this.firestore, 'usuarios');
@@ -345,152 +361,160 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
 
   /*---------------------------- PDF REPORTE EMPRESA------------------------- */
   generarReporteEmpresasPDF() {
-    if (!this.empresaSeleccionada || this.errorFecha) return;
-  
-    const inicio = new Date(this.fechaInicio);
-    const fin = new Date(this.fechaFin);
-    const fechaEmision = new Date();
-  
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`Reporte General ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(`Fecha de inicio: ${inicio.toLocaleDateString()}`, 15, 30);
-    doc.text(`Fecha de finalización: ${fin.toLocaleDateString()}`, 15, 36);
-    doc.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString()}`, 15, 42);
-  
-    const modulos = [
-      { nombre: 'Minutos Asignados', campo: 'minutosAtraso', pagado: 'minutosPagados' },
-      { nombre: 'Administración Asignada', campo: 'administracion', pagado: 'adminPagada' },
-      { nombre: 'Minutos Base Asignados', campo: 'minutosBase', pagado: 'minBasePagados' },
-      { nombre: 'Multas Asignadas', campo: 'multas', pagado: 'multasPagadas' }
-    ];
-  
-    let currentY = 50;
-    const resumenFinal: [string, number, number, number][] = [];
-  
-    for (const modulo of modulos) {
-      doc.setFontSize(14);
-      doc.text(modulo.nombre, 15, currentY);
-      currentY += 6;
-  
-      const fechasSet = new Set(this.reportes.map(r => {
-      const fecha = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
-      if (fecha instanceof Date) {
-        return fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' }); // Ej: 09/07/2025
-      }
-      return typeof fecha === 'string' ? fecha : '';
+  if (!this.empresaSeleccionada || this.errorFecha) return;
+
+  const inicio = new Date(this.fechaInicio);
+  const fin = new Date(this.fechaFin);
+  const fechaEmision = new Date();
+
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text(`Reporte General ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
+  doc.text(`Fecha de finalización: ${fin.toLocaleDateString('es-EC')}`, 15, 36);
+  doc.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString('es-EC')}`, 15, 42);
+
+  // ✅ Generar fechas ordenadas cronológicamente
+  const fechasArray: string[] = [];
+  let actual = new Date(inicio);
+  while (actual <= fin) {
+    fechasArray.push(actual.toLocaleDateString('es-EC', {
+       day: '2-digit'
     }));
+    actual.setDate(actual.getDate() + 1);
+  }
 
-const fechasArray = Array.from(fechasSet).filter(f => !!f).sort();
-      const unidades = [...new Set(this.reportes.map(r => r.unidad))];
-  
-      let totalAsignadoModulo = 0;
-      let totalSaldoModulo = 0;
-  
-      // TABLA 1: MONTOS ASIGNADOS POR DÍA
-      const bodyAsignados = unidades.map(unidad => {
-        const row: (string | number)[] = [unidad || ''];
-        let total = 0;
+  const unidades = [...new Set(this.reportes.map(r => r.unidad))];
+  const modulos = [
+    { nombre: 'Minutos Asignados', campo: 'minutosAtraso', pagado: 'minutosPagados' },
+    { nombre: 'Administración Asignada', campo: 'administracion', pagado: 'adminPagada' },
+    { nombre: 'Minutos Base Asignados', campo: 'minutosBase', pagado: 'minBasePagados' },
+    { nombre: 'Multas Asignadas', campo: 'multas', pagado: 'multasPagadas' }
+  ];
 
-        for (const fecha of fechasArray) {
-          const rep = this.reportes.find(r => {
-            const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
-            const fechaFormateada = fechaRep instanceof Date
-              ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
-              : typeof fechaRep === 'string' ? fechaRep : '';
+  let currentY = 50;
+  const resumenFinal: [string, number, number, number][] = [];
 
-            return r.unidad === unidad && fechaFormateada === fecha;
-          });
+  for (const modulo of modulos) {
+    doc.setFontSize(14);
+    doc.text(modulo.nombre, 15, currentY);
+    currentY += 6;
 
-          const asignado = rep ? Number(rep[modulo.campo as keyof ReporteConPagos]) || 0 : 0;
-          row.push(`$${asignado.toFixed(2)}`);
-          total += asignado;
-        }
+    let totalAsignadoModulo = 0;
+    let totalSaldoModulo = 0;
 
-        totalAsignadoModulo += total;
-        row.push(`$${total.toFixed(2)}`);
-        return row;
-      });
-  
-      autoTable(doc, {
-        startY: currentY,
-        head: [['UNIDAD', ...fechasArray, 'TOTAL']],
-        body: bodyAsignados,
-        styles: { fontSize: 8 },
-        margin: { left: 15, right: 15 },
-        didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
-      });
-  
-      // TÍTULO: MONTOS ADEUDADOS
-      doc.setFontSize(12);
-      doc.text(`${modulo.nombre.replace('Asignados', 'Adeudados')}`, 15, currentY);
-      currentY += 6;
-  
-      // TABLA 2: MONTOS POR COBRAR POR DÍA
-      const bodyPorCobrar = unidades.map(unidad => {
+    // ✅ TABLA 1: ASIGNADOS
+    const bodyAsignados = unidades.map(unidad => {
       const row: (string | number)[] = [unidad || ''];
       let total = 0;
 
-        for (const fecha of fechasArray) {
-          const rep = this.reportes.find(r => {
-            const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
-            const fechaFormateada = fechaRep instanceof Date
-              ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
-              : typeof fechaRep === 'string' ? fechaRep : '';
+      for (const fecha of fechasArray) {
+        const registros = this.reportes.filter(r => {
+          const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
+          const fechaFormateada = fechaRep instanceof Date
+            ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
+            : typeof fechaRep === 'string' ? fechaRep : '';
 
-            return r.unidad === unidad && fechaFormateada === fecha;
-          });
+          return r.unidad === unidad && fechaFormateada === fecha;
+        });
 
-          const asignado = rep ? Number(rep[modulo.campo as keyof ReporteConPagos]) || 0 : 0;
-          const pagado = rep ? Number(rep[modulo.pagado as keyof ReporteConPagos]) || 0 : 0;
-          const saldo = asignado - pagado;
+        const suma = registros.reduce((acc, r) => acc + (Number(r[modulo.campo as keyof ReporteConPagos]) || 0), 0);
+        row.push(`$${Math.round(2)}`);
 
-          row.push(`$${saldo.toFixed(2)}`);
-          total += saldo;
-        }
+        total += suma;
+      }
 
-        totalSaldoModulo += total;
-        row.push(`$${total.toFixed(2)}`);
-        return row;
-      });
+      totalAsignadoModulo += total;
+      row.push(`$${Math.round(2)}`);
 
-      autoTable(doc, {
-        startY: currentY,
-        head: [['UNIDAD', ...fechasArray, 'TOTAL']],
-        body: bodyPorCobrar,
-        styles: { fontSize: 8 },
-        margin: { left: 15, right: 15 },
-        didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
-      });
-  
-      resumenFinal.push([modulo.nombre, totalAsignadoModulo, totalSaldoModulo, totalAsignadoModulo - totalSaldoModulo]);
-    }
-  
-    // RESUMEN FINAL POR MÓDULO
-    doc.setFontSize(14);
-    doc.text('Resumen Final por Módulo', 15, currentY);
-    currentY += 6;
-  
+      return row;
+    });
+
     autoTable(doc, {
       startY: currentY,
-      head: [['MÓDULO', 'ASIGNADO TOTAL', 'SALDO TOTAL', 'PAGADO TOTAL']],
-      body: resumenFinal.map(([nombre, asignado, saldo, pagado]) => [
-        nombre,
-        `$${asignado.toFixed(2)}`,
-        `$${saldo.toFixed(2)}`,
-        `$${pagado.toFixed(2)}`
-      ]),
-      styles: { fontSize: 10 },
-      margin: { left: 15, right: 15 }
+      head: [['UNIDAD', ...fechasArray, 'TOTAL']],
+      body: bodyAsignados,
+      styles: { fontSize: 8 },
+      margin: { left: 15, right: 15 },
+      didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
     });
-  
-    doc.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
+
+    // ✅ TABLA 2: ADEUDADOS
+    doc.setFontSize(12);
+    doc.text(`${modulo.nombre.replace('Asignados', 'Adeudados')}`, 15, currentY);
+    currentY += 6;
+
+    const bodyPorCobrar = unidades.map(unidad => {
+      const row: (string | number)[] = [unidad || ''];
+      let total = 0;
+
+      for (const fecha of fechasArray) {
+        const registros = this.reportes.filter(r => {
+          const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
+          const fechaFormateada = fechaRep instanceof Date
+            ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
+            : typeof fechaRep === 'string' ? fechaRep : '';
+
+          return r.unidad === unidad && fechaFormateada === fecha;
+        });
+
+        const asignado = registros.reduce((acc, r) => acc + (Number(r[modulo.campo as keyof ReporteConPagos]) || 0), 0);
+        const pagado = registros.reduce((acc, r) => acc + (Number(r[modulo.pagado as keyof ReporteConPagos]) || 0), 0);
+        const saldo = asignado - pagado;
+
+        row.push(`$${saldo.toFixed(2)}`);
+        total += saldo;
+      }
+
+      totalSaldoModulo += total;
+      row.push(`$${total.toFixed(2)}`);
+      return row;
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['UNIDAD', ...fechasArray, 'TOTAL']],
+      body: bodyPorCobrar,
+      styles: { fontSize: 7 },
+      margin: { left: 15, right: 15 },
+      didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
+    });
+
+    resumenFinal.push([
+      modulo.nombre,
+      totalAsignadoModulo,
+      totalSaldoModulo,
+      totalAsignadoModulo - totalSaldoModulo
+    ]);
   }
+
+  // ✅ RESUMEN FINAL
+  doc.setFontSize(14);
+  doc.text('Resumen Final por Módulo', 15, currentY);
+  currentY += 6;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['MÓDULO', 'ASIGNADO TOTAL', 'SALDO TOTAL', 'PAGADO TOTAL']],
+    body: resumenFinal.map(([nombre, asignado, saldo, pagado]) => [
+      nombre,
+      `$${asignado.toFixed(2)}`,
+      `$${saldo.toFixed(2)}`,
+      `$${pagado.toFixed(2)}`
+    ]),
+    styles: { fontSize: 10 },
+    margin: { left: 15, right: 15 }
+  });
+
+  doc.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
+}
+
   
-  /*---------------------------- PDF REPORTE EMPRESA------------------------- */
+  /*---------------------------- PDF REPORTE EMPRESA FIN------------------------- */
 
   async filtrarPor(tipo: 'hoy' | 'semana' | 'mes') {
+    this.modoActual = 'filtrado';
     const hoy = new Date();
     let fechaInicio: Date;
     let fechaFin: Date;
@@ -517,7 +541,7 @@ const fechasArray = Array.from(fechasSet).filter(f => !!f).sort();
 
   async filtrarPorFechaPersonalizada() {
     if (!this.fechaPersonalizada) return;
-
+    this.modoActual = 'filtrado';
     const [anio, mes, dia] = this.fechaPersonalizada.split('-').map(Number);
     const fechaInicio = new Date(anio, mes - 1, dia, 0, 0, 0);
     const fechaFin = new Date(anio, mes - 1, dia, 23, 59, 59);
@@ -661,6 +685,19 @@ irANuevoRegistro(): void {
   irACierreCaja() {
     this.router.navigate(['/reportes/cierre-caja']);
   }
+  limpiarFiltros() {
+  this.fechaPersonalizada = '';
+  this.fechaInicio = '';
+  this.fechaFin = '';
+  this.empresaSeleccionada = null;
+  this.errorFecha = '';
+  this.modoActual = 'todos';
+  this.cursorStack = [];
+  this.ultimaFechaCursor = null;
+  this.paginaActual = 1;
+  this.hayMasReportes = true;
+  this.cargarTodosLosReportes();
+}
 
   volver() {
     this.router.navigate(['']);

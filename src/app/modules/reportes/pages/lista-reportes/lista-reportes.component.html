@@ -132,7 +132,7 @@
       </tbody>
     </table>
 
-    <div class="paginacion">
+    <div class="paginacion" *ngIf="modoActual === 'todos'">
       <button (click)="cargarTodosLosReportes('anterior')" [disabled]="paginaActual <= 1">
         ← Anterior
       </button>
@@ -141,6 +141,7 @@
         Siguiente →
       </button>
     </div>
+
 
     <!-- Botones inferiores -->
     <div class="botones-inferiores">
