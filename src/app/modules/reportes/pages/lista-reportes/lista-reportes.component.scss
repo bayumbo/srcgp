@@ -522,3 +522,25 @@ h5 {
     }
   }
 }
+.overlay-cargando {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(18, 18, 18, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+
+  .spinner-pdf {
+    background: #fff;
+    color: #111;
+    padding: 2rem 3rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    font-size: 1.2rem;
+    font-family: 'Segoe UI', sans-serif;
+  }
+}

@@ -38,7 +38,7 @@ export class ReporteListaComponent implements OnInit {
 
   esSocio: boolean = false;
   modoActual: 'todos' | 'filtrado' = 'todos'; // 👈 para saber si estás en modo paginado o con filtro
-
+  cargandoPDF: boolean = false;
   reportes: ReporteConPagos[] = [];
   cargando: boolean = true;
   mostrarFiltros = false;
@@ -322,6 +322,50 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
     return snapshot.docs.map(doc => doc.id);
   } 
 
+  private agruparDatosParaPDF(): Map<string, Map<string, any>> {
+    const agrupado = new Map<string, Map<string, any>>();
+
+    for (const reporte of this.reportes) {
+      const unidad = reporte.unidad || 'SIN_UNIDAD';
+      const fecha = (reporte.fechaModificacion instanceof Date
+        ? reporte.fechaModificacion
+        : (reporte.fechaModificacion as any)?.toDate?.())?.toLocaleDateString('es-EC', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }) ?? 'Sin Fecha';
+
+      if (!agrupado.has(unidad)) agrupado.set(unidad, new Map());
+      const fechasMap = agrupado.get(unidad)!;
+
+      if (!fechasMap.has(fecha)) {
+        fechasMap.set(fecha, {
+          minutosAtraso: 0,
+          minutosPagados: 0,
+          administracion: 0,
+          adminPagada: 0,
+          minutosBase: 0,
+          minBasePagados: 0,
+          multas: 0,
+          multasPagadas: 0
+        });
+      }
+
+      const valores = fechasMap.get(fecha)!;
+
+      valores.minutosAtraso += reporte.minutosAtraso || 0;
+      valores.minutosPagados += reporte.minutosPagados || 0;
+      valores.administracion += reporte.administracion || 0;
+      valores.adminPagada += reporte.adminPagada || 0;
+      valores.minutosBase += reporte.minutosBase || 0;
+      valores.minBasePagados += reporte.minBasePagados || 0;
+      valores.multas += reporte.multas || 0;
+      valores.multasPagadas += reporte.multasPagadas || 0;
+    }
+
+    return agrupado;
+  }
+
   async eliminarReporte(reporte: any) {
       const fecha = reporte.fechaModificacion?.toDate?.().toLocaleDateString('es-EC', {
       year: 'numeric',
@@ -360,76 +404,77 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
   }
 
   /*---------------------------- PDF REPORTE EMPRESA------------------------- */
-  generarReporteEmpresasPDF() {
+  async generarReporteEmpresasPDF() {
+  this.cargandoPDF = true;
   if (!this.empresaSeleccionada || this.errorFecha) return;
 
   const inicio = new Date(this.fechaInicio);
+  inicio.setHours(0, 0, 0, 0);
   const fin = new Date(this.fechaFin);
+  fin.setHours(0, 0, 0, 0);
   const fechaEmision = new Date();
-
   const doc = new jsPDF();
+
+  // 🧩 Prepara encabezado
   doc.setFontSize(18);
   doc.text(`Reporte General ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
+
   doc.setFontSize(12);
   doc.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
   doc.text(`Fecha de finalización: ${fin.toLocaleDateString('es-EC')}`, 15, 36);
   doc.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString('es-EC')}`, 15, 42);
 
-  // ✅ Generar fechas ordenadas cronológicamente
+  // 🧩 Generar fechas ordenadas cronológicamente
   const fechasArray: string[] = [];
   let actual = new Date(inicio);
   while (actual <= fin) {
     fechasArray.push(actual.toLocaleDateString('es-EC', {
-       day: '2-digit'
+       month: '2-digit', day: '2-digit'
     }));
     actual.setDate(actual.getDate() + 1);
   }
 
   const unidades = [...new Set(this.reportes.map(r => r.unidad))];
+  const agrupado = this.agruparDatosParaPDF();
+
   const modulos = [
-    { nombre: 'Minutos Asignados', campo: 'minutosAtraso', pagado: 'minutosPagados' },
-    { nombre: 'Administración Asignada', campo: 'administracion', pagado: 'adminPagada' },
-    { nombre: 'Minutos Base Asignados', campo: 'minutosBase', pagado: 'minBasePagados' },
-    { nombre: 'Multas Asignadas', campo: 'multas', pagado: 'multasPagadas' }
+    { nombre: 'Minutos', campo: 'minutosAtraso', pagado: 'minutosPagados' },
+    { nombre: 'Administración', campo: 'administracion', pagado: 'adminPagada' },
+    { nombre: 'Minutos Base', campo: 'minutosBase', pagado: 'minBasePagados' },
+    { nombre: 'Multas', campo: 'multas', pagado: 'multasPagadas' }
   ];
 
   let currentY = 50;
   const resumenFinal: [string, number, number, number][] = [];
 
   for (const modulo of modulos) {
+    // 🧾 TÍTULO 1: ASIGNADOS
     doc.setFontSize(14);
-    doc.text(modulo.nombre, 15, currentY);
+    doc.text(`${modulo.nombre} Asignados`, 15, currentY);
     currentY += 6;
 
-    let totalAsignadoModulo = 0;
-    let totalSaldoModulo = 0;
+    let totalAsignado = 0;
+    let totalSaldo = 0;
 
-    // ✅ TABLA 1: ASIGNADOS
-    const bodyAsignados = unidades.map(unidad => {
+    const bodyAsignados: (string | number)[][] = [];
+
+    for (const unidad of unidades) {
       const row: (string | number)[] = [unidad || ''];
-      let total = 0;
+      let totalUnidad = 0;
 
       for (const fecha of fechasArray) {
-        const registros = this.reportes.filter(r => {
-          const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
-          const fechaFormateada = fechaRep instanceof Date
-            ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
-            : typeof fechaRep === 'string' ? fechaRep : '';
-
-          return r.unidad === unidad && fechaFormateada === fecha;
-        });
-
-        const suma = registros.reduce((acc, r) => acc + (Number(r[modulo.campo as keyof ReporteConPagos]) || 0), 0);
-        row.push(`$${Math.round(2)}`);
-
-        total += suma;
+        const datos = agrupado.get(unidad)?.get(fecha);
+        const valor = datos?.[modulo.campo] || 0;
+        row.push(`$${Math.round(valor)}`);
+        totalUnidad += valor;
       }
 
-      totalAsignadoModulo += total;
-      row.push(`$${Math.round(2)}`);
+      row.push(`$${Math.round(totalUnidad)}`);
+      totalAsignado += totalUnidad;
+      bodyAsignados.push(row);
+    }
 
-      return row;
-    });
+    await new Promise(resolve => setTimeout(resolve, 50)); // Pausa para evitar cuelgue
 
     autoTable(doc, {
       startY: currentY,
@@ -440,56 +485,53 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
     });
 
-    // ✅ TABLA 2: ADEUDADOS
+    // 🧾 TÍTULO 2: ADEUDADOS
     doc.setFontSize(12);
-    doc.text(`${modulo.nombre.replace('Asignados', 'Adeudados')}`, 15, currentY);
+    doc.text(`${modulo.nombre} Adeudados`, 15, currentY);
     currentY += 6;
 
-    const bodyPorCobrar = unidades.map(unidad => {
+    const bodyAdeudados: (string | number)[][] = [];
+
+    for (const unidad of unidades) {
       const row: (string | number)[] = [unidad || ''];
-      let total = 0;
+      let totalUnidad = 0;
 
       for (const fecha of fechasArray) {
-        const registros = this.reportes.filter(r => {
-          const fechaRep = (r.fechaModificacion as any)?.toDate?.() ?? r.fechaModificacion;
-          const fechaFormateada = fechaRep instanceof Date
-            ? fechaRep.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' })
-            : typeof fechaRep === 'string' ? fechaRep : '';
-
-          return r.unidad === unidad && fechaFormateada === fecha;
-        });
-
-        const asignado = registros.reduce((acc, r) => acc + (Number(r[modulo.campo as keyof ReporteConPagos]) || 0), 0);
-        const pagado = registros.reduce((acc, r) => acc + (Number(r[modulo.pagado as keyof ReporteConPagos]) || 0), 0);
+        const datos = agrupado.get(unidad)?.get(fecha);
+        const asignado = datos?.[modulo.campo] || 0;
+        const pagado = datos?.[modulo.pagado] || 0;
         const saldo = asignado - pagado;
-
         row.push(`$${saldo.toFixed(2)}`);
-        total += saldo;
+        totalUnidad += saldo;
       }
 
-      totalSaldoModulo += total;
-      row.push(`$${total.toFixed(2)}`);
-      return row;
-    });
+      row.push(`$${totalUnidad.toFixed(2)}`);
+      totalSaldo += totalUnidad;
+      bodyAdeudados.push(row);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 50)); // Pausa
 
     autoTable(doc, {
       startY: currentY,
       head: [['UNIDAD', ...fechasArray, 'TOTAL']],
-      body: bodyPorCobrar,
+      body: bodyAdeudados,
       styles: { fontSize: 7 },
       margin: { left: 15, right: 15 },
       didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
     });
 
+    const totalPagado = totalAsignado - totalSaldo;
+
     resumenFinal.push([
       modulo.nombre,
-      totalAsignadoModulo,
-      totalSaldoModulo,
-      totalAsignadoModulo - totalSaldoModulo
+      totalAsignado,
+      totalSaldo,
+      totalPagado
     ]);
   }
 
-  // ✅ RESUMEN FINAL
+  // 🧾 RESUMEN FINAL
   doc.setFontSize(14);
   doc.text('Resumen Final por Módulo', 15, currentY);
   currentY += 6;
@@ -506,9 +548,11 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
     styles: { fontSize: 10 },
     margin: { left: 15, right: 15 }
   });
-
+  
   doc.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
+  this.cargandoPDF = false;
 }
+
 
   
   /*---------------------------- PDF REPORTE EMPRESA FIN------------------------- */
@@ -572,6 +616,7 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
   /*--------------------GENERAR PDF -------------------*/
 
 generarPDFMinutos(data: ReporteConPagos[], fecha: Date) {
+  fecha.setHours(0, 0, 0, 0);
   const doc = new jsPDF();
   const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -618,6 +663,7 @@ generarPDFMinutos(data: ReporteConPagos[], fecha: Date) {
 }
 
 generarPDFAdministracion(data: ReporteConPagos[], fecha: Date) {
+  fecha.setHours(0, 0, 0, 0);
   const doc = new jsPDF();
   const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
 

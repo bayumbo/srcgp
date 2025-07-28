@@ -90,6 +90,7 @@
     <table *ngIf="reportes.length > 0">
       <thead>
         <tr>
+          <th>Fecha</th>
           <th>Nombre</th>
           <th>Unidad</th>
           <th>Min. Atraso</th>
@@ -105,6 +106,7 @@
       </thead>
       <tbody>
         <tr *ngFor="let reporte of reportes">
+          <td>{{ reporte.fechaModificacion | date: 'dd/MM/yyyy' }}</td>
           <td data-label="Nombre">{{ reporte.nombre + ' ' + reporte.apellido }}</td>
           <td data-label="Unidad">{{ reporte.unidad }}</td>
           <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
@@ -141,7 +143,12 @@
         Siguiente →
       </button>
     </div>
-
+    
+    <div *ngIf="cargandoPDF" class="overlay-cargando">
+      <div class="spinner-pdf">
+        <p>🌀 Generando PDF, por favor espera...</p>
+      </div>
+    </div>
 
     <!-- Botones inferiores -->
     <div class="botones-inferiores">
