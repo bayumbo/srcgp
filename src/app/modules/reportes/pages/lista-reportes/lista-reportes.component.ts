@@ -330,7 +330,7 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       const fecha = (reporte.fechaModificacion instanceof Date
         ? reporte.fechaModificacion
         : (reporte.fechaModificacion as any)?.toDate?.())?.toLocaleDateString('es-EC', {
-          year: 'numeric',
+          
           month: '2-digit',
           day: '2-digit'
         }) ?? 'Sin Fecha';
@@ -408,16 +408,15 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
   this.cargandoPDF = true;
   if (!this.empresaSeleccionada || this.errorFecha) return;
 
-  const inicio = new Date(this.fechaInicio);
-  inicio.setHours(0, 0, 0, 0);
-  const fin = new Date(this.fechaFin);
-  fin.setHours(0, 0, 0, 0);
+  const inicio = new Date(`${this.fechaInicio}T12:00:00`);
+  const fin = new Date(`${this.fechaFin}T12:00:00`);
+  
   const fechaEmision = new Date();
-  const doc = new jsPDF();
+  const doc = new jsPDF({ orientation: 'landscape' });
 
   // 🧩 Prepara encabezado
   doc.setFontSize(18);
-  doc.text(`Reporte General ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
+  doc.text(`Reporte ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
 
   doc.setFontSize(12);
   doc.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
@@ -501,11 +500,11 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
         const asignado = datos?.[modulo.campo] || 0;
         const pagado = datos?.[modulo.pagado] || 0;
         const saldo = asignado - pagado;
-        row.push(`$${saldo.toFixed(2)}`);
+        row.push(`$${Math.round(saldo)}`);
         totalUnidad += saldo;
       }
 
-      row.push(`$${totalUnidad.toFixed(2)}`);
+      row.push(`$${Math.round(totalUnidad)}`);
       totalSaldo += totalUnidad;
       bodyAdeudados.push(row);
     }
