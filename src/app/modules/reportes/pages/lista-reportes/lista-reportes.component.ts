@@ -433,7 +433,13 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
     actual.setDate(actual.getDate() + 1);
   }
 
-  const unidades = [...new Set(this.reportes.map(r => r.unidad))];
+  const unidades = [...new Set(this.reportes.map(r => r.unidad))]
+  .filter(Boolean)
+  .sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, '')) || 0;
+    const numB = parseInt(b.replace(/\D/g, '')) || 0;
+    return numA - numB;
+  });
   const agrupado = this.agruparDatosParaPDF();
 
   const modulos = [
@@ -475,11 +481,12 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
 
     await new Promise(resolve => setTimeout(resolve, 50)); // Pausa para evitar cuelgue
 
-    autoTable(doc, {
+  autoTable(doc, {
       startY: currentY,
       head: [['UNIDAD', ...fechasArray, 'TOTAL']],
       body: bodyAsignados,
-      styles: { fontSize: 8 },
+      styles: { fontSize: 6.5, cellPadding: 1.5 },
+      headStyles: { fontSize: 7.5, fillColor: [41, 128, 185], halign: 'center' },
       margin: { left: 15, right: 15 },
       didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
     });
@@ -515,7 +522,8 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       startY: currentY,
       head: [['UNIDAD', ...fechasArray, 'TOTAL']],
       body: bodyAdeudados,
-      styles: { fontSize: 7 },
+      styles: { fontSize: 6.5, cellPadding: 1.5 },
+      headStyles: { fontSize: 7.5, fillColor: [41, 128, 185], halign: 'center' },
       margin: { left: 15, right: 15 },
       didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
     });
