@@ -130,8 +130,12 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
   try {
     let baseQuery = query(
       collectionGroup(this.firestore, 'reportesDiarios'),
-      orderBy('fechaModificacion', 'desc')
+      orderBy('fechaModificacion', 'desc'), // Ordena primero por fecha de forma descendente
+      orderBy('unidad', 'asc') // Luego, dentro de cada fecha, ordena por unidad de forma ascendente
     );
+
+    // Ajusta el número de reportes por página a 10
+    this.reportesPorPagina = 10;
 
     if (direccion === 'siguiente' && this.ultimaFechaCursor) {
       baseQuery = query(baseQuery, startAfter(this.ultimaFechaCursor), limit(this.reportesPorPagina));
@@ -158,16 +162,12 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       const data = docSnap.data() as NuevoRegistro;
       const id = docSnap.id;
       const uid = docSnap.ref.parent.parent?.id ?? '';
-
-      // ✅ Obtener unidad directamente desde el campo del reporte
       const unidad = data.unidad ?? '';
 
-      // Obtener datos del usuario
       const userRef = doc(this.firestore, `usuarios/${uid}`);
       const userSnap = await getDoc(userRef);
       const userData = userSnap.exists() ? userSnap.data() : {};
 
-      // Cargar pagos
       const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
       const pagosSnap = await getDocs(pagosRef);
 
@@ -185,9 +185,6 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       });
 
       const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
-
-      // 🧾 Log de verificación
-      console.log(`🔍 Reporte ID: ${id} | UID: ${uid} | Unidad: ${unidad}`);
 
       tempReportes.push({
         id,
@@ -207,6 +204,9 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       });
     }
 
+    // ❌ Elimina la función de ordenamiento personalizada de aquí.
+    // El ordenamiento ya se maneja en la consulta de Firestore.
+    
     const firstDoc = snapshot.docs[0];
     const lastDoc = snapshot.docs[snapshot.docs.length - 1];
 
@@ -220,8 +220,6 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       this.paginaActual = 1;
     }
 
-    console.log('🧾 Página', this.paginaActual, tempReportes.map(r => r.nombre));
-
     this.reportes = tempReportes;
     this.hayMasReportes = snapshot.docs.length === this.reportesPorPagina;
 
@@ -232,8 +230,7 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
   }
 }
 
-
-  async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
+async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
   this.cargando = true;
   this.cursorStack = [];
   this.ultimaFechaCursor = null;
@@ -251,12 +248,14 @@ async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') 
       collectionGroup(this.firestore, 'reportesDiarios'),
       where('fechaModificacion', '>=', start),
       where('fechaModificacion', '<=', end),
-      orderBy('fechaModificacion', 'desc')
+      orderBy('fechaModificacion', 'desc'),
+      orderBy('unidad', 'asc') 
     );
 
     const snapshot = await getDocs(ref);
     const tempReportes: ReporteConPagos[] = [];
 
+    // ... (el resto de tu código para procesar los datos es el mismo)
     for (const docSnap of snapshot.docs) {
       const data = docSnap.data() as NuevoRegistro;
       const id = docSnap.id;
