@@ -366,11 +366,13 @@ async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
   }
 
   async eliminarReporte(reporte: any) {
-      const fecha = reporte.fechaModificacion?.toDate?.().toLocaleDateString('es-EC', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) || 'Sin fecha';
+      const fecha = (reporte.fechaModificacion instanceof Date
+        ? reporte.fechaModificacion
+        : (reporte.fechaModificacion as any)?.toDate?.())?.toLocaleDateString('es-EC', {
+          year: '2-digit',
+          month: '2-digit',
+          day: '2-digit'
+        }) ?? 'Sin Fecha';
    const confirmar = confirm(`¿Deseas eliminar el reporte de ${reporte.nombre} del ${fecha}?`);
     if (!confirmar) return;
 
