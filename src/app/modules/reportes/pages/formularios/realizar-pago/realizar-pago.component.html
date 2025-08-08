@@ -5,7 +5,8 @@
   </div>
 
   <div class="info-usuario" *ngIf="registros.length > 0">
-    <p><strong>Nombre:</strong> {{ registros[0].nombre }}</p>
+    <p><strong>Nombre:</strong> {{ registros[0].nombre }}  {{ registros[0].apellido }}</p>
+   
     <p><strong>Unidad:</strong> {{ registros[0].unidad }}</p>
   </div>
 
@@ -24,7 +25,14 @@
           </thead>
           <tbody>
             <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registro.id!)">
-              <td>{{ pago.fecha.toDate() | date:'shortDate' }}</td>
+               <td>
+                <span *ngIf="!esPagoEnEdicion(pago, campo)">
+                    {{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}
+                </span>
+                <input *ngIf="esPagoEnEdicion(pago, campo)" 
+                      type="date" 
+                      [(ngModel)]="fechaEnEdicion">
+              </td> 
             
               <td class="celda-pago-editable">
                 <!-- Contenedor fijo -->
@@ -75,6 +83,16 @@
                   [(ngModel)]="pagosActuales[registro.id!][campo]"
                   (ngModelChange)="validarPago(registro.id!, campo)"
                   placeholder="Ingresar"
+                />
+              </td>
+            </tr>
+            <tr  >
+              <td><strong>Fecha de pago:</strong></td>
+              <td class="celda-input-fecha">
+                <input
+                  type="date"
+                  [(ngModel)]="fechasPagosActuales[registro.id!][campo]"
+                  class="form-control"
                 />
               </td>
             </tr>

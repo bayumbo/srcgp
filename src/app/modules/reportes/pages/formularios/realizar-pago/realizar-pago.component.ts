@@ -39,7 +39,7 @@ export class RealizarPagoComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private firestore = inject(Firestore);
-  private storage = inject(Storage); 
+  private storage = inject(Storage);
 
   uidUsuario: string = '';
   reporteId: string = '';
@@ -53,9 +53,11 @@ export class RealizarPagoComponent implements OnInit {
   };
 
   pagosActuales: Record<string, Partial<Record<CampoClave, number>>> = {};
+  fechasPagosActuales: Record<string, Partial<Record<CampoClave, string>>> = {};
   campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
   pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
   nuevoMonto: number | null = null;
+  fechaEnEdicion: string | null = null;
 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
@@ -92,6 +94,12 @@ export class RealizarPagoComponent implements OnInit {
 
     for (const r of this.registros) {
       this.pagosActuales[r.id!] = {};
+      this.fechasPagosActuales[r.id!] = {
+        minutosAtraso: new Date().toISOString().substring(0, 10),
+        administracion: new Date().toISOString().substring(0, 10),
+        minutosBase: new Date().toISOString().substring(0, 10),
+        multas: new Date().toISOString().substring(0, 10)
+      };
     }
 
     console.log('📄 registros:', this.registros);
@@ -102,21 +110,21 @@ export class RealizarPagoComponent implements OnInit {
     for (const campo of this.campos) {
       this.pagosTotales[campo] = [];
     }
-  
+
     for (const registro of this.registros) {
       const reporteId = registro.id!;
       const ref = fsCollection(
         this.firestore,
         `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`
       );
-  
+
       const snap = await getDocs(ref);
-  
+
       const pagos: DocumentoPago[] = snap.docs.map(d => ({
         id: d.id,
         ...(d.data() as Omit<DocumentoPago, 'id'>)
       }));
-  
+
       for (const campo of this.campos) {
         const nuevosPagos = pagos
           .flatMap(p => {
@@ -125,63 +133,80 @@ export class RealizarPagoComponent implements OnInit {
               ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
               : [];
           });
-  
+
         this.pagosTotales[campo].push(...nuevosPagos);
       }
     }
-  
+
     console.log('💰 Pagos cargados:', this.pagosTotales);
   }
 
   cargandoPago: boolean = false;
+  fechaSeleccionada: Date = new Date();
 
   async guardarPagosGenerales() {
     if (this.cargandoPago) return;
-  
     this.cargandoPago = true;
-    const fecha = Timestamp.fromDate(new Date());
-  
+
     try {
       for (const registro of this.registros) {
         const detalles: Partial<Record<CampoClave, number>> = {};
+        // ✅ Creamos un array para almacenar todos los pagos y sus fechas
+        const pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[] = [];
         let tienePago = false;
         let total = 0;
-  
+
+        // 1. Recolectar todos los pagos y sus fechas
         for (const campo of this.campos) {
           const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
           if (monto > 0) {
+            tienePago = true;
             detalles[campo] = monto;
             total += monto;
-            tienePago = true;
+
+            const fechaPagoRegistro = this.fechasPagosActuales[registro.id!]?.[campo as CampoClave];
+            if (!fechaPagoRegistro) {
+              console.error(`Fecha de pago no encontrada para el campo: ${campo}`);
+              continue;
+            }
+
+            const [year, month, day] = fechaPagoRegistro.split('-').map(Number);
+            const fechaPagoLocal = new Date(year, month - 1, day);
+            const fecha = Timestamp.fromDate(fechaPagoLocal);
+            
+            pagosConFechas.push({ campo, monto, fecha });
           }
         }
-  
-        if (!tienePago) continue;
-  
-        // 1️⃣ Generar PDF y obtener URL
-        const urlPDF = await this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
-          nombre: registro.nombre,
-          apellido: registro.apellido,
-          unidad: registro.unidad,
-          total,
-          detalles,
-          fechaDePago: fecha
-        });
-  
-        // 2️⃣ Guardar el documento en Firestore (UNA sola vez)
-        const ref = collection(
-          this.firestore,
-          `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
-        );
-  
-        await addDoc(ref, {
-          fecha,
-          detalles,
-          total,
-          urlPDF
-        });
+
+        // 2. Si hay pagos, generar un único recibo y guardar un solo documento
+        if (tienePago && pagosConFechas.length > 0) { // ✅ Verificamos que haya fechas
+          const urlPDF = await this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
+            nombre: registro.nombre,
+            apellido: registro.apellido,
+            unidad: registro.unidad,
+            total: total,
+            detalles: detalles,
+            // ✅ PASAMOS EL NUEVO ARRAY AL GENERADOR DE PDF
+            pagosConFechas: pagosConFechas
+          });
+
+          const ref = collection(
+            this.firestore,
+            `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
+          );
+
+          await addDoc(ref, {
+            // Usamos la fecha del primer pago para el documento de Firestore
+            fecha: pagosConFechas[0].fecha,
+            detalles: detalles,
+            total: total,
+            urlPDF,
+            // Guardamos las fechas individuales por cada módulo
+            fechasPorModulo: pagosConFechas.reduce((acc, p) => ({ ...acc, [p.campo]: p.fecha }), {})
+          });
+        }
       }
-  
+
       alert('✅ Pagos registrados y recibos generados correctamente.');
       this.router.navigate(['/reportes/lista-reportes']);
     } catch (error) {
@@ -191,12 +216,9 @@ export class RealizarPagoComponent implements OnInit {
       this.cargandoPago = false;
     }
   }
-  
-
-  
   /*---------------------------------- Lógica generar recibo y formato----------------------*/
   
- async generarReciboYSubirPDF(
+  async generarReciboYSubirPDF(
     uid: string,
     reporteId: string,
     datos: {
@@ -205,10 +227,13 @@ export class RealizarPagoComponent implements OnInit {
       unidad: string;
       total: number;
       detalles: Partial<Record<CampoClave, number>>;
-      fechaDePago: Timestamp;
+      // ✅ EL PARÁMETRO AHORA ES UN ARRAY DE PAGOS, CADA UNO CON SU FECHA.
+      pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[];
     }
   ): Promise<string> {
-    const fechaActual = new Date();
+
+    // ✅ Usamos la fecha del primer pago del array como la fecha de emisión del recibo
+    const fechaActual = datos.pagosConFechas[0]?.fecha.toDate() || new Date();
     const fechaTexto = fechaActual.toLocaleDateString('es-EC', {
       year: 'numeric',
       month: 'long',
@@ -218,90 +243,50 @@ export class RealizarPagoComponent implements OnInit {
       hour: '2-digit',
       minute: '2-digit'
     });
-  
+
     const campos: CampoClave[] = ['administracion', 'minutosBase', 'minutosAtraso', 'multas'];
-  
+
     const pendientes: Record<CampoClave, number> = {
       administracion: 0,
       minutosBase: 0,
       minutosAtraso: 0,
       multas: 0
     };
-  
+
     const registro = this.registros.find(r => r.id === reporteId);
     if (!registro) throw new Error('Registro no encontrado en memoria');
       
     for (const campo of campos) {
       const totalCampo = registro[campo] ?? 0;
-  
       const pagadoAnterior = this.calcularTotalPagado(campo, reporteId);
       const pagadoNuevo = datos.detalles?.[campo] ?? 0;
-  
-      // Aquí se sigue usando para los pendientes, lo cual es correcto
+
       pendientes[campo] = Math.max(totalCampo - (pagadoAnterior + pagadoNuevo), 0);
     }
-  
-    // 🛠️ Recuperar todos los pagos existentes para el reporte
-    const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}/pagosTotales`);
-    const pagosSnap = await getDocs(pagosRef);
-    
-    // 🛠️ Crear arrays para la tabla del pago actual y para el historial de pagos
+
+    // ✅ Creamos la tabla del pago actual iterando sobre el array 'pagosConFechas'
     const tablaPagoActual = [];
-    const historialPagos = [];
-    
-    // 🛠️ Iterar sobre los pagos y separar el pago actual del historial
-    pagosSnap.docs.forEach(pagoDoc => {
-      const pagoData = pagoDoc.data() as { detalles: Partial<Record<CampoClave, number>>; fecha: Timestamp; total: number};
-      const fechaPagoExistente = (pagoData.fecha as unknown as Timestamp)?.toDate()?.toLocaleDateString('es-EC', {
+    for (const pago of datos.pagosConFechas) {
+      const fechaDelPago = pago.fecha.toDate().toLocaleDateString('es-EC', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      }) || 'Sin fecha';
-  
-      if (pagoDoc.id === 'pago-actual-temporal') { // Identificador temporal para el pago actual
-        for (const campo of campos) {
-          if (pagoData.detalles[campo] && pagoData.detalles[campo]! > 0) {
-            tablaPagoActual.push([
-              campo === 'administracion' ? 'Administración' :
-              campo === 'minutosBase' ? 'Minutos Base' :
-              campo === 'minutosAtraso' ? 'Minutos Atraso' :
-              'Multas',
-              fechaPagoExistente,
-              `$${pagoData.detalles[campo]!.toFixed(2)}`
-            ]);
-          }
-        }
-      } else {
-        historialPagos.push([
-          pagoData.total,
-          fechaPagoExistente,
-        ]);
-      }
-    });
-
-    // 🛠️ Añadir el pago actual al PDF directamente, en lugar de iterar nuevamente
-    const fechaDelPagoActual = datos.fechaDePago?.toDate().toLocaleDateString('es-EC', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) || 'Sin fecha';
-
-    for (const campo of campos) {
-      if (datos.detalles[campo] && datos.detalles[campo]! > 0) {
-        tablaPagoActual.push([
-          campo === 'administracion' ? 'Administración' :
-          campo === 'minutosBase' ? 'Minutos Base' :
-          campo === 'minutosAtraso' ? 'Minutos Atraso' :
-          'Multas',
-          fechaDelPagoActual,
-          `$${datos.detalles[campo]!.toFixed(2)}`
-        ]);
-      }
+      });
+      
+      const descripcion = 
+        pago.campo === 'administracion' ? 'Administración' :
+        pago.campo === 'minutosBase' ? 'Minutos Base' :
+        pago.campo === 'minutosAtraso' ? 'Minutos Atraso' :
+        'Multas';
+      
+      tablaPagoActual.push([
+        descripcion,
+        fechaDelPago,
+        `$${pago.monto.toFixed(2)}`
+      ]);
     }
-
-    // Añadir el total al final de la tabla de pagos
     tablaPagoActual.push(['TOTAL', '', `$${datos.total.toFixed(2)}`]);
-  
+
     // Cargar logos
     const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
     const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
@@ -331,7 +316,7 @@ export class RealizarPagoComponent implements OnInit {
     autoTable(pdfDoc, {
       startY: 60,
       head: [['Descripción', 'Fecha', 'Valor']],
-      // 🛠️ Usamos el array tablaPagoActual para mostrar solo el pago que se realiza en este momento
+      // ✅ Usamos el array tablaPagoActual que ahora contiene las fechas individuales
       body: tablaPagoActual,
       styles: { fontSize: 11, halign: 'right' },
       headStyles: { fillColor: [30, 144, 255], halign: 'center' }
@@ -389,7 +374,6 @@ export class RealizarPagoComponent implements OnInit {
     pdfDoc.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
     return pdfUrl;
   }
-    
   
   cargarImagenBase64(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -481,27 +465,41 @@ export class RealizarPagoComponent implements OnInit {
   iniciarEdicion(pago: PagoPorModulo, campo: CampoClave) {
     this.pagoEnEdicion = { id: pago.id, campo };
     this.nuevoMonto = pago.cantidad;
+    const fecha = pago.fecha.toDate();
+    this.fechaEnEdicion = fecha.toISOString().substring(0, 10);
   }
+  
+
   async guardarEdicion() {
     if (this.pagoEnEdicion && this.nuevoMonto != null && this.nuevoMonto >= 0) {
       const { id, campo } = this.pagoEnEdicion;
       const pago = this.campos
         .flatMap(c => this.pagosTotales[c])
         .find(p => p.id === id);
-  
+
       if (!pago) return;
-  
+
       const ref = doc(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${pago.reporteId}/pagosTotales/${pago.id}`);
-      await updateDoc(ref, {
+      
+      const updateData: any = {
         [`detalles.${campo}`]: this.nuevoMonto
-      });
-  
+      };
+
+      if (this.fechaEnEdicion) {
+        const [year, month, day] = this.fechaEnEdicion.split('-').map(Number);
+        const nuevaFecha = new Date(year, month - 1, day);
+        updateData.fecha = Timestamp.fromDate(nuevaFecha);
+      }
+      
+      await updateDoc(ref, updateData);
+
       alert('✅ Pago actualizado');
       await this.cargarPagosTotales();
-  
+
       // Limpieza
       this.pagoEnEdicion = null;
       this.nuevoMonto = null;
+      this.fechaEnEdicion = null;
     }
   }
   esPagoEnEdicion(pago: PagoPorModulo, campo: CampoClave): boolean {
@@ -514,9 +512,4 @@ export class RealizarPagoComponent implements OnInit {
   volver() {
     this.router.navigate(['/reportes/lista-reportes']);
   }
-
-  
 }
-
-
-

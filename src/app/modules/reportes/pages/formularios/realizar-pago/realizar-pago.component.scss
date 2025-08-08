@@ -72,7 +72,16 @@
         padding: 0.5rem;
         text-align: center;
       }
-
+      .celda-input-fecha {
+          // Aseguramos que el contenido de la celda se alinee a la izquierda o al centro,
+          // dependiendo de la apariencia que quieras.
+          // Si quieres que el input esté perfectamente alineado a la izquierda, usa:
+          text-align: left;
+          // Si quieres que esté en el centro pero sin espacio extra, usa:
+          // display: flex;
+          // justify-content: center;
+          // align-items: center;
+        }
       input {
         width: 100%;
         padding: 0.4rem;
@@ -80,15 +89,20 @@
         border: 1px solid #ccc;
         border-radius: 6px;
         background-color: #f9f9f9;
-        box-sizing: border-box; // 🔒 evita desbordes
-        display: block;
+        box-sizing: border-box; 
+        
+        // 👉 Añade esta línea para corregir la alineación
+        display: inline-block;
 
+        
         &:focus {
           outline: none;
           border-color: #2f8071;
           background-color: #ffffff;
         }
       }
+
+      
 
       td[colspan="2"] {
         text-align: center;
