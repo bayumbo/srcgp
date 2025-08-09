@@ -4,18 +4,17 @@
     <h4>Gestión de Pago</h4>
   </div>
 
-  <div class="info-usuario" *ngIf="registros.length > 0">
-    <p><strong>Nombre:</strong> {{ registros[0].nombre }}  {{ registros[0].apellido }}</p>
-   
-    <p><strong>Unidad:</strong> {{ registros[0].unidad }}</p>
+  <div class="info-usuario" *ngIf="registros">
+    <p><strong>Nombre:</strong> {{ registros.nombre }}  {{ registros.apellido }}</p>
+    <p><strong>Unidad:</strong> {{ registros.unidad }}</p>
   </div>
 
   <!-- Contenedor de los módulos -->
-  <div class="contenedor-modulos">
+   <div class="contenedor-modulos" *ngIf="registros">
     <div class="modulo" *ngFor="let campo of campos">
       <h3>{{ campo | titlecase }}</h3>
 
-      <div class="tabla-pagos" *ngFor="let registro of registros">
+      <div class="tabla-pagos" *ngIf="registros">
         <table>
           <thead>
             <tr>
@@ -24,7 +23,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registro.id!)">
+            <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registros.id!)">
                <td>
                 <span *ngIf="!esPagoEnEdicion(pago, campo)">
                     {{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}
@@ -62,16 +61,16 @@
             </tr>
             
             
-            <tr *ngIf="filtrarPagosPorRegistro(campo, registro.id!).length === 0">
+            <tr *ngIf="filtrarPagosPorRegistro(campo, registros.id!).length === 0">
               <td colspan="2">Sin pagos registrados</td>
             </tr>
             <tr>
               <td><strong>Total pagado:</strong></td>
-              <td><strong>{{ calcularTotalPagado(campo, registro.id!) }}</strong></td>
+              <td><strong>{{ calcularTotalPagado(campo, registros.id!) }}</strong></td>
             </tr>
             <tr>
               <td><strong>Deuda:</strong></td>
-              <td><strong>{{ calcularDeuda(registro, campo) }}</strong></td>
+              <td><strong>{{ calcularDeuda(registros, campo) }}</strong></td>
             </tr>
             <tr>
               <td><strong>Pago actual:</strong></td>
@@ -79,9 +78,9 @@
                 <input
                   type="number"
                   min="0"
-                  [max]="calcularDeuda(registro, campo)"
-                  [(ngModel)]="pagosActuales[registro.id!][campo]"
-                  (ngModelChange)="validarPago(registro.id!, campo)"
+                  [max]="calcularDeuda(registros, campo)"
+                  [(ngModel)]="pagosActuales[registros.id!][campo]"
+                  (ngModelChange)="validarPago(registros.id!, campo)"
                   placeholder="Ingresar"
                 />
               </td>
@@ -91,7 +90,7 @@
               <td class="celda-input-fecha">
                 <input
                   type="date"
-                  [(ngModel)]="fechasPagosActuales[registro.id!][campo]"
+                  [(ngModel)]="fechasPagosActuales[registros.id!][campo]"
                   class="form-control"
                 />
               </td>

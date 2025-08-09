@@ -43,7 +43,7 @@ export class RealizarPagoComponent implements OnInit {
 
   uidUsuario: string = '';
   reporteId: string = '';
-  registros: NuevoRegistro[] = [];
+  registros: NuevoRegistro | null = null;
 
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
@@ -62,6 +62,7 @@ export class RealizarPagoComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
     const uid = this.route.snapshot.paramMap.get('uid');
+
     if (!id || !uid) {
       this.router.navigate(['/reportes/lista-reportes']);
       return;
@@ -78,69 +79,64 @@ export class RealizarPagoComponent implements OnInit {
       return;
     }
 
-    const data = snap.data() as NuevoRegistro;
+    this.registros = {
+      ...(snap.data() as NuevoRegistro),
+      id: snap.id
+    };
 
-    await this.cargarRegistrosDelUsuario(uid);
-    await this.cargarPagosTotales();;
-  }
-
-  async cargarRegistrosDelUsuario(uid: string) {
-    const ref = collection(this.firestore, `usuarios/${uid}/reportesDiarios`);
-    const snap = await getDocs(ref);
-    this.registros = snap.docs.map(d => ({
-      ...(d.data() as NuevoRegistro),
-      id: d.id
-    }));
-
-    for (const r of this.registros) {
-      this.pagosActuales[r.id!] = {};
-      this.fechasPagosActuales[r.id!] = {
-        minutosAtraso: new Date().toISOString().substring(0, 10),
-        administracion: new Date().toISOString().substring(0, 10),
-        minutosBase: new Date().toISOString().substring(0, 10),
-        multas: new Date().toISOString().substring(0, 10)
-      };
+    // ✅ AÑADE ESTE CÓDIGO para inicializar los objetos
+    // Esto previene que el HTML intente acceder a propiedades de un objeto 'undefined'
+    if (this.registros.id) {
+      this.pagosActuales[this.registros.id] = {};
+      this.fechasPagosActuales[this.registros.id] = {};
     }
 
-    console.log('📄 registros:', this.registros);
-  }
+    this.pagosTotales = {
+      minutosAtraso: [],
+      administracion: [],
+      minutosBase: [],
+      multas: []
+    };
+
+    await this.cargarPagosTotales();
+  }  
 
   async cargarPagosTotales() {
-    // Limpia el estado de pagos anteriores
-    for (const campo of this.campos) {
-      this.pagosTotales[campo] = [];
-    }
-
-    for (const registro of this.registros) {
-      const reporteId = registro.id!;
-      const ref = fsCollection(
-        this.firestore,
-        `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`
-      );
-
-      const snap = await getDocs(ref);
-
-      const pagos: DocumentoPago[] = snap.docs.map(d => ({
-        id: d.id,
-        ...(d.data() as Omit<DocumentoPago, 'id'>)
-      }));
-
-      for (const campo of this.campos) {
-        const nuevosPagos = pagos
-          .flatMap(p => {
-            const cantidad = p.detalles?.[campo] ?? 0;
-            return cantidad > 0
-              ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
-              : [];
-          });
-
-        this.pagosTotales[campo].push(...nuevosPagos);
-      }
-    }
-
-    console.log('💰 Pagos cargados:', this.pagosTotales);
+  // Limpia el estado de pagos anteriores
+  for (const campo of this.campos) {
+    this.pagosTotales[campo as CampoClave] = [];
   }
 
+  // ✅ Usamos la variable 'registros' directamente
+  if (this.registros) {
+    const reporteId = this.registros.id!;
+    const ref = collection(
+      this.firestore,
+      `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`
+    );
+
+    const snap = await getDocs(ref);
+
+    const pagos: DocumentoPago[] = snap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() as Omit<DocumentoPago, 'id'>)
+    }));
+
+    for (const campo of this.campos) {
+      const nuevosPagos = pagos
+        .flatMap(p => {
+          const cantidad = p.detalles?.[campo] ?? 0;
+          return cantidad > 0
+            ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
+            : [];
+        });
+
+      this.pagosTotales[campo as CampoClave].push(...nuevosPagos);
+    }
+  }
+
+  console.log('💰 Pagos cargados:', this.pagosTotales);
+}
   cargandoPago: boolean = false;
   fechaSeleccionada: Date = new Date();
 
@@ -149,9 +145,9 @@ export class RealizarPagoComponent implements OnInit {
     this.cargandoPago = true;
 
     try {
-      for (const registro of this.registros) {
+        if (this.registros) {
+        const registro = this.registros; // ✅ Usamos un nombre de variable más claro
         const detalles: Partial<Record<CampoClave, number>> = {};
-        // ✅ Creamos un array para almacenar todos los pagos y sus fechas
         const pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[] = [];
         let tienePago = false;
         let total = 0;
@@ -230,6 +226,7 @@ export class RealizarPagoComponent implements OnInit {
       // ✅ EL PARÁMETRO AHORA ES UN ARRAY DE PAGOS, CADA UNO CON SU FECHA.
       pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[];
     }
+    
   ): Promise<string> {
 
     // ✅ Usamos la fecha del primer pago del array como la fecha de emisión del recibo
@@ -253,9 +250,9 @@ export class RealizarPagoComponent implements OnInit {
       multas: 0
     };
 
-    const registro = this.registros.find(r => r.id === reporteId);
+    const registro = this.registros; // Ya tienes el objeto 'registro' aquí
     if (!registro) throw new Error('Registro no encontrado en memoria');
-      
+          
     for (const campo of campos) {
       const totalCampo = registro[campo] ?? 0;
       const pagadoAnterior = this.calcularTotalPagado(campo, reporteId);
@@ -371,7 +368,11 @@ export class RealizarPagoComponent implements OnInit {
     pdfDoc.addImage(qrBase64, 'PNG', (210 - qrSize) / 2, yFinal2 + displayHeight + 30, qrSize, qrSize);
 
     // 💾 Guardar localmente
-    pdfDoc.save(`recibo_pago_${datos.nombre.replace(/\s+/g, '_')}.pdf`);
+    
+    pdfDoc.save(`recibo_${datos.nombre.replace(/\s+/g, '_')}_
+    ${datos.apellido.replace(/\s+/g, '_')}_
+    ${datos.unidad.replace(/\s+/g, '_')}_
+    ${fechaTexto}.pdf`);
     return pdfUrl;
   }
   
@@ -417,22 +418,34 @@ export class RealizarPagoComponent implements OnInit {
 
   calcularTotalGeneral(): number {
     let total = 0;
-    for (const registro of this.registros) {
+    
+    // ✅ Verifica si el objeto existe antes de continuar
+    if (this.registros) {
+      const registro = this.registros; // ✅ Usa una variable para mayor claridad
       for (const campo of this.campos) {
         const deuda = this.calcularDeuda(registro, campo);
         const actual = this.pagosActuales[registro.id!]?.[campo] ?? 0;
         total += Math.min(deuda, actual);
       }
     }
+
     return total;
   }
 
   validarPago(reporteId: string, campo: CampoClave) {
-    const registro = this.registros.find(r => r.id === reporteId);
-    const deuda = registro ? this.calcularDeuda(registro, campo) : 0;
-    const actual = this.pagosActuales[reporteId]?.[campo] ?? 0;
-    if (actual > deuda) {
-      this.pagosActuales[reporteId][campo] = deuda;
+    // ✅ Verifica si el objeto existe
+    if (this.registros) {
+      const registro = this.registros; // ✅ Usamos el objeto directamente
+      
+      // ✅ Aquí ya no necesitas buscar el registro, ya lo tienes.
+      // Solo debes validar que el id que recibes sea el mismo.
+      if (registro.id === reporteId) {
+        const deuda = this.calcularDeuda(registro, campo);
+        const actual = this.pagosActuales[reporteId]?.[campo] ?? 0;
+        if (actual > deuda) {
+          this.pagosActuales[reporteId][campo] = deuda;
+        }
+      }
     }
   }
 

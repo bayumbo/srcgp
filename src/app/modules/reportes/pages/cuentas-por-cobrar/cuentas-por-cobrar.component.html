@@ -3,7 +3,7 @@
 <div class="contenedor-principal">
   <!-- IZQUIERDA: Buscar unidad -->
   <div class="contenedor-unidades">
-    <ng-container *ngIf="!cargando; else cargandoSpinner">
+    <ng-container *ngIf="!cargandoUnidades; else cargandoSpinner">
     <h5>Seleccione la unidad</h5>
     <input
       type="text"
@@ -11,6 +11,7 @@
       placeholder="Buscar unidad o nombre"
       class="buscador"
     />
+    <button class="boton-volver" (click)="volver()">← Volver</button>
     <table class="tabla-unidades">
       <thead>
         <tr>
@@ -21,7 +22,7 @@
       <tbody>
         <tr
           *ngFor="let item of unidadesFiltradas"
-          (click)="seleccionarUnidad(item.unidad)"
+          (click)="seleccionarUnidad(item.unidad, item.uid)"
           [ngClass]="{ 'selected': unidadSeleccionada === item.unidad }"
         >
           <td>{{ item.unidad }}</td>
@@ -29,7 +30,7 @@
         </tr>
       </tbody>      
     </table>
-    <button class="boton-volver" (click)="volver()">← Volver</button>
+    
   </ng-container>
   <ng-template #cargandoSpinner>
     <div class="spinner-contenedor">
@@ -42,7 +43,7 @@
   <!-- DERECHA: Detalle de reportes -->
   <div class="detalle-usuario" *ngIf="unidadSeleccionada">
     <div class="detalle-contenido">
-    <ng-container *ngIf="!cargando; else cargandoSpinner">
+    <ng-container *ngIf="!cargandoReportes; else cargandoSpinner">
     <div *ngIf="reportesSeleccionados.length > 0" class="detalle-usuario">
       <h5 class="titulo-reporte">Reporte acumulado</h5>
       <p><strong>Unidad:</strong> {{ unidadSeleccionada }}</p>
@@ -59,12 +60,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of reportesSeleccionados">
-            <td>{{ r.fechaModificacion | date: 'shortDate' }}</td>
-            <td>{{ r.administracion - r.adminPagada | currency:'USD' }}</td>
-            <td>{{ r.minutosBase - r.minBasePagados | currency:'USD' }}</td>
-            <td>{{ r.minutosAtraso - r.minutosPagados | currency:'USD' }}</td>
-            <td>{{ r.multas - r.multasPagadas | currency:'USD' }}</td>
+         <tr *ngFor="let reporte of reportesConFechaConvertida">
+            <td>{{ reporte.fechaModificacion | date: 'shortDate' }}</td>
+            <td>{{ reporte.administracion - reporte.adminPagada | currency:'USD' }}</td>
+            <td>{{ reporte.minutosBase - reporte.minBasePagados | currency:'USD' }}</td>
+            <td>{{ reporte.minutosAtraso - reporte.minutosPagados | currency:'USD' }}</td>
+            <td>{{ reporte.multas - reporte.multasPagadas | currency:'USD' }}</td>
           </tr>
         </tbody>
       </table>
