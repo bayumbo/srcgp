@@ -86,6 +86,7 @@ export class AuthService {
     });
   }
 
+  
   async signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
     const secondaryApp = initializeApp(environment.firebase, 'SecondaryApp');
     const secondaryAuth = getAuthStandalone(secondaryApp);
@@ -197,6 +198,7 @@ export class AuthService {
   getCurrentUser() {
   return this.auth.currentUser;
   }
+  
 
   // Renombramos y adaptamos el método para cargar el rol y actualizar el BehaviorSubject
   async cargarRolActual(): Promise<string | null> {
@@ -221,7 +223,7 @@ export class AuthService {
   }
 
   async obtenerCorreoPorCedula(cedula: string): Promise<string | null> {
-    const usuariosRef = collection(this.firestore, 'usuarios');
+    const usuariosRef = collection(this.firestore, 'usuariosPublicos');
     const q = query(usuariosRef, where('cedula', '==', cedula));
     const snapshot = await getDocs(q);
 

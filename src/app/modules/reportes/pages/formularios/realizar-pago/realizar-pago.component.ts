@@ -369,10 +369,10 @@ export class RealizarPagoComponent implements OnInit {
 
     // 💾 Guardar localmente
     
-    pdfDoc.save(`recibo_${datos.nombre.replace(/\s+/g, '_')}_
-    ${datos.apellido.replace(/\s+/g, '_')}_
+    pdfDoc.save(`${fechaTexto}_
     ${datos.unidad.replace(/\s+/g, '_')}_
-    ${fechaTexto}.pdf`);
+    ${datos.nombre.replace(/\s+/g, '_')}_
+    ${datos.apellido.replace(/\s+/g, '_')}.pdf`);
     return pdfUrl;
   }
   

@@ -19,7 +19,8 @@ import {
   query,
   setDoc,
   Firestore, 
-  deleteDoc
+  deleteDoc,
+  Timestamp
 } from '@angular/fire/firestore';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService, Usuario, Unidad } from 'src/app/core/auth/services/auth.service'; // Importar 'Unidad'
@@ -68,43 +69,37 @@ export class PerfilComponent implements OnInit {
     private functions: Functions
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    
-    const uidParam = this.route.snapshot.paramMap.get('uid');
-    const auth = getAuth();
+async ngOnInit(): Promise<void> {
+  const uidParam = this.route.snapshot.paramMap.get('uid');
 
-
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      // Eliminar el unsubscribe aquí, se debe llamar solo una vez o al final del flujo principal
-      // unsubscribe(); // <-- Eliminar esta línea
-
-      if (user) {
-        this.correo = user.email || '';
-
-        if (uidParam) {
-          this.uid = uidParam;
-
-          // Ver si el perfil es de otro usuario
-          if (uidParam !== user.uid) {
-            this.soloLectura = true;
-          }
-        } else {
-          this.uid = user.uid;
-        }
-
-        await this.cargarDatosUsuario();
-        await this.obtenerReportesUsuario();
-        await this.cargarPagosUsuario();
-        await this.authService.getCurrentUser()?.getIdToken(true); // Forzar recarga
-        const rol = await this.authService.cargarRolActual();
-        this.esAdmin = rol === 'admin';
-      }
-
-      // Mover unsubscribe aquí para que se ejecute después de toda la lógica de carga inicial
-      // o manejar con Observables como se sugirió en la respuesta anterior para un mejor flujo.
-      unsubscribe();
-    });
+  // Obtener el usuario actual
+  const user = await this.authService.getCurrentUser();
+  if (!user) {
+    // Manejar caso de no autenticado, redirigir o mostrar mensaje
+    return;
   }
+
+  this.correo = user.email || '';
+
+  if (uidParam) { 
+    this.uid = uidParam;
+    if (uidParam !== user.uid) {
+      this.soloLectura = true;
+    }
+  } else {
+    this.uid = user.uid;
+  }
+
+  // 🔄 FORZAR RECARGA DEL TOKEN ANTES DE CONSULTAS
+  await user.getIdToken(true); // <- clave
+  const rol = await this.authService.cargarRolActual();
+  this.esAdmin = rol === 'admin';
+
+  // Ahora sí hacemos las consultas a Firestore
+  await this.cargarDatosUsuario();
+  await this.obtenerReportesUsuario();
+  await this.cargarPagosUsuario();
+}
 
 
   async cargarDatosUsuario() {
@@ -175,6 +170,8 @@ export class PerfilComponent implements OnInit {
         minBasePagados += detalles.minutosBase || 0;
         multasPagadas += detalles.multas || 0;
       });
+      
+      const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
 
       tempReportes.push({
         ...data,
@@ -183,7 +180,8 @@ export class PerfilComponent implements OnInit {
         minutosPagados,
         adminPagada,
         minBasePagados,
-        multasPagadas
+        multasPagadas,
+        fechaModificacion
       });
     }
 
