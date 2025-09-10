@@ -325,7 +325,7 @@ async eliminarUsuario(): Promise<void> {
     if (user) {
       await user.getIdToken(true);
       const tokenResult = await user.getIdTokenResult();
-      console.log('🔄 Token recargado antes de eliminar:', tokenResult.claims);
+      //console.log('🔄 Token recargado antes de eliminar:', tokenResult.claims);
     }
 
     const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');

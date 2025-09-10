@@ -84,9 +84,10 @@
  </div>
  </div>
 
-<button type="submit">
- <span class="material-icons">person_add</span> Registrar Nuevo Usuario
- </button>
+<button type="submit" [disabled]="isRegistering">
+  <span class="material-icons">person_add</span>
+  {{ isRegistering ? 'Registrando...' : 'Registrar Nuevo Usuario' }}
+</button>
  <div *ngIf="mensajeError" class="error-message">
  <span class="material-icons">error</span> {{ mensajeError }}
  </div>
