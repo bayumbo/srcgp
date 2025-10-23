@@ -17,7 +17,7 @@ import { Firestore, collection, getDocs, doc, getDoc } from '@angular/fire/fires
 export class NuevoRegistroComponent {
   reporte: NuevoRegistro = {
     adminPagada: 0,
-    administracion: 0,
+    administracion: 2,
     minBasePagados: 0,
     minutosAtraso: 0,
     minutosBase: 0,
@@ -46,9 +46,10 @@ export class NuevoRegistroComponent {
   constructor(private reportesService: ReportesService) {
     this.cargarUsuarios();
     this.cargarSiEsEdicion();
-    this.fechaInput = this.reporte.fechaModificacion instanceof Date
-  ? this.reporte.fechaModificacion.toISOString().split('T')[0]
-  : '';
+    const hoy = new Date();
+    const offset = hoy.getTimezoneOffset(); // en minutos
+    const hoyLocal = new Date(hoy.getTime() - offset * 60000);
+    this.fechaInput = hoyLocal.toISOString().split('T')[0];
   }
 
   cancelar(): void {

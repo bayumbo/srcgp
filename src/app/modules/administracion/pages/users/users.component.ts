@@ -34,6 +34,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
   styleUrls: ['./user.component.scss']
 })
 export class PerfilComponent implements OnInit {
+  cargando: boolean = false;
   nombres: string = '';
   apellidos: string = ''; 
   correo: string = '';
@@ -48,7 +49,8 @@ export class PerfilComponent implements OnInit {
   showNewPassword: boolean = false;
   esAdmin: boolean = false;
   soloLectura: boolean = false;
-
+  mostrarConfirmacion = false;
+  eliminando = false;
   // Para comparar cambios
   // Nota: Considera si necesitas comparar cambios en las unidades aquí o en otra parte
   datosOriginales: Partial<Usuario> = {}; // CAMBIO: Usar Partial<Usuario> para tipado
@@ -140,8 +142,11 @@ async ngOnInit(): Promise<void> {
   }
 
   async obtenerReportesUsuario() {
-    if (!this.uid) return;
+  if (!this.uid) return;
 
+  this.cargando = true; // ⬅️ Inicia el spinner
+
+  try {
     const firestore = getFirestore();
     const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
     const q = query(reportesRef, orderBy('fechaModificacion', 'desc'));
@@ -161,7 +166,7 @@ async ngOnInit(): Promise<void> {
       let minBasePagados = 0;
       let multasPagadas = 0;
 
-      pagosSnap.forEach(pagoDoc => {
+      pagosSnap.forEach((pagoDoc) => {
         const pago = pagoDoc.data();
         const detalles = pago['detalles'] ?? {};
 
@@ -170,8 +175,9 @@ async ngOnInit(): Promise<void> {
         minBasePagados += detalles.minutosBase || 0;
         multasPagadas += detalles.multas || 0;
       });
-      
-      const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
+
+      const fechaModificacion =
+        (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
 
       tempReportes.push({
         ...data,
@@ -181,12 +187,18 @@ async ngOnInit(): Promise<void> {
         adminPagada,
         minBasePagados,
         multasPagadas,
-        fechaModificacion
+        fechaModificacion,
       });
     }
 
     this.reportesUsuario = tempReportes;
+  } catch (error) {
+    console.error('Error al obtener reportes del usuario:', error);
+  } finally {
+    this.cargando = false; // ⬅️ Detiene el spinner siempre, haya éxito o error
   }
+}
+
 
 
 
@@ -315,17 +327,19 @@ async ngOnInit(): Promise<void> {
     this.actualizarPagosPaginados();
   }
 
-async eliminarUsuario(): Promise<void> {
-  const confirmar = confirm('¿Eliminar este usuario completamente (Firestore + Auth)?');
-  if (!confirmar || !this.uid) return;
+eliminarUsuario(): void {
+  this.mostrarConfirmacion = true;
+}
+
+async confirmarEliminacion(): Promise<void> {
+  this.mostrarConfirmacion = false;
+  this.eliminando = true;
 
   try {
-    // 🔁 Forzar recarga del token para asegurar que el claim esté actualizado
     const user = getAuth().currentUser;
     if (user) {
       await user.getIdToken(true);
-      const tokenResult = await user.getIdTokenResult();
-      //console.log('🔄 Token recargado antes de eliminar:', tokenResult.claims);
+      await user.getIdTokenResult();
     }
 
     const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');
@@ -336,8 +350,15 @@ async eliminarUsuario(): Promise<void> {
   } catch (error) {
     console.error('❌ Error al eliminar usuario:', error);
     alert('❌ No se pudo eliminar completamente el usuario.');
+  } finally {
+    this.eliminando = false;
   }
 }
+
+cancelarEliminacion(): void {
+  this.mostrarConfirmacion = false;
+}
+
 
   actualizarPagosPaginados() {
     const inicio = (this.paginaActualPagos - 1) * this.pagosPorPagina;

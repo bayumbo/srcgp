@@ -126,7 +126,11 @@
     <div class="tabla-reportes-usuario">
       <div class="tabla-scroll-horizontal">
         <h3>📄 Tus Reportes Registrados</h3>
-        <table *ngIf="reportesUsuario.length > 0">
+        <div class="loading" *ngIf="cargando">
+        <div class="spinner"></div>
+        <p>Cargando reportes...</p>
+      </div>
+        <table *ngIf="!cargando && reportesUsuario.length > 0">
           <thead>
             <tr>
               <th>Fecha</th>
@@ -156,7 +160,7 @@
             </tr>
           </tbody>
         </table>
-        <p *ngIf="reportesUsuario.length === 0">Aún no tienes reportes registrados.</p>
+        <p *ngIf="!cargando &&reportesUsuario.length === 0">Aún no tienes reportes registrados.</p>
         <div class="tabla-recibos-usuario">
           <h3>📥 Recibos de Pagos</h3>
           <table *ngIf="pagosPaginados.length > 0">
@@ -190,4 +194,23 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- 🔘 Modal de confirmación -->
+<div class="modal-overlay" *ngIf="mostrarConfirmacion">
+  <div class="modal">
+    <h3>⚠️ Confirmar eliminación</h3>
+    <p>¿Deseas eliminar este usuario completamente (Firestore + Auth)?</p>
+    <p class="texto-advertencia">Esta acción no se puede deshacer.</p>
+    <div class="modal-buttons">
+      <button class="btn-cancelar" (click)="cancelarEliminacion()">Cancelar</button>
+      <button class="btn-eliminar" (click)="confirmarEliminacion()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⏳ Spinner mientras se elimina -->
+<div class="overlay-spinner" *ngIf="eliminando">
+  <div class="spinner"></div>
+  <p>Eliminando usuario...</p>
 </div>
