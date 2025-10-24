@@ -73,15 +73,15 @@
 
 
   <div *ngIf="activos.length > 0 || pasivos.length > 0 || patrimonio.length > 0" class="resultado-estado">
-    
+
     <div class="acciones">
       <button (click)="generarPDF()" [disabled]="activos.length === 0 && pasivos.length === 0 && patrimonio.length === 0">
         📄 Generar PDF
       </button>
     </div>
-    
-    
-    
+
+
+
     <h6>ACTIVOS</h6>
     <table>
       <thead>
@@ -90,7 +90,7 @@
       <tbody>
         <tr *ngFor="let item of activos">
           <td>{{ item.codigo }}</td>
-          <td>{{ item.nombre }}</td>
+          <td>{{ item.descripcion }}</td>
           <td>{{ item.saldo | number:'1.2-2' }}</td>
         </tr>
       </tbody>
@@ -99,7 +99,7 @@
       </tfoot>
     </table>
 
-   
+
 
 
     <h6>PASIVOS</h6>
@@ -110,7 +110,7 @@
       <tbody>
         <tr *ngFor="let item of pasivos">
           <td>{{ item.codigo }}</td>
-          <td>{{ item.nombre }}</td>
+          <td>{{ item.descripcion }}</td>
           <td>{{ item.saldo | number:'1.2-2' }}</td>
         </tr>
       </tbody>
@@ -127,7 +127,7 @@
       <tbody>
         <tr *ngFor="let item of patrimonio">
           <td>{{ item.codigo }}</td>
-          <td>{{ item.nombre }}</td>
+          <td>{{ item.descripcion }}</td>
           <td>{{ item.saldo | number:'1.2-2' }}</td>
         </tr>
       </tbody>

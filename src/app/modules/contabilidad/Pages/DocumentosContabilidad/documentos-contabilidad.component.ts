@@ -20,25 +20,25 @@ export class DocumentosContabilidadComponent implements OnInit {
   formDoc: FormGroup;
   documentos: DocumentoContable[] = [];
   editandoId: string | null = null;
- 
+
 
    // Paginación y búsqueda
    filtro = '';
    paginaActual = 1;
    registrosPorPagina = 7;
- 
+
    constructor(private fb: FormBuilder, private docService: DocumentosService) {
      this.formDoc = this.fb.group({
        codigo: ['', Validators.required],
        descripcion: ['', Validators.required],
      });
    }
- 
+
 
    async ngOnInit(): Promise<void> {
     this.documentos = (await this.docService.obtenerDocumentos())
       .filter(d => !!d.codigo && !!d.descripcion);
-  
+
     setTimeout(() => {
       const preloader = document.getElementById('preloader');
       if (preloader) preloader.style.display = 'none';
@@ -48,7 +48,7 @@ export class DocumentosContabilidadComponent implements OnInit {
   subCodificacion = false;
   subTransacciones = false;
   subLibros = false;
-  
+
   submenus: Record<SubmenuKeys, boolean> = {
     codificacion: false,
     transacciones: false,
@@ -59,9 +59,9 @@ export class DocumentosContabilidadComponent implements OnInit {
       event.preventDefault();
       this.submenus[nombre] = !this.submenus[nombre];
     }
-  
-  
-  
+
+
+
       toggleMenu() {
       this.menuAbierto = !this.menuAbierto;
     }
@@ -75,20 +75,20 @@ export class DocumentosContabilidadComponent implements OnInit {
   }
   async guardarDocumento() {
     if (this.formDoc.invalid) return;
-  
+
     const data = this.formDoc.value;
-  
+
     if (this.editandoId) {
       await this.docService.actualizarDocumento(this.editandoId, data);
       this.editandoId = null;
     } else {
       await this.docService.agregarDocumento(data);
     }
-  
+
     this.documentos = await this.docService.obtenerDocumentos(); // recargar tabla
     this.formDoc.reset();
   }
-  
+
   editar(doc: any) {
     this.formDoc.setValue({
       codigo: doc.codigo,
@@ -139,5 +139,5 @@ irUltimaPagina() {
   this.paginaActual = this.totalPaginas;
 }
 
-}  
+}
 
