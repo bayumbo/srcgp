@@ -90,8 +90,9 @@
               <td class="celda-input-fecha">
                 <input
                   type="date"
-                  [(ngModel)]="fechasPagosActuales[registros.id!][campo]"
                   class="form-control"
+                  [(ngModel)]="fechasPagosActuales[registros.id!][campo]"
+                  [value]="fechasPagosActuales[registros.id!][campo] || obtenerFechaActual()"
                 />
               </td>
             </tr>

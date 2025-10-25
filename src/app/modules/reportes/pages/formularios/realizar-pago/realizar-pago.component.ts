@@ -99,9 +99,24 @@ export class RealizarPagoComponent implements OnInit {
     };
 
     await this.cargarPagosTotales();
+    
+    if (this.registros?.id) {
+  for (const campo of this.campos) {
+    if (!this.fechasPagosActuales[this.registros.id][campo]) {
+      this.fechasPagosActuales[this.registros.id][campo] = this.obtenerFechaActual();
+    }
+  }
+}
   }  
 
-  async cargarPagosTotales() {
+  obtenerFechaActual(): string {
+  const hoy = new Date();
+  const year = hoy.getFullYear();
+  const month = String(hoy.getMonth() + 1).padStart(2, '0');
+  const day = String(hoy.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+async cargarPagosTotales() {
   // Limpia el estado de pagos anteriores
   for (const campo of this.campos) {
     this.pagosTotales[campo as CampoClave] = [];
@@ -141,77 +156,81 @@ export class RealizarPagoComponent implements OnInit {
   fechaSeleccionada: Date = new Date();
 
   async guardarPagosGenerales() {
-    if (this.cargandoPago) return;
-    this.cargandoPago = true;
+  if (this.cargandoPago) return;
+  this.cargandoPago = true;
 
-    try {
-        if (this.registros) {
-        const registro = this.registros; // ✅ Usamos un nombre de variable más claro
-        const detalles: Partial<Record<CampoClave, number>> = {};
-        const pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[] = [];
-        let tienePago = false;
-        let total = 0;
+  try {
+    if (this.registros) {
+      const registro = this.registros;
+      const detalles: Partial<Record<CampoClave, number>> = {};
+      const pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[] = [];
+      let tienePago = false;
+      let total = 0;
 
-        // 1. Recolectar todos los pagos y sus fechas
-        for (const campo of this.campos) {
-          const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
-          if (monto > 0) {
-            tienePago = true;
-            detalles[campo] = monto;
-            total += monto;
+      for (const campo of this.campos) {
+        const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
+        if (monto > 0) {
+          tienePago = true;
+          detalles[campo] = monto;
+          total += monto;
 
-            const fechaPagoRegistro = this.fechasPagosActuales[registro.id!]?.[campo as CampoClave];
-            if (!fechaPagoRegistro) {
-              console.error(`Fecha de pago no encontrada para el campo: ${campo}`);
-              continue;
-            }
+          const fechaPagoRegistro = this.fechasPagosActuales[registro.id!]?.[campo];
+          if (!fechaPagoRegistro) continue;
 
-            const [year, month, day] = fechaPagoRegistro.split('-').map(Number);
-            const fechaPagoLocal = new Date(year, month - 1, day);
-            const fecha = Timestamp.fromDate(fechaPagoLocal);
-            
-            pagosConFechas.push({ campo, monto, fecha });
-          }
-        }
-
-        // 2. Si hay pagos, generar un único recibo y guardar un solo documento
-        if (tienePago && pagosConFechas.length > 0) { // ✅ Verificamos que haya fechas
-          const urlPDF = await this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
-            nombre: registro.nombre,
-            apellido: registro.apellido,
-            unidad: registro.unidad,
-            total: total,
-            detalles: detalles,
-            // ✅ PASAMOS EL NUEVO ARRAY AL GENERADOR DE PDF
-            pagosConFechas: pagosConFechas
-          });
-
-          const ref = collection(
-            this.firestore,
-            `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
-          );
-
-          await addDoc(ref, {
-            // Usamos la fecha del primer pago para el documento de Firestore
-            fecha: pagosConFechas[0].fecha,
-            detalles: detalles,
-            total: total,
-            urlPDF,
-            // Guardamos las fechas individuales por cada módulo
-            fechasPorModulo: pagosConFechas.reduce((acc, p) => ({ ...acc, [p.campo]: p.fecha }), {})
-          });
+          const [year, month, day] = fechaPagoRegistro.split('-').map(Number);
+          const fecha = Timestamp.fromDate(new Date(year, month - 1, day));
+          pagosConFechas.push({ campo, monto, fecha });
         }
       }
 
-      alert('✅ Pagos registrados y recibos generados correctamente.');
-      this.router.navigate(['/reportes/lista-reportes']);
-    } catch (error) {
-      console.error('❌ Error al guardar los pagos:', error);
-      alert('Ocurrió un error al guardar los pagos. Intenta nuevamente.');
-    } finally {
-      this.cargandoPago = false;
+      if (tienePago && pagosConFechas.length > 0) {
+        const ref = collection(
+          this.firestore,
+          `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
+        );
+
+        // 1️⃣ Guardar inmediatamente el pago (sin PDF aún)
+        const docRef = await addDoc(ref, {
+          fecha: pagosConFechas[0].fecha,
+          detalles,
+          total,
+          urlPDF: null,
+          fechasPorModulo: pagosConFechas.reduce((acc, p) => ({ ...acc, [p.campo]: p.fecha }), {})
+        });
+        
+
+        // 2️⃣ Liberar el botón y navegar ya
+        alert('✅ Pago registrado correctamente. Generando recibo en segundo plano...');
+        this.router.navigate(['/reportes/lista-reportes']);
+        this.cargandoPago = false;
+
+        // 3️⃣ Generar PDF en segundo plano
+        this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
+          nombre: registro.nombre,
+          apellido: registro.apellido,
+          unidad: registro.unidad,
+          total,
+          detalles,
+          pagosConFechas
+        })
+        .then(async (urlPDF) => {
+          // Actualiza el documento con el link del PDF
+          await updateDoc(doc(this.firestore, ref.path, docRef.id), { urlPDF });
+          console.log('📄 Recibo PDF generado y URL actualizada');
+        })
+        .catch(err => {
+          console.error('❌ Error generando el PDF:', err);
+        });
+      }
     }
+  } catch (error) {
+    console.error('❌ Error al guardar los pagos:', error);
+    alert('Ocurrió un error al guardar los pagos.');
+  } finally {
+    this.cargandoPago = false;
   }
+}
+
   /*---------------------------------- Lógica generar recibo y formato----------------------*/
   
   async generarReciboYSubirPDF(
@@ -368,11 +387,14 @@ export class RealizarPagoComponent implements OnInit {
     pdfDoc.addImage(qrBase64, 'PNG', (210 - qrSize) / 2, yFinal2 + displayHeight + 30, qrSize, qrSize);
 
     // 💾 Guardar localmente
-    
-    pdfDoc.save(`${fechaTexto}_
-    ${datos.unidad.replace(/\s+/g, '_')}_
-    ${datos.nombre.replace(/\s+/g, '_')}_
-    ${datos.apellido.replace(/\s+/g, '_')}.pdf`);
+        
+    setTimeout(() => {
+      pdfDoc.save(`${fechaTexto}_
+      ${datos.unidad.replace(/\s+/g, '_')}_
+      ${datos.nombre.replace(/\s+/g, '_')}_
+      ${datos.apellido.replace(/\s+/g, '_')}.pdf`);
+    }, 500); // medio segundo después, opcional
+
     return pdfUrl;
   }
   
