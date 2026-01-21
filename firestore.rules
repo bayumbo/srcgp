@@ -1,19 +1,125 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
+    // -------------------------------------
+    // Funciones auxiliares
+    // -------------------------------------
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    // Admin por custom claim O por campo rol en usuarios/{uid}
+    function esAdmin() {
+      return request.auth != null && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin'
+      );
+    }
+
+    // -------------------------------------
+    // Colección de usuarios privados
+    // -------------------------------------
+    match /usuarios/{userId} {
+      allow read, write: if estaAutenticado() && (request.auth.uid == userId || esAdmin());
+
+      match /unidades/{unidadId} {
+        allow read, write: if estaAutenticado() && (request.auth.uid == userId || esAdmin());
+      }
+
+      // reportesDiarios dentro de usuarios
+      match /reportesDiarios/{reporteId} {
+        allow read, write: if estaAutenticado() && (
+          esAdmin() || request.auth.uid == resource.data.userId
+        );
+
+        match /pagosTotales/{pagoId} {
+          allow read, write: if estaAutenticado() && (
+            esAdmin() || request.auth.uid == resource.data.userId
+          );
+        }
+      }
+    }
+
+    // -------------------------------------
+    // CollectionGroup para reportesDiarios
+    // -------------------------------------
+    match /{path=**}/reportesDiarios/{reporteId} {
+      allow read, write: if estaAutenticado() && (
+        esAdmin() || request.auth.uid == resource.data.userId
+      );
+
+      match /pagosTotales/{pagoId} {
+        allow read, write: if estaAutenticado() && (
+          esAdmin() || request.auth.uid == resource.data.userId
+        );
+      }
+    }
+
+    // -------------------------------------
+    // Colecciones de contabilidad
+    // -------------------------------------
+    match /catalogo-cuentas/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /centro-costos/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /cierresCaja/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /documentos-contables/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /asientos-apertura/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /comprobantes-ingreso/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /comprobantes/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /transacciones-generales/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /compras-varias/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    match /libro-diario/{docId} {
+      allow read, write: if estaAutenticado();
+    }
+
+    // -------------------------------------
+    // NUEVA colección global de unidades
+    // -------------------------------------
+    match /unidades/{unidadId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin(); // Solo admin sincroniza/crea unidades globales
+    }
+
+    // -------------------------------------
+    // Colección de usuarios públicos
+    // -------------------------------------
+    match /usuariosPublicos/{userId} {
+      allow read: if true; // público
+      allow write: if esAdmin(); // solo admins
+    }
+
+    // -------------------------------------
+    // Bloquear todo lo demás
+    // -------------------------------------
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 5, 1);
+      allow read, write: if false;
     }
   }
 }

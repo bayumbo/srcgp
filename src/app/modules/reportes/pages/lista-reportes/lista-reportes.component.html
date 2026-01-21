@@ -10,7 +10,7 @@
     <h5>NÓMINA DE RECAUDACIÓN</h5>
     <button class="boton-volver" (click)="volver()">← Volver</button>
 
-   
+
     <!-- Contenedor de acciones superior -->
     <div class="acciones-globales">
       <!-- Izquierda: Reporte Empresas -->
@@ -23,6 +23,9 @@
 
       <!-- Derecha: Filtros y nuevo registro -->
       <div class="acciones-secundarias">
+        <button class="btn" (click)="agregarDia()" [disabled]="creandoDia">
+          {{ creandoDia ? 'Creando día...' : 'Agregar día' }}
+        </button>
         <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
           <span class="material-icons">filter_alt</span>
         </button>
@@ -32,24 +35,24 @@
         </button>
       </div>
     </div>
-    
+
     <div *ngIf="mostrarOpcionesEmpresa" class="panel-empresa">
       <!-- Botones de empresas -->
       <div class="botones-empresa">
         <button (click)="seleccionarEmpresa('Pintag')" [class.activa]="empresaSeleccionada === 'Pintag'">Pintag</button>
         <button (click)="seleccionarEmpresa('Antisana')" [class.activa]="empresaSeleccionada === 'Antisana'">Antisana</button>
       </div>
-    
+
       <!-- Fechas -->
       <div *ngIf="empresaSeleccionada" class="filtros-fecha">
         <label>Fecha de inicio:</label>
         <input type="date" [(ngModel)]="fechaInicio" (change)="validarRangoFechas()" />
-    
+
         <label>Fecha de fin:</label>
         <input type="date" [(ngModel)]="fechaFin" (change)="validarRangoFechas()" />
-    
+
         <p class="error" *ngIf="errorFecha">{{ errorFecha }}</p>
-    
+
         <button
           class="generar-reporte"
           (click)="generarReporteEmpresasPDF()"
@@ -74,7 +77,7 @@
         <div class="acciones-imprimir">
           <button class="boton-imprimir" (click)="imprimirPDFMinutosDesdeVista()">
             <span class="material-icons">schedule</span>
-            Imprimir Minutos 
+            Imprimir Minutos
           </button>
           <button class="boton-imprimir" (click)="imprimirPDFAdministracionDesdeVista()">
             <span class="material-icons">receipt_long</span>
@@ -85,7 +88,7 @@
 
       <button class="limpiar" (click)="cargarTodosLosReportes()">Limpiar filtros</button>
     </div>
-    
+
     <!-- Tabla -->
     <table *ngIf="reportes.length > 0">
       <thead>
@@ -143,7 +146,7 @@
         Siguiente →
       </button>
     </div>
-    
+
     <div *ngIf="cargandoPDF" class="overlay-cargando">
       <div class="spinner-pdf">
         <p>🌀 Generando PDF, por favor espera...</p>
