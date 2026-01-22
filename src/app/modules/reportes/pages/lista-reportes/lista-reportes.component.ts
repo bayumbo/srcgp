@@ -37,35 +37,35 @@ export class ReporteListaComponent implements OnInit {
   creandoDia = false;
   esSocio: boolean = false;
 
-  // Nuevo: modo de vista
-  modoVista: 'historico' | 'diario' = 'historico';
-
-  modoActual: 'todos' | 'filtrado' = 'todos'; // se mantiene para tu lógica existente
+  modoVista: 'historico' | 'diario' = 'diario';
+  modoActual: 'todos' | 'filtrado' = 'filtrado';
   cargandoPDF: boolean = false;
 
   reportes: ReporteConPagos[] = [];
   cargando: boolean = true;
 
   mostrarFiltros = false;
-  fechaPersonalizada: string = ''; // yyyy-mm-dd (por input type=date)
+  fechaPersonalizada: string = ''; // yyyy-mm-dd
 
-  // Empresa
+  // Empresa (solo para PDF Empresas)
   mostrarOpcionesEmpresa = false;
   empresaSeleccionada: string | null = null;
   fechaInicio: string = '';
   fechaFin: string = '';
   errorFecha: string = '';
 
-  // Paginación (histórico)
-  paginaActual: number = 1;
-  reportesPorPagina: number = 5;
-  private storage = inject(Storage);
-  hayMasReportes: boolean = true;
-  private cacheUsuarios = new Map<string, any>();
+  // Mensajes
+  mostrarMensajeDia: boolean = false;
+  mensajeEstadoDia: string = '';
 
+  // Paginación (legacy/histórico)
+  paginaActual: number = 1;
+  reportesPorPagina: number = 10;
+  hayMasReportes: boolean = true;
   cursorStack: any[] = [];
   ultimaFechaCursor: any = null;
 
+  private storage = inject(Storage);
   private firestore = inject(Firestore);
   private router = inject(Router);
 
@@ -79,8 +79,8 @@ export class ReporteListaComponent implements OnInit {
       this.esSocio = role === 'socio';
     });
 
-    // Por defecto, carga el histórico como lo venías haciendo
-    await this.cargarTodosLosReportes();
+    // Pantalla principal: último día generado
+    await this.cargarUltimoDiaGenerado();
   }
 
   // ==========================
@@ -93,99 +93,303 @@ export class ReporteListaComponent implements OnInit {
     return `${yyyy}-${mm}-${dd}`;
   }
 
+  private startOfWeekISO(date: Date): string {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 domingo
+    const diff = day === 0 ? -6 : 1 - day; // lunes
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return this.toISO(d);
+  }
+
+  private endOfWeekISO(date: Date): string {
+    const start = new Date(`${this.startOfWeekISO(date)}T12:00:00`);
+    start.setDate(start.getDate() + 6);
+    return this.toISO(start);
+  }
+
+  private startOfMonthISO(date: Date): string {
+    const d = new Date(date.getFullYear(), date.getMonth(), 1);
+    d.setHours(0, 0, 0, 0);
+    return this.toISO(d);
+  }
+
+  private endOfMonthISO(date: Date): string {
+    const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    d.setHours(0, 0, 0, 0);
+    return this.toISO(d);
+  }
+
+  // Visible si cualquier valor asignado/pagado es > 0
+  private esRegistroVisible(r: any): boolean {
+    const asignados =
+      (r.minutosAtraso ?? 0) +
+      (r.administracion ?? 0) +
+      (r.minutosBase ?? 0) +
+      (r.multas ?? 0);
+
+    const pagados =
+      (r.minutosPagados ?? 0) +
+      (r.adminPagada ?? 0) +
+      (r.minBasePagados ?? 0) +
+      (r.multasPagadas ?? 0);
+
+    return (asignados + pagados) > 0;
+  }
+
   // ==========================
-  // NUEVO: Cargar vista DIARIA desde reportes_dia
+  // Cargar ÚLTIMO día generado (reportes_dia)
   // ==========================
-  async cargarDiaEnListaReportes(fechaISO: string) {
+  async cargarUltimoDiaGenerado() {
     this.cargando = true;
     this.modoVista = 'diario';
-    this.hayMasReportes = false; // en diario no hay paginación (muestras todas)
+    this.modoActual = 'filtrado';
+    this.hayMasReportes = false;
+
+    this.mostrarMensajeDia = false;
+    this.mensajeEstadoDia = '';
 
     try {
-      // 1) traer unidades globales activas de ambas empresas (ordenadas)
-      const [unP, unA] = await Promise.all([
-        this.reportesDiaService.getUnidadesPorEmpresa('General Pintag'),
-        this.reportesDiaService.getUnidadesPorEmpresa('Expreso Antisana'),
-      ]);
+      // Buscamos el último día generado en reportes_dia (por fecha desc)
+      const ref = collection(this.firestore, 'reportes_dia');
+      const q = query(ref, orderBy('fecha', 'desc'), limit(1));
+      const snap = await getDocs(q);
 
-      const unidades = [...unP, ...unA];
+      if (snap.empty) {
+        this.reportes = [];
+        this.fechaPersonalizada = '';
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = 'No existen días generados aún en reportes_dia.';
+        return;
+      }
 
-      // 2) traer docs ya creados del día
-      const [regP, regA] = await Promise.all([
-        this.reportesDiaService.getRegistrosDia('General Pintag', fechaISO),
-        this.reportesDiaService.getRegistrosDia('Expreso Antisana', fechaISO),
-      ]);
+      const data = snap.docs[0].data() as any;
+      const fechaISO = data.fecha as string;
 
-      const regs = [...regP, ...regA];
-      const mapReg = new Map<string, any>();
-      regs.forEach(r => mapReg.set(r.unidadId ?? r.id, r));
-
-      // 3) mapear a tu interfaz ReporteConPagos (para que la tabla actual funcione)
-      const temp: ReporteConPagos[] = unidades.map((u: any) => {
-        const r = mapReg.get(u.id);
-
-        const administracion = r?.administracion ?? 2;
-        const minutosBase = r?.minutosBase ?? 0;
-        const minutosAtraso = r?.minutosAtraso ?? 0;
-        const multas = r?.multas ?? 0;
-
-        const adminPagada = r?.adminPagada ?? 0;
-        const minBasePagados = r?.minBasePagados ?? 0;
-        const minutosPagados = r?.minutosPagados ?? 0;
-        const multasPagadas = r?.multasPagadas ?? 0;
-
-        // En el modo diario no existe uid+id legacy; usamos unidadId como id
-        return {
-          id: u.id,                // <- unidadId
-          uid: u.uidPropietario ?? '', // para mantener estructura (si tu HTML lo usa)
-          unidad: u.codigo ?? '',
-          nombre: u.propietarioNombre ?? '',
-          apellido: '',
-
-          minutosAtraso,
-          administracion,
-          minutosBase,
-          multas,
-
-          minutosPagados,
-          adminPagada,
-          minBasePagados,
-          multasPagadas,
-
-          // usamos fecha del día como fechaModificacion para reusar UI/PDF
-          fechaModificacion: new Date(`${fechaISO}T12:00:00`),
-
-          // opcional: guarda empresa para ordenar o filtrar en HTML si quieres
-          empresa: u.empresa ?? '',
-        } as any;
-      });
-
-      // 4) ordenar por empresa y numeroOrden (si tu tabla depende de unidad asc, igual queda)
-      temp.sort((a: any, b: any) => {
-        const ea = (a.empresa ?? '').toString();
-        const eb = (b.empresa ?? '').toString();
-        if (ea !== eb) return ea.localeCompare(eb);
-
-        // orden por número extraído de unidad: E01, P03, etc.
-        const numA = parseInt((a.unidad ?? '').replace(/\D/g, ''), 10) || 0;
-        const numB = parseInt((b.unidad ?? '').replace(/\D/g, ''), 10) || 0;
-        return numA - numB;
-      });
-
-      this.reportes = temp;
-      this.modoActual = 'filtrado'; // para que tu UI no intente paginar
-
+      this.fechaPersonalizada = fechaISO;
+      await this.cargarDiaEnListaReportes(fechaISO);
     } catch (e) {
-      console.error('❌ Error cargando día:', e);
-      alert('Error al cargar el día. Revise consola.');
+      console.error('❌ Error cargando último día:', e);
       this.reportes = [];
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = 'Error cargando el último día. Revise consola.';
     } finally {
       this.cargando = false;
     }
   }
 
   // ==========================
-  // Botón: Agregar día
+  // Opción A: Día exacto (SOLO registros existentes y visibles)
+  // ==========================
+  async cargarDiaEnListaReportes(fechaISO: string) {
+    this.cargando = true;
+    this.modoVista = 'diario';
+    this.modoActual = 'filtrado';
+    this.hayMasReportes = false;
+
+    this.mostrarMensajeDia = false;
+    this.mensajeEstadoDia = '';
+
+    try {
+      const [existeP, existeA] = await Promise.all([
+        this.reportesDiaService.existeDia('General Pintag' as any, fechaISO),
+        this.reportesDiaService.existeDia('Expreso Antisana' as any, fechaISO),
+      ]);
+
+      if (!existeP && !existeA) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No existen reportes generados para el día ${fechaISO}.`;
+        return;
+      }
+
+      const [regP, regA] = await Promise.all([
+        existeP ? this.reportesDiaService.getRegistrosDia('General Pintag' as any, fechaISO) : Promise.resolve([]),
+        existeA ? this.reportesDiaService.getRegistrosDia('Expreso Antisana' as any, fechaISO) : Promise.resolve([]),
+      ]);
+
+      const regs: any[] = [...regP, ...regA];
+
+      if (regs.length === 0) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No hay unidades registradas para el día ${fechaISO}.`;
+        return;
+      }
+
+      // Solo para completar campos visuales
+      const [unP, unA] = await Promise.all([
+        this.reportesDiaService.getUnidadesPorEmpresa('General Pintag' as any),
+        this.reportesDiaService.getUnidadesPorEmpresa('Expreso Antisana' as any),
+      ]);
+      const mapUnidad = new Map<string, any>();
+      [...unP, ...unA].forEach(u => mapUnidad.set(u.id, u));
+
+      const temp: ReporteConPagos[] = regs.map((r: any) => {
+        const unidadId = r.unidadId ?? r.id;
+        const u = mapUnidad.get(unidadId) ?? null;
+
+        return {
+          id: unidadId,
+          uid: u?.uidPropietario ?? r.uidPropietario ?? '',
+          unidad: u?.codigo ?? r.codigo ?? '',
+          nombre: u?.propietarioNombre ?? r.propietarioNombre ?? '',
+          apellido: '',
+
+          minutosAtraso: r.minutosAtraso ?? 0,
+          administracion: r.administracion ?? 0, // <- no inventar 2
+          minutosBase: r.minutosBase ?? 0,
+          multas: r.multas ?? 0,
+
+          minutosPagados: r.minutosPagados ?? 0,
+          adminPagada: r.adminPagada ?? 0,
+          minBasePagados: r.minBasePagados ?? 0,
+          multasPagadas: r.multasPagadas ?? 0,
+
+          fechaModificacion: new Date(`${fechaISO}T12:00:00`),
+          empresa: r.empresa ?? u?.empresa ?? '',
+        } as any;
+      });
+
+      const visibles = temp.filter(r => this.esRegistroVisible(r));
+
+      if (visibles.length === 0) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No existen reportes con valores para el día ${fechaISO}.`;
+        return;
+      }
+
+      visibles.sort((a: any, b: any) => {
+        const ea = (a.empresa ?? '').toString();
+        const eb = (b.empresa ?? '').toString();
+        if (ea !== eb) return ea.localeCompare(eb);
+
+        const numA = parseInt((a.unidad ?? '').replace(/\D/g, ''), 10) || 0;
+        const numB = parseInt((b.unidad ?? '').replace(/\D/g, ''), 10) || 0;
+        return numA - numB;
+      });
+
+      this.reportes = visibles;
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = `Mostrando reportes del día ${fechaISO}.`;
+    } catch (e) {
+      console.error('❌ Error cargando día:', e);
+      this.reportes = [];
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = 'Error al cargar el día. Revise consola.';
+    } finally {
+      this.cargando = false;
+    }
+  }
+
+  // ==========================
+  // Semana/Mes: detallado por fecha (NO acumulado) + visible
+  // ==========================
+  async cargarRangoDetalladoEnListaReportes(inicioISO: string, finISO: string) {
+    this.cargando = true;
+    this.modoVista = 'diario';
+    this.modoActual = 'filtrado';
+    this.hayMasReportes = false;
+
+    this.mostrarMensajeDia = false;
+    this.mensajeEstadoDia = '';
+
+    try {
+      const dias = await this.reportesDiaService.getDiasEnRango(inicioISO, finISO);
+
+      if (!dias || dias.length === 0) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No existen reportes generados entre ${inicioISO} y ${finISO}.`;
+        return;
+      }
+
+      // Unidades globales solo para completar nombre/código
+      const [unP, unA] = await Promise.all([
+        this.reportesDiaService.getUnidadesPorEmpresa('General Pintag' as any),
+        this.reportesDiaService.getUnidadesPorEmpresa('Expreso Antisana' as any),
+      ]);
+      const mapUnidad = new Map<string, any>();
+      [...unP, ...unA].forEach(u => mapUnidad.set(u.id, u));
+
+      const registrosPorDia = await Promise.all(
+        dias.map(d => this.reportesDiaService.getRegistrosDia(d.empresa as any, d.fecha))
+      );
+
+      const temp: ReporteConPagos[] = [];
+
+      for (let i = 0; i < dias.length; i++) {
+        const dia = dias[i]; // { empresa, fecha, ... }
+        const regs = registrosPorDia[i] || [];
+
+        for (const r of regs as any[]) {
+          const unidadId = r.unidadId ?? r.id;
+          const u = mapUnidad.get(unidadId) ?? null;
+
+          temp.push({
+            id: unidadId,
+            uid: u?.uidPropietario ?? r.uidPropietario ?? '',
+            unidad: u?.codigo ?? r.codigo ?? '',
+            nombre: u?.propietarioNombre ?? r.propietarioNombre ?? '',
+            apellido: '',
+
+            minutosAtraso: r.minutosAtraso ?? 0,
+            administracion: r.administracion ?? 0,
+            minutosBase: r.minutosBase ?? 0,
+            multas: r.multas ?? 0,
+
+            minutosPagados: r.minutosPagados ?? 0,
+            adminPagada: r.adminPagada ?? 0,
+            minBasePagados: r.minBasePagados ?? 0,
+            multasPagadas: r.multasPagadas ?? 0,
+
+            fechaModificacion: new Date(`${dia.fecha}T12:00:00`),
+            empresa: dia.empresa ?? u?.empresa ?? '',
+          } as any);
+        }
+      }
+
+      const visibles = temp.filter(r => this.esRegistroVisible(r));
+
+      if (visibles.length === 0) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No existen reportes con valores en el rango ${inicioISO} a ${finISO}.`;
+        return;
+      }
+
+      // Orden cronológico ascendente -> empresa -> unidad
+      visibles.sort((a: any, b: any) => {
+        const fa = new Date(a.fechaModificacion).getTime();
+        const fb = new Date(b.fechaModificacion).getTime();
+        if (fa !== fb) return fa - fb;
+
+        const ea = (a.empresa ?? '').toString();
+        const eb = (b.empresa ?? '').toString();
+        if (ea !== eb) return ea.localeCompare(eb);
+
+        const numA = parseInt((a.unidad ?? '').replace(/\D/g, ''), 10) || 0;
+        const numB = parseInt((b.unidad ?? '').replace(/\D/g, ''), 10) || 0;
+        return numA - numB;
+      });
+
+      this.reportes = visibles;
+
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = `Mostrando reportes del ${inicioISO} al ${finISO} (ordenado por fecha).`;
+    } catch (e) {
+      console.error('❌ Error cargando rango:', e);
+      this.reportes = [];
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = 'Error al cargar semana/mes. Revisa consola.';
+    } finally {
+      this.cargando = false;
+    }
+  }
+
+  // ==========================
+  // Botón: Agregar día (crea día completo en reportes_dia)
   // ==========================
   async agregarDia() {
     try {
@@ -194,11 +398,8 @@ export class ReporteListaComponent implements OnInit {
       const res = await this.reportesDiaService.agregarDiaCompleto();
       alert(`Día ${res.fecha} creado/actualizado. Nuevos: ${res.creados}. Ya existentes: ${res.omitidos}.`);
 
-      // Cargar inmediatamente el día creado
-      await this.cargarDiaEnListaReportes(res.fecha);
-
-      // setear también el input de fecha personalizada para que coincida con la vista
       this.fechaPersonalizada = res.fecha;
+      await this.cargarDiaEnListaReportes(res.fecha);
 
     } catch (e) {
       console.error(e);
@@ -209,11 +410,94 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Lógica existente (HISTÓRICO)
+  // Filtros
+  // ==========================
+  async filtrarPor(tipo: 'hoy' | 'semana' | 'mes') {
+    const hoy = new Date();
+
+    if (tipo === 'hoy') {
+      const hoyISO = this.toISO(hoy);
+      this.fechaPersonalizada = hoyISO;
+      await this.cargarDiaEnListaReportes(hoyISO);
+      return;
+    }
+
+    if (tipo === 'semana') {
+      const inicioISO = this.startOfWeekISO(hoy);
+      const finISO = this.endOfWeekISO(hoy);
+      await this.cargarRangoDetalladoEnListaReportes(inicioISO, finISO);
+      return;
+    }
+
+    const inicioISO = this.startOfMonthISO(hoy);
+    const finISO = this.endOfMonthISO(hoy);
+    await this.cargarRangoDetalladoEnListaReportes(inicioISO, finISO);
+  }
+
+  async filtrarPorFechaPersonalizada() {
+    if (!this.fechaPersonalizada) return;
+    await this.cargarDiaEnListaReportes(this.fechaPersonalizada);
+  }
+
+  // ==========================
+  // Empresa (solo para Reporte Empresas PDF)
+  // ==========================
+  seleccionarEmpresa(nombreBoton: string) {
+    if (nombreBoton === 'Pintag') {
+      this.empresaSeleccionada = 'General Pintag';
+    } else if (nombreBoton === 'Antisana') {
+      this.empresaSeleccionada = 'Expreso Antisana';
+    }
+    this.fechaInicio = '';
+    this.fechaFin = '';
+    this.errorFecha = '';
+  }
+
+  validarRangoFechas() {
+    if (this.fechaInicio && this.fechaFin) {
+      const inicio = new Date(this.fechaInicio);
+      const fin = new Date(this.fechaFin);
+      const diferenciaDias = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (diferenciaDias < 0) {
+        this.errorFecha = 'La fecha de inicio no puede ser mayor que la de fin.';
+        this.reportes = [];
+      } else if (diferenciaDias > 31) {
+        this.errorFecha = 'El rango no debe superar los 31 días.';
+        this.reportes = [];
+      } else {
+        this.errorFecha = '';
+        this.actualizarVistaPorRangoLegacy(); // para PDF empresas actual usa legacy: lo dejamos
+      }
+    }
+  }
+
+  // Mantengo tu flujo actual (legacy) solo para reporte empresas si lo necesitas.
+  // Si ya lo migraste a reportes_dia, luego lo cambiamos.
+  actualizarVistaPorRangoLegacy() {
+    if (!this.fechaInicio || !this.fechaFin || this.errorFecha) {
+      this.reportes = [];
+      return;
+    }
+    const inicio = new Date(this.fechaInicio);
+    const fin = new Date(this.fechaFin);
+    this.consultarReportesEnRango(inicio, fin);
+  }
+
+  async obtenerUIDsPorEmpresa(nombreEmpresa: string): Promise<string[]> {
+    const usuariosRef = collection(this.firestore, 'usuarios');
+    const q = query(usuariosRef, where('empresa', '==', nombreEmpresa));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.id);
+  }
+
+  // ==========================
+  // LEGACY (histórico) - se mantiene por compatibilidad
   // ==========================
   async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') {
     this.cargando = true;
     this.modoVista = 'historico';
+    this.modoActual = 'todos';
 
     try {
       let baseQuery = query(
@@ -249,7 +533,6 @@ export class ReporteListaComponent implements OnInit {
         const data = docSnap.data() as NuevoRegistro;
         const id = docSnap.id;
         const uid = docSnap.ref.parent.parent?.id ?? '';
-        const unidad = data.unidad ?? '';
 
         const userRef = doc(this.firestore, `usuarios/${uid}`);
         const userSnap = await getDoc(userRef);
@@ -276,9 +559,9 @@ export class ReporteListaComponent implements OnInit {
         tempReportes.push({
           id,
           uid,
-          unidad,
-          nombre: userData['nombres'] ?? '',
-          apellido: userData['apellidos'] ?? '',
+          unidad: data.unidad ?? '',
+          nombre: (userData as any)['nombres'] ?? '',
+          apellido: (userData as any)['apellidos'] ?? '',
           minutosAtraso: data.minutosAtraso ?? 0,
           administracion: data.administracion ?? 0,
           minutosBase: data.minutosBase ?? 0,
@@ -308,7 +591,7 @@ export class ReporteListaComponent implements OnInit {
       this.hayMasReportes = snapshot.docs.length === this.reportesPorPagina;
 
     } catch (error) {
-      console.error('❌ Error en paginación:', error);
+      console.error('❌ Error en paginación legacy:', error);
     } finally {
       this.cargando = false;
     }
@@ -362,7 +645,7 @@ export class ReporteListaComponent implements OnInit {
 
         pagosSnap.forEach(pagoDoc => {
           const pago = pagoDoc.data();
-          const detalles = pago['detalles'] ?? {};
+          const detalles = (pago as any)['detalles'] ?? {};
           minutosPagados += detalles.minutosAtraso || 0;
           adminPagada += detalles.administracion || 0;
           minBasePagados += detalles.minutosBase || 0;
@@ -372,12 +655,12 @@ export class ReporteListaComponent implements OnInit {
         const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
 
         tempReportes.push({
-          ...data,
+          ...(data as any),
           id,
           uid,
-          nombre: userData['nombres'] ?? '',
-          apellido: userData['apellidos'] ?? '',
-          unidad: data.unidad ?? userData['unidad'] ?? '',
+          nombre: (userData as any)['nombres'] ?? '',
+          apellido: (userData as any)['apellidos'] ?? '',
+          unidad: data.unidad ?? (userData as any)['unidad'] ?? '',
           minutosPagados,
           adminPagada,
           minBasePagados,
@@ -390,111 +673,14 @@ export class ReporteListaComponent implements OnInit {
       this.paginaActual = 1;
 
     } catch (error) {
-      console.error('Error al consultar por rango:', error);
+      console.error('Error al consultar por rango legacy:', error);
     } finally {
       this.cargando = false;
     }
   }
 
   // ==========================
-  // Filtros: ahora en modo DIARIO
-  // ==========================
-  async filtrarPor(tipo: 'hoy' | 'semana' | 'mes') {
-    // Nueva lógica: si quieres que hoy/semana/mes sigan siendo HISTÓRICO, déjalo como estaba.
-    // Pero por tu requerimiento de operación diaria instantánea, "hoy" debe cargar diario.
-
-    if (tipo === 'hoy') {
-      const hoyISO = this.toISO(new Date());
-      this.fechaPersonalizada = hoyISO;
-      await this.cargarDiaEnListaReportes(hoyISO);
-      return;
-    }
-
-    // Semana/Mes: por ahora conserva histórico (porque diario sería por día, no rango)
-    // Si quieres semana/mes en diario, se hace con lectura múltiple (y aún sería rápido).
-    this.modoActual = 'filtrado';
-
-    const hoy = new Date();
-    let fechaInicio: Date;
-    let fechaFin: Date;
-
-    if (tipo === 'semana') {
-      const diaActual = hoy.getDay();
-      const diferencia = diaActual === 0 ? 6 : diaActual - 1;
-      fechaInicio = new Date(hoy);
-      fechaInicio.setDate(hoy.getDate() - diferencia);
-      fechaInicio.setHours(0, 0, 0, 0);
-
-      fechaFin = new Date(hoy);
-      fechaFin.setHours(23, 59, 59, 999);
-    } else {
-      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0);
-      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
-    }
-
-    await this.consultarReportesEnRango(fechaInicio, fechaFin);
-  }
-
-  async filtrarPorFechaPersonalizada() {
-    if (!this.fechaPersonalizada) return;
-
-    // En vez de histórico por rango, cargar el día exacto
-    await this.cargarDiaEnListaReportes(this.fechaPersonalizada);
-  }
-
-  // ==========================
-  // Empresa (se mantiene)
-  // ==========================
-  seleccionarEmpresa(nombreBoton: string) {
-    if (nombreBoton === 'Pintag') {
-      this.empresaSeleccionada = 'General Pintag';
-    } else if (nombreBoton === 'Antisana') {
-      this.empresaSeleccionada = 'Expreso Antisana';
-    }
-    this.fechaInicio = '';
-    this.fechaFin = '';
-    this.errorFecha = '';
-  }
-
-  validarRangoFechas() {
-    if (this.fechaInicio && this.fechaFin) {
-      const inicio = new Date(this.fechaInicio);
-      const fin = new Date(this.fechaFin);
-      const diferenciaDias = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
-
-      if (diferenciaDias < 0) {
-        this.errorFecha = 'La fecha de inicio no puede ser mayor que la de fin.';
-        this.reportes = [];
-      } else if (diferenciaDias > 31) {
-        this.errorFecha = 'El rango no debe superar los 31 días.';
-        this.reportes = [];
-      } else {
-        this.errorFecha = '';
-        this.actualizarVistaPorRango();
-      }
-    }
-  }
-
-  actualizarVistaPorRango() {
-    if (!this.fechaInicio || !this.fechaFin || this.errorFecha) {
-      this.reportes = [];
-      return;
-    }
-
-    const inicio = new Date(this.fechaInicio);
-    const fin = new Date(this.fechaFin);
-    this.consultarReportesEnRango(inicio, fin);
-  }
-
-  async obtenerUIDsPorEmpresa(nombreEmpresa: string): Promise<string[]> {
-    const usuariosRef = collection(this.firestore, 'usuarios');
-    const q = query(usuariosRef, where('empresa', '==', nombreEmpresa));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.id);
-  }
-
-  // ==========================
-  // PDFs: se mantienen iguales
+  // PDFs (Minutos / Administración)
   // ==========================
   imprimirPDFMinutosDesdeVista() {
     if (!this.fechaPersonalizada) {
@@ -515,6 +701,13 @@ export class ReporteListaComponent implements OnInit {
   }
 
   generarPDFMinutos(data: ReporteConPagos[], fecha: Date) {
+    const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
+
+    if (filtrado.length === 0) {
+      alert('No hay valores de minutos para imprimir en esta vista.');
+      return;
+    }
+
     fecha.setHours(0, 0, 0, 0);
     const doc = new jsPDF();
     const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -538,14 +731,14 @@ export class ReporteListaComponent implements OnInit {
     doc.text('Píntag, Antisana S2-138', 135, 60);
     doc.text('consorciopinexpres@hotmail.com', 135, 65);
 
-    const cuerpo = data.map(item => [
+    const cuerpo = filtrado.map(item => [
       item.unidad || '',
       item.nombre || '',
-      `$ ${item.minutosAtraso?.toFixed(2) || '0.00'}`,
+      `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
       ''
     ]);
 
-    const totalMinutos = data.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
+    const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
 
     autoTable(doc, {
       head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
@@ -562,6 +755,13 @@ export class ReporteListaComponent implements OnInit {
   }
 
   generarPDFAdministracion(data: ReporteConPagos[], fecha: Date) {
+    const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
+
+    if (filtrado.length === 0) {
+      alert('No hay valores de administración para imprimir en esta vista.');
+      return;
+    }
+
     fecha.setHours(0, 0, 0, 0);
     const doc = new jsPDF();
     const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -585,14 +785,14 @@ export class ReporteListaComponent implements OnInit {
     doc.text('Píntag, Antisana S2-138', 135, 60);
     doc.text('consorciopinexpres@hotmail.com', 135, 65);
 
-    const cuerpo = data.map(item => [
+    const cuerpo = filtrado.map(item => [
       item.unidad || '',
       item.nombre || '',
-      `$ ${item.administracion?.toFixed(2) || '0.00'}`,
+      `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
       ''
     ]);
 
-    const totalAdministracion = data.reduce((sum, item) => sum + (item.administracion || 0), 0);
+    const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
 
     autoTable(doc, {
       head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
@@ -609,10 +809,9 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Eliminar reporte (solo histórico)
+  // Eliminar reporte (legacy/histórico)
   // ==========================
   async eliminarReporte(reporte: any) {
-    // Si estamos en modo diario, no se elimina desde aquí
     if (this.modoVista === 'diario') {
       alert('En modo diario no se eliminan registros. Si necesitas, lo manejamos como “desactivar unidad” o “reset”.');
       return;
@@ -656,7 +855,7 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Navegación (sin cambios)
+  // Navegación
   // ==========================
   irANuevoRegistro(): void {
     this.router.navigate(['/reportes/nuevo-registro']);
@@ -667,7 +866,6 @@ export class ReporteListaComponent implements OnInit {
   }
 
   irAPagar(uid: string, id: string): void {
-    // En modo diario no hay pago por documento legacy; se pagará desde flujo de pagos (lo vemos luego)
     this.router.navigate([`/reportes/realizar-pago`, uid, id]);
   }
 
@@ -679,30 +877,12 @@ export class ReporteListaComponent implements OnInit {
     this.router.navigate(['/reportes/cierre-caja']);
   }
 
-  limpiarFiltros() {
-    this.fechaPersonalizada = '';
-    this.fechaInicio = '';
-    this.fechaFin = '';
-    this.empresaSeleccionada = null;
-    this.errorFecha = '';
-    this.modoActual = 'todos';
-
-    // volver a histórico
-    this.modoVista = 'historico';
-    this.cursorStack = [];
-    this.ultimaFechaCursor = null;
-    this.paginaActual = 1;
-    this.hayMasReportes = true;
-
-    this.cargarTodosLosReportes();
-  }
-
   volver() {
     this.router.navigate(['']);
   }
 
   // ==========================
-  // PDF Empresa: se mantiene igual (tu código está abajo)
+  // PDF Empresas (tu implementación se mantiene)
   // ==========================
   private agruparDatosParaPDF(): Map<string, Map<string, any>> {
     const agrupado = new Map<string, Map<string, any>>();
@@ -748,23 +928,25 @@ export class ReporteListaComponent implements OnInit {
   }
 
   async generarReporteEmpresasPDF() {
-    // Tu implementación actual (sin cambios)
     this.cargandoPDF = true;
-    if (!this.empresaSeleccionada || this.errorFecha) return;
+    if (!this.empresaSeleccionada || this.errorFecha) {
+      this.cargandoPDF = false;
+      return;
+    }
 
     const inicio = new Date(`${this.fechaInicio}T12:00:00`);
     const fin = new Date(`${this.fechaFin}T12:00:00`);
 
     const fechaEmision = new Date();
-    const doc = new jsPDF({ orientation: 'landscape' });
+    const docPDF = new jsPDF({ orientation: 'landscape' });
 
-    doc.setFontSize(18);
-    doc.text(`Reporte ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
+    docPDF.setFontSize(18);
+    docPDF.text(`Reporte ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
 
-    doc.setFontSize(12);
-    doc.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
-    doc.text(`Fecha de finalización: ${fin.toLocaleDateString('es-EC')}`, 15, 36);
-    doc.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString('es-EC')}`, 15, 42);
+    docPDF.setFontSize(12);
+    docPDF.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
+    docPDF.text(`Fecha de finalización: ${fin.toLocaleDateString('es-EC')}`, 15, 36);
+    docPDF.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString('es-EC')}`, 15, 42);
 
     const fechasArray: string[] = [];
     let actual = new Date(inicio);
@@ -779,8 +961,8 @@ export class ReporteListaComponent implements OnInit {
     const unidades = [...new Set(this.reportes.map(r => r.unidad))]
       .filter(Boolean)
       .sort((a, b) => {
-        const numA = parseInt(a.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        const numA = parseInt(String(a).replace(/\D/g, '')) || 0;
+        const numB = parseInt(String(b).replace(/\D/g, '')) || 0;
         return numA - numB;
       });
 
@@ -797,8 +979,8 @@ export class ReporteListaComponent implements OnInit {
     const resumenFinal: [string, number, number, number][] = [];
 
     for (const modulo of modulos) {
-      doc.setFontSize(14);
-      doc.text(`${modulo.nombre} Asignados`, 15, currentY);
+      docPDF.setFontSize(14);
+      docPDF.text(`${modulo.nombre} Asignados`, 15, currentY);
       currentY += 6;
 
       let totalAsignado = 0;
@@ -824,7 +1006,7 @@ export class ReporteListaComponent implements OnInit {
 
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      autoTable(doc, {
+      autoTable(docPDF, {
         startY: currentY,
         head: [['UNIDAD', ...fechasArray, 'TOTAL']],
         body: bodyAsignados,
@@ -834,8 +1016,8 @@ export class ReporteListaComponent implements OnInit {
         didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
       });
 
-      doc.setFontSize(12);
-      doc.text(`${modulo.nombre} Adeudados`, 15, currentY);
+      docPDF.setFontSize(12);
+      docPDF.text(`${modulo.nombre} Adeudados`, 15, currentY);
       currentY += 6;
 
       const bodyAdeudados: (string | number)[][] = [];
@@ -860,7 +1042,7 @@ export class ReporteListaComponent implements OnInit {
 
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      autoTable(doc, {
+      autoTable(docPDF, {
         startY: currentY,
         head: [['UNIDAD', ...fechasArray, 'TOTAL']],
         body: bodyAdeudados,
@@ -880,11 +1062,11 @@ export class ReporteListaComponent implements OnInit {
       ]);
     }
 
-    doc.setFontSize(14);
-    doc.text('Resumen Final por Módulo', 15, currentY);
+    docPDF.setFontSize(14);
+    docPDF.text('Resumen Final por Módulo', 15, currentY);
     currentY += 6;
 
-    autoTable(doc, {
+    autoTable(docPDF, {
       startY: currentY,
       head: [['MÓDULO', 'ASIGNADO TOTAL', 'SALDO TOTAL', 'PAGADO TOTAL']],
       body: resumenFinal.map(([nombre, asignado, saldo, pagado]) => [
@@ -897,7 +1079,7 @@ export class ReporteListaComponent implements OnInit {
       margin: { left: 15, right: 15 }
     });
 
-    doc.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
+    docPDF.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
     this.cargandoPDF = false;
   }
 }

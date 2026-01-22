@@ -10,14 +10,60 @@ h5 {
   text-align: center;
   margin-bottom: 1rem;
 }
-
+.fila-seleccionada {
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+}
 .contenedor-boton-volver {
   position: fixed;
   top: 10px;
   left: 20px;
   z-index: 1100;
 }
+.mensaje-dia-wrap {
+  width: 100%;
+  margin: 12px 0;
+}
 
+.mensaje-dia {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  padding: 12px 16px;
+  border-radius: 10px;
+
+  // Mantén tu paleta; aquí lo dejo neutro
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 4px solid #2e8b7d; // ajusta a tu verde
+}
+
+.mensaje-dia .material-icons {
+  font-size: 22px;
+  line-height: 22px;
+  margin-top: 2px;
+}
+
+.mensaje-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.mensaje-texto p {
+  margin: 0;
+}
+
+.mensaje-texto small {
+  opacity: 0.9;
+}
+.filtros-rapidos{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
 .boton-volver {
   padding: 8px 12px;
   font-size: 14px;
@@ -117,7 +163,7 @@ h5 {
         background-color: #37474f;
       }
     }
-  
+
 
     .material-icons {
       font-size: 18px;
@@ -135,10 +181,10 @@ h5 {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-  
+
         &:hover {
           background-color: #37474f;
-          
+
         }
         &.activa {
           background-color: #2f8071;
@@ -151,7 +197,7 @@ h5 {
     .acciones-secundarias {
       display: flex;
       gap: 0.75rem;
-  
+
       .filtro, .nuevo-registro {
         display: flex;
         align-items: center;
@@ -165,7 +211,7 @@ h5 {
       .filtro {
         background-color: #546e7a;
         color: white;
-  
+
         &:hover {
           background-color: #455a64;
         }
@@ -173,13 +219,13 @@ h5 {
       .nuevo-registro {
         background-color: #2f8071;
         color: white;
-  
+
         &:hover {
           background-color: #455a64;
         }
       }
-    }  
-    
+    }
+
   }
   .panel-empresa {
     margin: 1rem 0;
@@ -285,13 +331,13 @@ h5 {
       padding: 0.5rem;
       border: 1px solid #ccc;
       text-align: center;
-    
+
       .acciones-contenedor {
         display: flex;
         justify-content: center;
         align-items: center;
         gap: 0.4rem;
-    
+
         button {
           width: 32px;
           height: 32px;
@@ -303,25 +349,25 @@ h5 {
           cursor: pointer;
           padding: 0;
           transition: background-color 0.2s ease;
-    
+
           .material-icons {
             font-size: 18px;
           }
         }
-    
+
         .editar {
           background-color: #2f8071;
           color: white;
-    
+
           &:hover {
             background-color: #1f5f54;
           }
         }
-    
+
         .pagar {
           background-color: #455a64;
           color: white;
-    
+
           &:hover {
             background-color: #37474f;
           }
@@ -329,14 +375,14 @@ h5 {
         .eliminar {
           background-color: #2f8071;
           color: white;
-    
+
           &:hover {
             background-color: #1f5f54;
           }
         }
       }
     }
-    
+
   }
 }
 
@@ -488,7 +534,7 @@ h5 {
       margin-bottom: 0.3rem;
     }
   }
-    
+
 }
 .paginacion {
   display: flex;
