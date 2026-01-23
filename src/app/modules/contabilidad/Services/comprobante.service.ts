@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { getAuth, onAuthStateChanged } from '@angular/fire/auth';
+import { getFunctions, httpsCallable } from '@angular/fire/functions';
 import {
   getFirestore,
   Firestore,
@@ -25,6 +27,68 @@ import {
   getDownloadURL,
   deleteObject
 } from '@angular/fire/storage'; // <-- también de AngularFire
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuardService {
+  private user: any = null;
+  private role: string | null = null;
+  private initialized = false;
+
+  constructor() {
+    const auth = getAuth();
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        this.user = user;
+
+        // 🔹 Intentar obtener el rol desde los custom claims
+        const token = await user.getIdTokenResult(true);
+        this.role = (token.claims['role'] as string) || null;
+      } else {
+        this.user = null;
+        this.role = null;
+      }
+      this.initialized = true;
+    });
+  }
+
+  async esperarAutenticacion() {
+    return new Promise<void>((resolve) => {
+      const interval = setInterval(() => {
+        if (this.initialized) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, 200);
+    });
+  }
+
+  getUsuario() {
+    return this.user;
+  }
+
+  getRol() {
+    return this.role;
+  }
+
+  esAdmin(): boolean {
+    return this.role === 'admin';
+  }
+
+  estaAutenticado(): boolean {
+    return this.user != null;
+  }
+}
+
+
+
+
+
+
+
+
+
 
 @Injectable({ providedIn: 'root' })
 export class FirebaseService {
@@ -96,7 +160,7 @@ export class FirebaseService {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
     const q = query(libroDiarioRef, where('numeroReferencia', '==', numeroReferencia));
     const snapshot = await getDocs(q);
-  
+
     for (const docSnap of snapshot.docs) {
       await deleteDoc(docSnap.ref);
     }
@@ -197,8 +261,8 @@ export class CatalogoService {
 
 
 
-  
-  
+
+
 }
 
 @Injectable({ providedIn: 'root' })
@@ -347,7 +411,7 @@ export class DocumentosService {
       ...doc.data()
     }) as DocumentoContable);
   }
-  
+
 
   async actualizarDocumento(id: string, data: Omit<DocumentoContable, 'id'>): Promise<void> {
     const ref = doc(this.firestore, 'documentos-contables', id);
@@ -485,7 +549,7 @@ export class ComprobanteIngresoService {
 
     const docRef = doc(this.firestore, 'comprobantes-ingreso', id);
     await deleteDoc(docRef);
-    
+
     await this.eliminarDeLibroDiarioPorNumero(numeroComprobante);
 
   }
@@ -495,12 +559,12 @@ export class ComprobanteIngresoService {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
     const q = query(libroDiarioRef, where('numeroReferencia', '==', numeroReferencia));
     const snapshot = await getDocs(q);
-  
+
     for (const docSnap of snapshot.docs) {
       await deleteDoc(docSnap.ref);
     }
   }
-  
+
 
 
 
@@ -554,7 +618,7 @@ export class TransaccionesGeneralesService {
 
   private async guardarEnLibroDiarioDesdeTransaccionesGenerales(data: any) {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
-  
+
     const transacciones = (data.transacciones || []).map((t: any) => ({
       cuenta: t.codigo || t.cuenta || '-', // puede venir como 'codigo' o 'cuenta'
       descripcion: t.descripcion || t.concepto || '-', // descripción o concepto
@@ -562,7 +626,7 @@ export class TransaccionesGeneralesService {
       debe: t.tipo === 'Debe' ? (t.monto || t.valor || 0) : 0,
       haber: t.tipo === 'Haber' ? (t.monto || t.valor || 0) : 0
     }));
-  
+
     await addDoc(libroDiarioRef, {
       numeroReferencia: data.documento || 'Sin Número', // 🔵 En transacciones es 'numeroReferencia'
       concepto: data.concepto || 'Sin Concepto',
@@ -571,7 +635,7 @@ export class TransaccionesGeneralesService {
       transacciones
     });
   }
-  
+
   async obtenerTransacciones(): Promise<any[]> {
     const refCol = collection(this.firestore, 'transacciones-generales');
     const snapshot = await getDocs(refCol);
@@ -587,7 +651,7 @@ export class TransaccionesGeneralesService {
     await deleteObject(fileRef);
 
 
-    
+
     const docRef = doc(this.firestore, 'transacciones-generales', id);
     await deleteDoc(docRef);
 
@@ -606,7 +670,7 @@ export class TransaccionesGeneralesService {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
     const q = query(libroDiarioRef, where('numeroReferencia', '==', numeroReferencia));
     const snapshot = await getDocs(q);
-  
+
     for (const docSnap of snapshot.docs) {
       await deleteDoc(docSnap.ref);
     }
@@ -623,7 +687,7 @@ export class ComprasVariasService {
     const q = query(refCol, orderBy('numero', 'desc'), limit(1));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
-      return snapshot.docs[0].data()['numero']; 
+      return snapshot.docs[0].data()['numero'];
     }
     return 0;
   }
@@ -657,7 +721,7 @@ export class ComprasVariasService {
 
   private async guardarEnLibroDiarioDesdeComprasVarias(data: any) {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
-  
+
     const transacciones = (data.transacciones || []).map((t: any) => ({
       cuenta: t.codigo || t.cuenta || '-',          // Código de cuenta o número
       descripcion: t.descripcion || t.concepto || '-', // Descripción o concepto
@@ -665,17 +729,17 @@ export class ComprasVariasService {
       debe: t.tipo === 'Debe' ? (t.monto || t.valor || 0) : 0,
       haber: t.tipo === 'Haber' ? (t.monto || t.valor || 0) : 0
     }));
-  
+
     await addDoc(libroDiarioRef, {
       numeroReferencia: data.numeroDocumento || 'Sin Número', // 📄 Aquí en Compras Varias es "numeroFormateado"
-      numeroFormateado: data.numeroFormateado || '-', 
+      numeroFormateado: data.numeroFormateado || '-',
       concepto: data.concepto || data.concepto || 'Sin Concepto', // ✅ El concepto general de la compra
       fecha: data.fecha ? new Date(data.fecha) : new Date(),
       tipoDocumento: 'Compra Varias', // 🔵 Así lo registraremos diferenciado
       transacciones
-    });   
+    });
   }
-  
+
 
   async obtenerCompras(): Promise<any[]> {
     const refCol = collection(this.firestore, 'compras-varias');
@@ -707,7 +771,7 @@ export class ComprasVariasService {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
     const q = query(libroDiarioRef, where('numeroFormateado', '==', numeroFormateado)); // <--- BUSCAR POR NUMEROFORMATEADO
     const snapshot = await getDocs(q);
-  
+
     for (const docSnap of snapshot.docs) {
       await deleteDoc(docSnap.ref);
     }
@@ -733,7 +797,7 @@ export class AsientoAperturaService {
   async obtenerUltimoNumero(): Promise<number> {
     const colRef = collection(this.firestore, 'asientos-apertura');
     const snapshot = await getDocs(colRef);
-    
+
     const numeros = snapshot.docs
       .map(docSnap => docSnap.data()?.['numero'])
       .filter((num: string) => typeof num === 'string' && num.startsWith('APR'))
@@ -812,7 +876,7 @@ export class AsientoAperturaService {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
     const q = query(libroDiarioRef, where('numeroReferencia', '==', numeroReferencia));
     const snapshot = await getDocs(q);
-  
+
     for (const docSnap of snapshot.docs) {
       await deleteDoc(docSnap.ref);
     }
@@ -825,7 +889,7 @@ export class LibroDiarioService {
   constructor(private firestore: Firestore) {}
   async guardarEnLibroDiario(data: any): Promise<void> {
     const libroDiarioRef = collection(this.firestore, 'libro-diario');
-  
+
     const nuevoLibro = {
       numeroTransaccion: data.numeroDocumento || data.numeroComprobante || data.numero || 'Sin Número',
       fecha: data.creado ? (data.creado instanceof Date ? data.creado : data.creado.toDate()) : new Date(),
@@ -843,10 +907,10 @@ export class LibroDiarioService {
             .reduce((acc: number, curr: any) => acc + (curr.valor || 0), 0)
         : 0
     };
-  
+
     await addDoc(libroDiarioRef, nuevoLibro);
   }
-  
+
   async obtenerLibrosEntreFechas(fechaInicio: Date, fechaFin: Date): Promise<any[]> {
     const ref = collection(this.firestore, 'libro-diario'); // 🔵 Colección principal de libros diarios
     const q = query(
@@ -874,12 +938,12 @@ export class LibroDiarioService {
       where('fecha', '<=', fechaFin),
       orderBy('fecha', 'asc')
     );
-    
+
     const snapshot = await getDocs(q);
-    
+
     return snapshot.docs.map(docSnap => {
       const data = docSnap.data() as any;
-  
+
       return {
         id: docSnap.id,
         numeroTransaccion: data.numeroReferencia || 'Sin Número',
@@ -889,7 +953,7 @@ export class LibroDiarioService {
       };
     });
   }
-  
-  
+
+
 }
 

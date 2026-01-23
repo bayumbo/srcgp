@@ -25,7 +25,7 @@ export class EstadoFinancieroComponent implements OnInit {
   totalActivos = 0;
   totalPasivos = 0;
   totalPatrimonio = 0;
-   
+
   fechaCorte: string = '';  // ✅ Añade esta línea
 
   constructor(
@@ -47,22 +47,22 @@ export class EstadoFinancieroComponent implements OnInit {
   subCodificacion = false;
   subTransacciones = false;
   subLibros = false;
-  
+
   submenus: Record<SubmenuKeys, boolean> = {
     codificacion: false,
     transacciones: false,
     libros: false
   };
     menuAbierto: boolean = false;
-    
-  
+
+
     toggleSubmenu(nombre: SubmenuKeys, event: Event): void {
       event.preventDefault();
       this.submenus[nombre] = !this.submenus[nombre];
     }
-  
-  
-  
+
+
+
       toggleMenu() {
       this.menuAbierto = !this.menuAbierto;
     }
@@ -78,24 +78,24 @@ export class EstadoFinancieroComponent implements OnInit {
 
    async generarPDF(): Promise<void> {
     const doc = new jsPDF();
-    
+
     // 📄 Encabezado
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
     doc.text('ESTADO DE SITUACIÓN FINANCIERA - CONSORCIO PINTAG EXPRESS', 105, 20, { align: 'center' });
-  
+
     doc.setFontSize(10);
     doc.setFont('Helvetica', 'normal');
     doc.text(`Fecha de Corte: ${this.fechaCorte}`, 105, 28, { align: 'center' });
-  
+
     let y = 40;
-  
+
     // 📋 ACTIVO
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(13);
     doc.text('ACTIVO', 15, y);
     y += 6;
-  
+
     autoTable(doc, {
       startY: y,
       head: [['Código', 'Cuenta', 'Valor']],
@@ -107,18 +107,18 @@ export class EstadoFinancieroComponent implements OnInit {
         { content: this.totalActivos.toFixed(2), styles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 } }
       ]]
     });
-  
+
     const lastTableActivo = (doc as any).lastAutoTable;
     y = (lastTableActivo?.finalY ?? y) + 10;
-    
 
-  
+
+
     // 📋 PASIVO
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(13);
     doc.text('PASIVO', 15, y);
     y += 6;
-  
+
     autoTable(doc, {
       startY: y,
       head: [['Código', 'Cuenta', 'Valor']],
@@ -130,18 +130,18 @@ export class EstadoFinancieroComponent implements OnInit {
         { content: this.totalPasivos.toFixed(2), styles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 } }
       ]]
     });
-  
+
     const lastTablePasivo = (doc as any).lastAutoTable;
     y = (lastTablePasivo?.finalY ?? y) + 10;
-    
 
-  
+
+
     // 📋 PATRIMONIO
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(13);
     doc.text('PATRIMONIO', 15, y);
     y += 6;
-  
+
     autoTable(doc, {
       startY: y,
       head: [['Código', 'Cuenta', 'Valor']],
@@ -153,27 +153,27 @@ export class EstadoFinancieroComponent implements OnInit {
         { content: this.totalPatrimonio.toFixed(2), styles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 } }
       ]]
     });
-  
+
     const lastTablePatrimonio = (doc as any).lastAutoTable;
     y = (lastTablePatrimonio?.finalY ?? y) + 10;
-    
 
-  
+
+
     // 📊 Resultado Final
     doc.setFillColor(236, 239, 241); // Gris claro
     doc.rect(15, y, 180, 12, 'F');
-  
+
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(11);
     doc.text('TOTAL PASIVO + PATRIMONIO', 20, y + 8);
-    
+
     const totalPasivoPatrimonio = this.totalPasivos + this.totalPatrimonio;
     doc.text(totalPasivoPatrimonio.toFixed(2), 195, y + 8, { align: 'right' });
-  
+
     // 📥 Guardar PDF
     doc.save(`EstadoSituacionFinanciera_${this.fechaCorte}.pdf`);
   }
-  
+
 
 
   async generarEstado() {
@@ -181,14 +181,14 @@ export class EstadoFinancieroComponent implements OnInit {
       this.formFecha.markAllAsTouched();
       return;
     }
-  
+
     const fechaCorte = this.formFecha.value.fechaCorte;
     this.fechaCorte = fechaCorte; // 👈 Agrega esta línea
-  
+
     const [catalogo, transacciones] = await Promise.all([
       this.estadoFinancieroService.obtenerCuentasCatalogo(),
       this.estadoFinancieroService.obtenerTransaccionesHastaFecha(fechaCorte)
-    ]); 
+    ]);
 
     // Clasificar saldos
     const saldos: Record<string, number> = {};
@@ -208,28 +208,37 @@ export class EstadoFinancieroComponent implements OnInit {
     catalogo.forEach(cuenta => {
       const saldo = saldos[cuenta.codigo] || 0;
       if (cuenta.tipo === 'Activo') {
-        this.activos.push({ 
+        this.activos.push({
           codigo: cuenta.codigo,
           descripcion: cuenta.nombre, // 👈 aquí adaptas
-          saldo 
+          saldo
         });
         this.totalActivos += saldo;
       } else if (cuenta.tipo === 'Pasivo') {
-        this.pasivos.push({ 
+        this.pasivos.push({
           codigo: cuenta.codigo,
           descripcion: cuenta.nombre, // 👈 aquí igual
-          saldo 
+          saldo
         });
         this.totalPasivos += saldo;
       } else if (cuenta.tipo === 'Patrimonio') {
-        this.patrimonio.push({ 
+        this.patrimonio.push({
           codigo: cuenta.codigo,
           descripcion: cuenta.nombre, // 👈 aquí también
-          saldo 
+          saldo
         });
         this.totalPatrimonio += saldo;
       }
-      
+
     });
+    // 🧮 Calcular patrimonio automáticamente si no hay cuentas tipo "Patrimonio"
+  if (this.patrimonio.length === 0) {
+    this.totalPatrimonio = this.totalActivos - this.totalPasivos;
+    this.patrimonio = [{
+      codigo: 'PAT',
+      descripcion: 'Patrimonio neto (Activo - Pasivo)',
+      saldo: this.totalPatrimonio
+    }];
+  }
   }
 }
