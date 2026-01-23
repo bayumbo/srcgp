@@ -1,592 +1,359 @@
-html, body {
-  overflow-x: hidden;
-  max-width: 100%;
+:host {
+  display: block;
+  padding: 1rem;
+  background-color: #f4f6f8;
+  min-height: 100vh;
   box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
 }
 
-h5 {
-  font-family: 'Segoe UI';
-  color: #1a1f20;
-  text-align: center;
+/* =========================
+   CONTENEDOR GENERAL
+========================= */
+.contenedor-reportes {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+}
+
+/* =========================
+   BARRA SUPERIOR
+========================= */
+.barra-superior {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
-.fila-seleccionada {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
-}
-.contenedor-boton-volver {
-  position: fixed;
-  top: 10px;
-  left: 20px;
-  z-index: 1100;
-}
-.mensaje-dia-wrap {
-  width: 100%;
-  margin: 12px 0;
-}
 
-.mensaje-dia {
-  width: 100%;
+.grupo-botones {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-
-  padding: 12px 16px;
-  border-radius: 10px;
-
-  // Mantén tu paleta; aquí lo dejo neutro
-  background: rgba(255, 255, 255, 0.05);
-  border-left: 4px solid #2e8b7d; // ajusta a tu verde
-}
-
-.mensaje-dia .material-icons {
-  font-size: 22px;
-  line-height: 22px;
-  margin-top: 2px;
-}
-
-.mensaje-texto {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-}
-
-.mensaje-texto p {
-  margin: 0;
-}
-
-.mensaje-texto small {
-  opacity: 0.9;
-}
-.filtros-rapidos{
-  display: flex;
-  gap: 10px;
+  gap: 0.5rem;
   flex-wrap: wrap;
-  margin-bottom: 12px;
 }
-.boton-volver {
-  padding: 8px 12px;
-  font-size: 14px;
-  background-color: #2f8071;
-  color: white;
+
+/* =========================
+   BOTONES
+========================= */
+button {
+  border-radius: 6px;
   border: none;
-  border-radius: 5px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
   cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primario {
+  background-color: #2f8071;
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background-color: #26685c;
+  }
+}
+
+.btn-secundario {
+  background-color: #e0e0e0;
+  color: #333;
+
+  &:hover:not(:disabled) {
+    background-color: #cfcfcf;
+  }
+}
+
+.btn-chip {
+  background-color: #f1f1f1;
+  border-radius: 20px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
 
   &:hover {
-    background-color: #37474f;
+    background-color: #dcdcdc;
   }
 }
 
-/* 🌀 Overlay de carga */
-.overlay-cargando {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(18, 18, 18, 0.9);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  gap: 1rem;
-
-  .spinner {
-    width: 50px;
-    height: 50px;
-    border: 6px solid #2f8071;
-    border-top: 6px solid transparent;
-    border-radius: 50%;
-    animation: girar 1s linear infinite;
-  }
-
-  p {
-    color: #ccc;
-    font-size: 16px;
-    font-weight: 500;
-  }
-}
-
-@keyframes girar {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 🧾 Tabla de reportes */
-.tabla-container {
-  padding: 1rem;
-  font-family: 'Segoe UI';
-  max-width: 100%;
-  box-sizing: border-box;
-
-  .acciones-globales {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;;
-
-    .filtro,
-    .nuevo-registro {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 5px;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background-color 0.2s ease;
-      height: 40px;
-    }
-
-    .filtro {
-      width: 50px;
-      background-color: #2f8071;
-      color: white;
-
-      &:hover {
-        background-color: #37474f;
-      }
-    }
-
-    .nuevo-registro {
-      width: 200px;
-      max-width: 100%;
-      gap: 0.4rem;
-      background-color: #2f8071;
-      color: white;
-
-      &:hover {
-        background-color: #37474f;
-      }
-    }
-
-
-    .material-icons {
-      font-size: 18px;
-    }
-    /*------------ACCIONES EMPRESAS--------------*/
-    .acciones-empresas {
-      button {
-        background-color: #2f8071;
-        color: white;
-        padding: 0.5rem 1rem;
-        border: none;
-        border-radius: 6px;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-
-        &:hover {
-          background-color: #37474f;
-
-        }
-        &.activa {
-          background-color: #2f8071;
-        }
-        .material-icons {
-          font-size: 18px;
-        }
-      }
-    }
-    .acciones-secundarias {
-      display: flex;
-      gap: 0.75rem;
-
-      .filtro, .nuevo-registro {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        border: none;
-        border-radius: 6px;
-        font-weight: 500;
-        cursor: pointer;
-      }
-      .filtro {
-        background-color: #546e7a;
-        color: white;
-
-        &:hover {
-          background-color: #455a64;
-        }
-      }
-      .nuevo-registro {
-        background-color: #2f8071;
-        color: white;
-
-        &:hover {
-          background-color: #455a64;
-        }
-      }
-    }
-
-  }
-  .panel-empresa {
-    margin: 1rem 0;
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-
-  .botones-empresa {
-    display: flex;
-    gap: 1rem;
-
-    button {
-      padding: 0.5rem 1.2rem;
-      border: none;
-      border-radius: 4px;
-      background-color: #455a64;
-      color: white;
-      cursor: pointer;
-      font-weight: 500;
-
-      &:hover {
-        background-color: #2f8071;
-      }
-
-      &.activa {
-        background-color: #2f8071;
-      }
-    }
-  }
-
-  .filtros-fecha {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-
-    label {
-      font-weight: 500;
-    }
-
-    input[type='date'] {
-      padding: 0.4rem 0.6rem;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-    }
-
-    .generar-reporte {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 5px;
-      background-color: #1e88e5;
-      color: white;
-      cursor: pointer;
-
-      &:hover {
-        background-color: #1565c0;
-      }
-
-      &:disabled {
-        background-color: #90a4ae;
-        cursor: not-allowed;
-      }
-
-          }
-
-    .error {
-      color: red;
-      font-size: 13px;
-      font-weight: 500;
-    }
-  }
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: #eee;
-
-    thead {
-      background-color: #2f8071;
-      color: white;
-    }
-
-    th, td {
-      padding: 0.75rem;
-      border: 1px solid #ccc;
-      text-align: center;
-      vertical-align: middle;
-    }
-
-    tbody tr:hover {
-      background-color: #f9f9f9;
-    }
-
-    td.acciones {
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      text-align: center;
-
-      .acciones-contenedor {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 0.4rem;
-
-        button {
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          transition: background-color 0.2s ease;
-
-          .material-icons {
-            font-size: 18px;
-          }
-        }
-
-        .editar {
-          background-color: #2f8071;
-          color: white;
-
-          &:hover {
-            background-color: #1f5f54;
-          }
-        }
-
-        .pagar {
-          background-color: #455a64;
-          color: white;
-
-          &:hover {
-            background-color: #37474f;
-          }
-        }
-        .eliminar {
-          background-color: #2f8071;
-          color: white;
-
-          &:hover {
-            background-color: #1f5f54;
-          }
-        }
-      }
-    }
-
-  }
-}
-
-/* 🎛️ Panel de filtros */
+/* =========================
+   PANEL FILTROS
+========================= */
 .panel-filtros {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.filtros-rapidos {
   display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.filtro-fecha {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.input-fecha {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+}
+
+.separador {
+  margin: 0.8rem 0;
+  border: none;
+  border-top: 1px solid #ddd;
+}
+
+.acciones-pdf {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   MENSAJES / ESTADO
+========================= */
+.estado-carga,
+.mensaje-dia {
+  margin: 0.8rem 0;
+  font-weight: 500;
+  color: #444;
+}
+
+/* =========================
+   ACCIONES MULTIPLES
+========================= */
+.acciones-multiples {
+  display: flex;
   align-items: center;
   gap: 0.8rem;
-  margin: 1rem 0;
-  background-color: #1e1e1e;
-  padding: 1rem;
+  margin: 0.8rem 0;
+  padding: 0.6rem;
+  background-color: #f0f7f6;
   border-radius: 8px;
+  border: 1px solid #cde3df;
+}
 
-  button {
-    background-color: #2f8071;
-    color: white;
-    border: none;
-    padding: 0.5rem 0.9rem;
-    border-radius: 5px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
+.seleccion-info {
+  font-weight: 600;
+  color: #2f8071;
+}
 
-    &:hover {
-      background-color: #37474f;
-    }
+.btn-eliminar-multi {
+  background-color: #c0392b;
+  color: #fff;
 
-    &.limpiar {
-      background-color: #757575;
-
-      &:hover {
-        background-color: #616161;
-      }
-    }
-  }
-
-  .filtro-personalizado {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-
-    label {
-      color: #ccc;
-      font-size: 14px;
-    }
-
-    input[type='date'] {
-      padding: 0.45rem;
-      background-color: #2c2c2c;
-      color: white;
-      border: 1px solid #444;
-      border-radius: 5px;
-      font-size: 14px;
-    }
+  &:hover {
+    background-color: #a93226;
   }
 }
-.acciones-imprimir{
 
+.btn-limpiar-multi {
+  background-color: #7f8c8d;
+  color: #fff;
+
+  &:hover {
+    background-color: #6c7a7a;
+  }
+}
+
+/* =========================
+   TABLA
+========================= */
+.tabla-wrapper {
+  width: 100%;
+  overflow-x: auto;              /* si no cabe, scroll horizontal */
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+}
+
+.tabla-reportes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 1180px;             /* clave: evita que "apriete" y corte Acciones */
+  table-layout: auto;
+}
+
+.tabla-reportes th,
+.tabla-reportes td {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #d0d0d0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tabla-reportes thead {
+  background-color: #2f8071;
+  color: #fff;
+}
+
+.tabla-reportes tbody tr:hover {
+  background-color: #f2f2f2;
+}
+
+/* Columna nombre: permitir salto de línea para ahorrar ancho */
+.col-nombre {
+  white-space: normal !important;
+  max-width: 320px;
+  line-height: 1.2;
+}
+
+/* Columna acciones: ancho mínimo para que no se corte */
+.col-acciones {
+  min-width: 150px;
+}
+
+/* ====== ACCIONES (ICONOS VISIBLES) ====== */
+.acciones {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.btn-icono {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  color: white;
-  border: none;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 5px;
-  cursor: pointer;
-
-    .material-icons {
-    font-size: 16px;
-    vertical-align: middle;
-  }
+  transition: 0.2s ease;
+  padding: 0;
 }
 
-/* 📎 Botones inferiores */
-.botones-inferiores {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding: 1rem;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-
-  button {
-    flex: 1;
-    text-align: center;
-    background-color: #2f8071;
-    color: white;
-    border: none;
-    padding: 1rem 0;
-    font-size: 16px;
-    font-weight: bold;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-
-    .material-icons {
-      font-size: 20px;
-    }
-
-    &:hover {
-      background-color: #1f5f54;
-    }
-  }
+.btn-icono.editar {
+  background-color: #2f8071;
+  color: #fff;
+}
+.btn-icono.pagar {
+  background-color: #34495e;
+  color: #fff;
+}
+.btn-icono.eliminar {
+  background-color: #c0392b;
+  color: #fff;
 }
 
+.btn-icono svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
 
-/* 📱 Responsive - modo tarjeta */
+/* ====== FILA SELECCIONADA (DOBLE CLICK) ====== */
+.fila-seleccionada {
+  background-color: #d6f0ea !important;
+  border-left: 4px solid #2f8071;
+}
+
+/* ====== MOBILE: reducir padding ====== */
 @media (max-width: 768px) {
-  thead {
-    display: none;
+  .tabla-reportes {
+    font-size: 0.78rem;
   }
-
-  tbody, tr, td {
-    display: block;
-    width: 100%;
-  }
-
-  tr {
-    margin-bottom: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-    padding: 0.5rem;
-  }
-
-  td {
-    text-align: left;
-    padding: 0.5rem;
-    border: none;
-    border-bottom: 1px solid #eee;
-    position: relative;
-
-    &::before {
-      content: attr(data-label);
-      font-weight: bold;
-      color: #555;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-  }
-
-}
-.paginacion {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1.5rem;
-
-  button {
-    background-color: #2f8071;
-    color: white;
-    border: none;
-    padding: 0.5rem 0.9rem;
-    border-radius: 5px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: #1f5f54;
-    }
-
-    &:disabled {
-      background-color: #555;
-      cursor: not-allowed;
-    }
-
-    &.activa {
-      background-color: #1f5f54;
-      border: 2px solid #81d4fa;
-    }
+  .tabla-reportes th,
+  .tabla-reportes td {
+    padding: 0.35rem 0.45rem;
   }
 }
-.overlay-cargando {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(18, 18, 18, 0.8);
+
+.tabla-reportes tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.tabla-reportes tbody tr:hover {
+  background-color: #f2f2f2;
+}
+
+/* =========================
+   FILA SELECCIONADA (DOBLE CLICK)
+========================= */
+.fila-seleccionada {
+  background-color: #d6f0ea !important;
+  border-left: 4px solid #2f8071;
+}
+
+/* =========================
+   ACCIONES POR FILA
+========================= */
+.acciones {
   display: flex;
   justify-content: center;
+  gap: 0.3rem;
+}
+
+.btn-icono {
+  padding: 0.25rem 0.4rem;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  display: flex;
   align-items: center;
-  z-index: 9999;
+  justify-content: center;
+}
 
-  .spinner-pdf {
-    background: #fff;
-    color: #111;
-    padding: 2rem 3rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    font-size: 1.2rem;
-    font-family: 'Segoe UI', sans-serif;
+.btn-icono.editar {
+  background-color: #2f8071;
+  color: #fff;
+}
+
+.btn-icono.pagar {
+  background-color: #34495e;
+  color: #fff;
+}
+
+.btn-icono.eliminar {
+  background-color: #c0392b;
+  color: #fff;
+}
+
+/* =========================
+   SIN DATOS
+========================= */
+.sin-datos {
+  padding: 1rem;
+  text-align: center;
+  color: #666;
+}
+
+/* =========================
+   NOTA AYUDA
+========================= */
+.nota-ayuda {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 768px) {
+  .barra-superior {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .acciones-multiples {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

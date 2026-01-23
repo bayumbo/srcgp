@@ -5,26 +5,41 @@ import {
   collection,
   getDocs,
   doc,
-  collection as fsCollection,
-  query,
-  where,
-  Timestamp,
-  orderBy,
-  collectionGroup,
+  getDoc,
   deleteDoc,
-  startAfter,
+  query,
+  orderBy,
   limit,
-  startAt,
-  getDoc
 } from '@angular/fire/firestore';
-import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
 import { AuthService } from 'src/app/core/auth/services/auth.service';
-import { ref, deleteObject, Storage } from '@angular/fire/storage';
 import { ReportesDiaService } from '../../services/reportes-dia.service';
+import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
+
+type EmpresaNombre = 'General Pintag' | 'Expreso Antisana';
+
+type ReporteListaRow = ReporteConPagos & {
+  fechaISO: string;
+  empresaKey: string;
+
+  // DocId real del doc dentro de subcolección "unidades"
+  // Ej: "ExpresoAntisana_E13"
+  unidadDocId: string;
+
+  // Código visual: "E13"
+  codigo: string;
+
+  // Ruta exacta al doc a borrar
+  refPath: string;
+
+  // Campos canónicos (según tu estructura)
+  uidPropietario: string;
+  propietarioNombre: string;
+};
 
 @Component({
   selector: 'app-reporte-lista',
@@ -34,38 +49,36 @@ import { ReportesDiaService } from '../../services/reportes-dia.service';
   styleUrls: ['./lista-reportes.component.scss'],
 })
 export class ReporteListaComponent implements OnInit {
+  // UI state
   creandoDia = false;
-  esSocio: boolean = false;
+  cargando = true;
+  cargandoEliminacion = false;
 
-  modoVista: 'historico' | 'diario' = 'diario';
-  modoActual: 'todos' | 'filtrado' = 'filtrado';
-  cargandoPDF: boolean = false;
-
-  reportes: ReporteConPagos[] = [];
-  cargando: boolean = true;
-
-  mostrarFiltros = false;
-  fechaPersonalizada: string = ''; // yyyy-mm-dd
-
-  // Empresa (solo para PDF Empresas)
-  mostrarOpcionesEmpresa = false;
-  empresaSeleccionada: string | null = null;
-  fechaInicio: string = '';
-  fechaFin: string = '';
-  errorFecha: string = '';
+  esSocio = false;
 
   // Mensajes
-  mostrarMensajeDia: boolean = false;
-  mensajeEstadoDia: string = '';
+  mostrarMensajeDia = false;
+  mensajeEstadoDia = '';
 
-  // Paginación (legacy/histórico)
-  paginaActual: number = 1;
-  reportesPorPagina: number = 10;
-  hayMasReportes: boolean = true;
-  cursorStack: any[] = [];
-  ultimaFechaCursor: any = null;
+  // Filtros
+  mostrarFiltros = false;
+  fechaPersonalizada = ''; // yyyy-mm-dd
 
-  private storage = inject(Storage);
+  // Reporte empresas (mantengo tus variables aunque aquí no las toco)
+  mostrarOpcionesEmpresa = false;
+  empresaSeleccionada: EmpresaNombre | null = null;
+  fechaInicio = '';
+  fechaFin = '';
+  errorFecha = '';
+  cargandoPDF = false;
+
+  // Data
+  reportes: ReporteListaRow[] = [];
+
+  // Selección múltiple
+  seleccion = new Set<string>();
+  seleccionarTodo = false;
+
   private firestore = inject(Firestore);
   private router = inject(Router);
 
@@ -79,12 +92,11 @@ export class ReporteListaComponent implements OnInit {
       this.esSocio = role === 'socio';
     });
 
-    // Pantalla principal: último día generado
     await this.cargarUltimoDiaGenerado();
   }
 
   // ==========================
-  // Helpers de fecha
+  // Helpers
   // ==========================
   private toISO(date: Date): string {
     const yyyy = date.getFullYear();
@@ -120,7 +132,28 @@ export class ReporteListaComponent implements OnInit {
     return this.toISO(d);
   }
 
-  // Visible si cualquier valor asignado/pagado es > 0
+  private empresaToKey(empresa: string): string {
+    // "Expreso Antisana" -> "ExpresoAntisana"
+    // "General Pintag" -> "GeneralPintag"
+    return (empresa || '').replace(/\s+/g, '').trim();
+  }
+
+  private diaDocId(empresaKey: string, fechaISO: string): string {
+    return `${empresaKey}_${fechaISO}`;
+  }
+
+  private unidadDocIdFromCodigo(empresaKey: string, codigo: string): string {
+    // Ej: empresaKey=ExpresoAntisana, codigo=E13 -> ExpresoAntisana_E13
+    return `${empresaKey}_${(codigo || '').toString().trim()}`;
+  }
+
+  // Key canónica de UI: empresaKey|fechaISO|unidadDocId
+  private keyDeFila(r: Pick<ReporteListaRow, 'empresaKey' | 'fechaISO' | 'unidadDocId'>): string {
+    return `${r.empresaKey}|${r.fechaISO}|${r.unidadDocId}`;
+  }
+
+  trackByReporte = (_: number, r: ReporteListaRow) => this.keyDeFila(r);
+
   private esRegistroVisible(r: any): boolean {
     const asignados =
       (r.minutosAtraso ?? 0) +
@@ -137,20 +170,64 @@ export class ReporteListaComponent implements OnInit {
     return (asignados + pagados) > 0;
   }
 
+  private ordenarPorEmpresaUnidad(a: any, b: any): number {
+    const ea = (a.empresa ?? '').toString();
+    const eb = (b.empresa ?? '').toString();
+    if (ea !== eb) return ea.localeCompare(eb);
+
+    // Ordena por número dentro del código (E13 -> 13)
+    const ca = (a.codigo ?? a.unidad ?? '').toString();
+    const cb = (b.codigo ?? b.unidad ?? '').toString();
+    const numA = parseInt(ca.replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(cb.replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  }
+
+  private ordenarPorFechaEmpresaUnidad(a: any, b: any): number {
+    const fa = new Date(`${a.fechaISO}T12:00:00`).getTime();
+    const fb = new Date(`${b.fechaISO}T12:00:00`).getTime();
+    if (fa !== fb) return fa - fb;
+    return this.ordenarPorEmpresaUnidad(a, b);
+  }
+
   // ==========================
-  // Cargar ÚLTIMO día generado (reportes_dia)
+  // Selección múltiple
+  // ==========================
+  isSelected(r: ReporteListaRow): boolean {
+    return this.seleccion.has(this.keyDeFila(r));
+  }
+
+  toggleSeleccionFila(r: ReporteListaRow): void {
+    const key = this.keyDeFila(r);
+    if (this.seleccion.has(key)) this.seleccion.delete(key);
+    else this.seleccion.add(key);
+  }
+
+  limpiarSeleccion(): void {
+    this.seleccion.clear();
+    this.seleccionarTodo = false;
+  }
+
+  toggleSeleccionTodos(checked: boolean): void {
+    this.seleccion.clear();
+    if (checked) this.reportes.forEach(r => this.seleccion.add(this.keyDeFila(r)));
+    this.seleccionarTodo = checked;
+  }
+
+  get seleccionCount(): number {
+    return this.seleccion.size;
+  }
+
+  // ==========================
+  // Cargar ÚLTIMO día generado
   // ==========================
   async cargarUltimoDiaGenerado() {
     this.cargando = true;
-    this.modoVista = 'diario';
-    this.modoActual = 'filtrado';
-    this.hayMasReportes = false;
-
     this.mostrarMensajeDia = false;
     this.mensajeEstadoDia = '';
+    this.limpiarSeleccion();
 
     try {
-      // Buscamos el último día generado en reportes_dia (por fecha desc)
       const ref = collection(this.firestore, 'reportes_dia');
       const q = query(ref, orderBy('fecha', 'desc'), limit(1));
       const snap = await getDocs(q);
@@ -179,77 +256,94 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Opción A: Día exacto (SOLO registros existentes y visibles)
+  // Día exacto
   // ==========================
   async cargarDiaEnListaReportes(fechaISO: string) {
     this.cargando = true;
-    this.modoVista = 'diario';
-    this.modoActual = 'filtrado';
-    this.hayMasReportes = false;
-
     this.mostrarMensajeDia = false;
     this.mensajeEstadoDia = '';
+    this.limpiarSeleccion();
 
     try {
-      const [existeP, existeA] = await Promise.all([
-        this.reportesDiaService.existeDia('General Pintag' as any, fechaISO),
-        this.reportesDiaService.existeDia('Expreso Antisana' as any, fechaISO),
-      ]);
+      const empresas: EmpresaNombre[] = ['General Pintag', 'Expreso Antisana'];
 
-      if (!existeP && !existeA) {
+      const existe = await Promise.all(
+        empresas.map(emp => this.reportesDiaService.existeDia(emp as any, fechaISO))
+      );
+
+      if (!existe.some(Boolean)) {
         this.reportes = [];
         this.mostrarMensajeDia = true;
         this.mensajeEstadoDia = `No existen reportes generados para el día ${fechaISO}.`;
         return;
       }
 
-      const [regP, regA] = await Promise.all([
-        existeP ? this.reportesDiaService.getRegistrosDia('General Pintag' as any, fechaISO) : Promise.resolve([]),
-        existeA ? this.reportesDiaService.getRegistrosDia('Expreso Antisana' as any, fechaISO) : Promise.resolve([]),
-      ]);
+      // Registros por empresa (idealmente esta función ya lee de reportes_dia/{dia}/unidades)
+      const regsPorEmpresa = await Promise.all(
+        empresas.map((emp, i) =>
+          existe[i] ? this.reportesDiaService.getRegistrosDia(emp as any, fechaISO) : Promise.resolve([])
+        )
+      );
 
-      const regs: any[] = [...regP, ...regA];
+      const temp: ReporteListaRow[] = [];
 
-      if (regs.length === 0) {
-        this.reportes = [];
-        this.mostrarMensajeDia = true;
-        this.mensajeEstadoDia = `No hay unidades registradas para el día ${fechaISO}.`;
-        return;
+      for (let idx = 0; idx < empresas.length; idx++) {
+        const emp = empresas[idx];
+        const empKey = this.empresaToKey(emp);
+        const regs = regsPorEmpresa[idx] || [];
+        const diaId = this.diaDocId(empKey, fechaISO);
+
+        for (const r of regs as any[]) {
+          // Compatibilidad:
+          // - r.id / r.unidadId puede venir como "ExpresoAntisana_E13"
+          // - r.codigo suele ser "E13"
+          const codigo = (r.codigo ?? '').toString().trim();
+          const unidadDocId = (r.unidadId ?? r.id ?? '').toString().trim()
+            || (codigo ? this.unidadDocIdFromCodigo(empKey, codigo) : '');
+
+          if (!unidadDocId) continue;
+
+          const refPath = `reportes_dia/${diaId}/unidades/${unidadDocId}`;
+
+          // Campos canónicos (preferidos)
+          const propietarioNombre = (r.propietarioNombre ?? r.nombre ?? '').toString().trim();
+          const uidPropietario = (r.uidPropietario ?? r.uid ?? '').toString().trim();
+
+          const row: ReporteListaRow = {
+            // ReporteConPagos base
+            id: unidadDocId,
+            uid: uidPropietario, // compatibilidad con tu navegación actual
+            unidad: codigo || unidadDocId, // en tabla se muestra E13
+            nombre: propietarioNombre,     // importante: pintar desde propietarioNombre
+            apellido: (r.apellido ?? '').toString().trim(),
+
+            minutosAtraso: r.minutosAtraso ?? 0,
+            administracion: r.administracion ?? 0,
+            minutosBase: r.minutosBase ?? 0,
+            multas: r.multas ?? 0,
+
+            minutosPagados: r.minutosPagados ?? 0,
+            adminPagada: r.adminPagada ?? 0,
+            minBasePagados: r.minBasePagados ?? 0,
+            multasPagadas: r.multasPagadas ?? 0,
+
+            fechaModificacion: new Date(`${fechaISO}T12:00:00`),
+            empresa: r.empresa ?? emp,
+
+            fechaISO,
+            empresaKey: empKey,
+
+            unidadDocId,
+            codigo: codigo || (unidadDocId.split('_').pop() ?? unidadDocId),
+            refPath,
+
+            uidPropietario,
+            propietarioNombre,
+          } as any;
+
+          temp.push(row);
+        }
       }
-
-      // Solo para completar campos visuales
-      const [unP, unA] = await Promise.all([
-        this.reportesDiaService.getUnidadesPorEmpresa('General Pintag' as any),
-        this.reportesDiaService.getUnidadesPorEmpresa('Expreso Antisana' as any),
-      ]);
-      const mapUnidad = new Map<string, any>();
-      [...unP, ...unA].forEach(u => mapUnidad.set(u.id, u));
-
-      const temp: ReporteConPagos[] = regs.map((r: any) => {
-        const unidadId = r.unidadId ?? r.id;
-        const u = mapUnidad.get(unidadId) ?? null;
-
-        return {
-          id: unidadId,
-          uid: u?.uidPropietario ?? r.uidPropietario ?? '',
-          unidad: u?.codigo ?? r.codigo ?? '',
-          nombre: u?.propietarioNombre ?? r.propietarioNombre ?? '',
-          apellido: '',
-
-          minutosAtraso: r.minutosAtraso ?? 0,
-          administracion: r.administracion ?? 0, // <- no inventar 2
-          minutosBase: r.minutosBase ?? 0,
-          multas: r.multas ?? 0,
-
-          minutosPagados: r.minutosPagados ?? 0,
-          adminPagada: r.adminPagada ?? 0,
-          minBasePagados: r.minBasePagados ?? 0,
-          multasPagadas: r.multasPagadas ?? 0,
-
-          fechaModificacion: new Date(`${fechaISO}T12:00:00`),
-          empresa: r.empresa ?? u?.empresa ?? '',
-        } as any;
-      });
 
       const visibles = temp.filter(r => this.esRegistroVisible(r));
 
@@ -260,17 +354,9 @@ export class ReporteListaComponent implements OnInit {
         return;
       }
 
-      visibles.sort((a: any, b: any) => {
-        const ea = (a.empresa ?? '').toString();
-        const eb = (b.empresa ?? '').toString();
-        if (ea !== eb) return ea.localeCompare(eb);
-
-        const numA = parseInt((a.unidad ?? '').replace(/\D/g, ''), 10) || 0;
-        const numB = parseInt((b.unidad ?? '').replace(/\D/g, ''), 10) || 0;
-        return numA - numB;
-      });
-
+      visibles.sort((a, b) => this.ordenarPorEmpresaUnidad(a, b));
       this.reportes = visibles;
+
       this.mostrarMensajeDia = true;
       this.mensajeEstadoDia = `Mostrando reportes del día ${fechaISO}.`;
     } catch (e) {
@@ -284,16 +370,13 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Semana/Mes: detallado por fecha (NO acumulado) + visible
+  // Semana/Mes (detalle por fecha, no acumulado)
   // ==========================
   async cargarRangoDetalladoEnListaReportes(inicioISO: string, finISO: string) {
     this.cargando = true;
-    this.modoVista = 'diario';
-    this.modoActual = 'filtrado';
-    this.hayMasReportes = false;
-
     this.mostrarMensajeDia = false;
     this.mensajeEstadoDia = '';
+    this.limpiarSeleccion();
 
     try {
       const dias = await this.reportesDiaService.getDiasEnRango(inicioISO, finISO);
@@ -305,34 +388,37 @@ export class ReporteListaComponent implements OnInit {
         return;
       }
 
-      // Unidades globales solo para completar nombre/código
-      const [unP, unA] = await Promise.all([
-        this.reportesDiaService.getUnidadesPorEmpresa('General Pintag' as any),
-        this.reportesDiaService.getUnidadesPorEmpresa('Expreso Antisana' as any),
-      ]);
-      const mapUnidad = new Map<string, any>();
-      [...unP, ...unA].forEach(u => mapUnidad.set(u.id, u));
-
       const registrosPorDia = await Promise.all(
         dias.map(d => this.reportesDiaService.getRegistrosDia(d.empresa as any, d.fecha))
       );
 
-      const temp: ReporteConPagos[] = [];
+      const temp: ReporteListaRow[] = [];
 
       for (let i = 0; i < dias.length; i++) {
-        const dia = dias[i]; // { empresa, fecha, ... }
+        const dia = dias[i]; // { empresa, fecha }
         const regs = registrosPorDia[i] || [];
+        const emp = dia.empresa as EmpresaNombre;
+        const empKey = this.empresaToKey(emp);
+        const diaId = this.diaDocId(empKey, dia.fecha);
 
         for (const r of regs as any[]) {
-          const unidadId = r.unidadId ?? r.id;
-          const u = mapUnidad.get(unidadId) ?? null;
+          const codigo = (r.codigo ?? '').toString().trim();
+          const unidadDocId = (r.unidadId ?? r.id ?? '').toString().trim()
+            || (codigo ? this.unidadDocIdFromCodigo(empKey, codigo) : '');
+
+          if (!unidadDocId) continue;
+
+          const refPath = `reportes_dia/${diaId}/unidades/${unidadDocId}`;
+
+          const propietarioNombre = (r.propietarioNombre ?? r.nombre ?? '').toString().trim();
+          const uidPropietario = (r.uidPropietario ?? r.uid ?? '').toString().trim();
 
           temp.push({
-            id: unidadId,
-            uid: u?.uidPropietario ?? r.uidPropietario ?? '',
-            unidad: u?.codigo ?? r.codigo ?? '',
-            nombre: u?.propietarioNombre ?? r.propietarioNombre ?? '',
-            apellido: '',
+            id: unidadDocId,
+            uid: uidPropietario,
+            unidad: codigo || unidadDocId,
+            nombre: propietarioNombre,
+            apellido: (r.apellido ?? '').toString().trim(),
 
             minutosAtraso: r.minutosAtraso ?? 0,
             administracion: r.administracion ?? 0,
@@ -345,7 +431,17 @@ export class ReporteListaComponent implements OnInit {
             multasPagadas: r.multasPagadas ?? 0,
 
             fechaModificacion: new Date(`${dia.fecha}T12:00:00`),
-            empresa: dia.empresa ?? u?.empresa ?? '',
+            empresa: r.empresa ?? emp,
+
+            fechaISO: dia.fecha,
+            empresaKey: empKey,
+
+            unidadDocId,
+            codigo: codigo || (unidadDocId.split('_').pop() ?? unidadDocId),
+            refPath,
+
+            uidPropietario,
+            propietarioNombre,
           } as any);
         }
       }
@@ -359,25 +455,11 @@ export class ReporteListaComponent implements OnInit {
         return;
       }
 
-      // Orden cronológico ascendente -> empresa -> unidad
-      visibles.sort((a: any, b: any) => {
-        const fa = new Date(a.fechaModificacion).getTime();
-        const fb = new Date(b.fechaModificacion).getTime();
-        if (fa !== fb) return fa - fb;
-
-        const ea = (a.empresa ?? '').toString();
-        const eb = (b.empresa ?? '').toString();
-        if (ea !== eb) return ea.localeCompare(eb);
-
-        const numA = parseInt((a.unidad ?? '').replace(/\D/g, ''), 10) || 0;
-        const numB = parseInt((b.unidad ?? '').replace(/\D/g, ''), 10) || 0;
-        return numA - numB;
-      });
-
+      visibles.sort((a, b) => this.ordenarPorFechaEmpresaUnidad(a, b));
       this.reportes = visibles;
 
       this.mostrarMensajeDia = true;
-      this.mensajeEstadoDia = `Mostrando reportes del ${inicioISO} al ${finISO} (ordenado por fecha).`;
+      this.mensajeEstadoDia = `Mostrando reportes del ${inicioISO} al ${finISO} (detallado por fecha).`;
     } catch (e) {
       console.error('❌ Error cargando rango:', e);
       this.reportes = [];
@@ -389,7 +471,7 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Botón: Agregar día (crea día completo en reportes_dia)
+  // Botón: Agregar día (crea día completo)
   // ==========================
   async agregarDia() {
     try {
@@ -400,7 +482,6 @@ export class ReporteListaComponent implements OnInit {
 
       this.fechaPersonalizada = res.fecha;
       await this.cargarDiaEnListaReportes(res.fecha);
-
     } catch (e) {
       console.error(e);
       alert('Error al agregar día. Revise consola.');
@@ -440,417 +521,79 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // Empresa (solo para Reporte Empresas PDF)
+  // ELIMINAR (individual) - REAL (por refPath)
   // ==========================
-  seleccionarEmpresa(nombreBoton: string) {
-    if (nombreBoton === 'Pintag') {
-      this.empresaSeleccionada = 'General Pintag';
-    } else if (nombreBoton === 'Antisana') {
-      this.empresaSeleccionada = 'Expreso Antisana';
-    }
-    this.fechaInicio = '';
-    this.fechaFin = '';
-    this.errorFecha = '';
-  }
+  async eliminarReporte(reporte: ReporteListaRow) {
+    const refPath = (reporte?.refPath ?? '').toString().trim();
 
-  validarRangoFechas() {
-    if (this.fechaInicio && this.fechaFin) {
-      const inicio = new Date(this.fechaInicio);
-      const fin = new Date(this.fechaFin);
-      const diferenciaDias = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
-
-      if (diferenciaDias < 0) {
-        this.errorFecha = 'La fecha de inicio no puede ser mayor que la de fin.';
-        this.reportes = [];
-      } else if (diferenciaDias > 31) {
-        this.errorFecha = 'El rango no debe superar los 31 días.';
-        this.reportes = [];
-      } else {
-        this.errorFecha = '';
-        this.actualizarVistaPorRangoLegacy(); // para PDF empresas actual usa legacy: lo dejamos
-      }
-    }
-  }
-
-  // Mantengo tu flujo actual (legacy) solo para reporte empresas si lo necesitas.
-  // Si ya lo migraste a reportes_dia, luego lo cambiamos.
-  actualizarVistaPorRangoLegacy() {
-    if (!this.fechaInicio || !this.fechaFin || this.errorFecha) {
-      this.reportes = [];
-      return;
-    }
-    const inicio = new Date(this.fechaInicio);
-    const fin = new Date(this.fechaFin);
-    this.consultarReportesEnRango(inicio, fin);
-  }
-
-  async obtenerUIDsPorEmpresa(nombreEmpresa: string): Promise<string[]> {
-    const usuariosRef = collection(this.firestore, 'usuarios');
-    const q = query(usuariosRef, where('empresa', '==', nombreEmpresa));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => d.id);
-  }
-
-  // ==========================
-  // LEGACY (histórico) - se mantiene por compatibilidad
-  // ==========================
-  async cargarTodosLosReportes(direccion: 'siguiente' | 'anterior' = 'siguiente') {
-    this.cargando = true;
-    this.modoVista = 'historico';
-    this.modoActual = 'todos';
-
-    try {
-      let baseQuery = query(
-        collectionGroup(this.firestore, 'reportesDiarios'),
-        orderBy('fechaModificacion', 'desc'),
-        orderBy('unidad', 'asc')
-      );
-
-      this.reportesPorPagina = 10;
-
-      if (direccion === 'siguiente' && this.ultimaFechaCursor) {
-        baseQuery = query(baseQuery, startAfter(this.ultimaFechaCursor), limit(this.reportesPorPagina));
-      } else if (direccion === 'anterior' && this.cursorStack.length >= 2) {
-        this.cursorStack.pop();
-        const anteriorDoc = this.cursorStack[this.cursorStack.length - 1];
-        baseQuery = query(baseQuery, startAt(anteriorDoc), limit(this.reportesPorPagina));
-        this.ultimaFechaCursor = anteriorDoc;
-        this.paginaActual--;
-      } else {
-        baseQuery = query(baseQuery, limit(this.reportesPorPagina));
-      }
-
-      const snapshot = await getDocs(baseQuery);
-      if (snapshot.empty) {
-        this.hayMasReportes = false;
-        this.cargando = false;
-        return;
-      }
-
-      const tempReportes: ReporteConPagos[] = [];
-
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data() as NuevoRegistro;
-        const id = docSnap.id;
-        const uid = docSnap.ref.parent.parent?.id ?? '';
-
-        const userRef = doc(this.firestore, `usuarios/${uid}`);
-        const userSnap = await getDoc(userRef);
-        const userData = userSnap.exists() ? userSnap.data() : {};
-
-        const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
-        const pagosSnap = await getDocs(pagosRef);
-
-        let minutosPagados = 0;
-        let adminPagada = 0;
-        let minBasePagados = 0;
-        let multasPagadas = 0;
-
-        pagosSnap.forEach(pagoDoc => {
-          const detalles = pagoDoc.data()['detalles'] ?? {};
-          minutosPagados += detalles.minutosAtraso || 0;
-          adminPagada += detalles.administracion || 0;
-          minBasePagados += detalles.minutosBase || 0;
-          multasPagadas += detalles.multas || 0;
-        });
-
-        const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
-
-        tempReportes.push({
-          id,
-          uid,
-          unidad: data.unidad ?? '',
-          nombre: (userData as any)['nombres'] ?? '',
-          apellido: (userData as any)['apellidos'] ?? '',
-          minutosAtraso: data.minutosAtraso ?? 0,
-          administracion: data.administracion ?? 0,
-          minutosBase: data.minutosBase ?? 0,
-          multas: data.multas ?? 0,
-          minutosPagados,
-          adminPagada,
-          minBasePagados,
-          multasPagadas,
-          fechaModificacion
-        });
-      }
-
-      const firstDoc = snapshot.docs[0];
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-
-      if (direccion === 'siguiente') {
-        if (this.cursorStack.length > 0) this.paginaActual++;
-        this.cursorStack.push(firstDoc);
-        this.ultimaFechaCursor = lastDoc;
-      } else if (direccion !== 'anterior') {
-        this.cursorStack = [firstDoc];
-        this.ultimaFechaCursor = lastDoc;
-        this.paginaActual = 1;
-      }
-
-      this.reportes = tempReportes;
-      this.hayMasReportes = snapshot.docs.length === this.reportesPorPagina;
-
-    } catch (error) {
-      console.error('❌ Error en paginación legacy:', error);
-    } finally {
-      this.cargando = false;
-    }
-  }
-
-  async consultarReportesEnRango(fechaInicio: Date, fechaFin: Date) {
-    this.cargando = true;
-    this.cursorStack = [];
-    this.ultimaFechaCursor = null;
-    this.paginaActual = 1;
-    this.hayMasReportes = false;
-
-    try {
-      const uidsValidos = this.empresaSeleccionada
-        ? await this.obtenerUIDsPorEmpresa(this.empresaSeleccionada)
-        : null;
-
-      const start = Timestamp.fromDate(fechaInicio);
-      const end = Timestamp.fromDate(new Date(fechaFin.setHours(23, 59, 59, 999)));
-
-      const refQ = query(
-        collectionGroup(this.firestore, 'reportesDiarios'),
-        where('fechaModificacion', '>=', start),
-        where('fechaModificacion', '<=', end),
-        orderBy('fechaModificacion', 'desc'),
-        orderBy('unidad', 'asc')
-      );
-
-      const snapshot = await getDocs(refQ);
-      const tempReportes: ReporteConPagos[] = [];
-
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data() as NuevoRegistro;
-        const id = docSnap.id;
-        const pathParts = docSnap.ref.path.split('/');
-        const uid = pathParts[1];
-
-        if (uidsValidos && !uidsValidos.includes(uid)) continue;
-
-        const userRef = doc(this.firestore, `usuarios/${uid}`);
-        const userSnap = await getDoc(userRef);
-        const userData = userSnap.exists() ? userSnap.data() : {};
-
-        const pagosRef = fsCollection(this.firestore, `usuarios/${uid}/reportesDiarios/${id}/pagosTotales`);
-        const pagosSnap = await getDocs(pagosRef);
-
-        let minutosPagados = 0;
-        let adminPagada = 0;
-        let minBasePagados = 0;
-        let multasPagadas = 0;
-
-        pagosSnap.forEach(pagoDoc => {
-          const pago = pagoDoc.data();
-          const detalles = (pago as any)['detalles'] ?? {};
-          minutosPagados += detalles.minutosAtraso || 0;
-          adminPagada += detalles.administracion || 0;
-          minBasePagados += detalles.minutosBase || 0;
-          multasPagadas += detalles.multas || 0;
-        });
-
-        const fechaModificacion = (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
-
-        tempReportes.push({
-          ...(data as any),
-          id,
-          uid,
-          nombre: (userData as any)['nombres'] ?? '',
-          apellido: (userData as any)['apellidos'] ?? '',
-          unidad: data.unidad ?? (userData as any)['unidad'] ?? '',
-          minutosPagados,
-          adminPagada,
-          minBasePagados,
-          multasPagadas,
-          fechaModificacion
-        });
-      }
-
-      this.reportes = tempReportes;
-      this.paginaActual = 1;
-
-    } catch (error) {
-      console.error('Error al consultar por rango legacy:', error);
-    } finally {
-      this.cargando = false;
-    }
-  }
-
-  // ==========================
-  // PDFs (Minutos / Administración)
-  // ==========================
-  imprimirPDFMinutosDesdeVista() {
-    if (!this.fechaPersonalizada) {
-      alert('Selecciona una fecha primero');
-      return;
-    }
-    const fecha = new Date(this.fechaPersonalizada);
-    this.generarPDFMinutos(this.reportes, fecha);
-  }
-
-  imprimirPDFAdministracionDesdeVista() {
-    if (!this.fechaPersonalizada) {
-      alert('Selecciona una fecha primero');
-      return;
-    }
-    const fecha = new Date(this.fechaPersonalizada);
-    this.generarPDFAdministracion(this.reportes, fecha);
-  }
-
-  generarPDFMinutos(data: ReporteConPagos[], fecha: Date) {
-    const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
-
-    if (filtrado.length === 0) {
-      alert('No hay valores de minutos para imprimir en esta vista.');
+    if (!refPath) {
+      console.warn('No existe refPath en el registro. No se puede eliminar de forma segura.', reporte);
+      alert('No se pudo eliminar: este registro no tiene refPath.');
       return;
     }
 
-    fecha.setHours(0, 0, 0, 0);
-    const doc = new jsPDF();
-    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    const logo1 = new Image();
-    logo1.src = '/assets/img/LogoPintag.png';
-    const logo2 = new Image();
-    logo2.src = '/assets/img/LogoAntisana.png';
-
-    doc.addImage(logo1, 'PNG', 15, 10, 25, 25);
-    doc.addImage(logo2, 'PNG', 170, 10, 25, 25);
-
-    doc.setFontSize(16);
-    doc.text('Minutos', 105, 45, { align: 'center' });
-
-    doc.setFontSize(11);
-    doc.text(`Fecha: ${fechaTexto}`, 15, 55);
-
-    doc.setFontSize(10);
-    doc.text('Consorcio Píntag Expresso', 135, 55);
-    doc.text('Píntag, Antisana S2-138', 135, 60);
-    doc.text('consorciopinexpres@hotmail.com', 135, 65);
-
-    const cuerpo = filtrado.map(item => [
-      item.unidad || '',
-      item.nombre || '',
-      `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
-      ''
-    ]);
-
-    const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
-
-    autoTable(doc, {
-      head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
-      body: cuerpo,
-      startY: 75,
-      styles: { fontSize: 10 }
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(11);
-    doc.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, 15, finalY);
-
-    doc.save(`Minutos_${this.fechaPersonalizada}.pdf`);
-  }
-
-  generarPDFAdministracion(data: ReporteConPagos[], fecha: Date) {
-    const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
-
-    if (filtrado.length === 0) {
-      alert('No hay valores de administración para imprimir en esta vista.');
-      return;
-    }
-
-    fecha.setHours(0, 0, 0, 0);
-    const doc = new jsPDF();
-    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    const logo1 = new Image();
-    logo1.src = '/assets/img/LogoPintag.png';
-    const logo2 = new Image();
-    logo2.src = '/assets/img/LogoAntisana.png';
-
-    doc.addImage(logo1, 'PNG', 15, 10, 25, 25);
-    doc.addImage(logo2, 'PNG', 170, 10, 25, 25);
-
-    doc.setFontSize(16);
-    doc.text('Administración', 105, 45, { align: 'center' });
-
-    doc.setFontSize(11);
-    doc.text(`Fecha: ${fechaTexto}`, 15, 55);
-
-    doc.setFontSize(10);
-    doc.text('Consorcio Píntag Expresso', 135, 55);
-    doc.text('Píntag, Antisana S2-138', 135, 60);
-    doc.text('consorciopinexpres@hotmail.com', 135, 65);
-
-    const cuerpo = filtrado.map(item => [
-      item.unidad || '',
-      item.nombre || '',
-      `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
-      ''
-    ]);
-
-    const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
-
-    autoTable(doc, {
-      head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
-      body: cuerpo,
-      startY: 75,
-      styles: { fontSize: 10 }
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(11);
-    doc.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, 15, finalY);
-
-    doc.save(`Administracion_${this.fechaPersonalizada}.pdf`);
-  }
-
-  // ==========================
-  // Eliminar reporte (legacy/histórico)
-  // ==========================
-  async eliminarReporte(reporte: any) {
-    if (this.modoVista === 'diario') {
-      alert('En modo diario no se eliminan registros. Si necesitas, lo manejamos como “desactivar unidad” o “reset”.');
-      return;
-    }
-
-    const fecha = (reporte.fechaModificacion instanceof Date
-      ? reporte.fechaModificacion
-      : (reporte.fechaModificacion as any)?.toDate?.())?.toLocaleDateString('es-EC', {
-        year: '2-digit',
-        month: '2-digit',
-        day: '2-digit'
-      }) ?? 'Sin Fecha';
-
-    const confirmar = confirm(`¿Deseas eliminar el reporte de ${reporte.nombre} del ${fecha}?`);
+    const confirmar = confirm(`¿Eliminar registro ${reporte.codigo || reporte.unidad} del día ${reporte.fechaISO}?`);
     if (!confirmar) return;
 
     try {
-      const uid = reporte.uid;
-      const reporteId = reporte.id;
+      const ref = doc(this.firestore, refPath);
+      await deleteDoc(ref);
 
-      const pagosRef = collection(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}/pagosTotales`);
-      const pagosSnap = await getDocs(pagosRef);
-      for (const docPago of pagosSnap.docs) {
-        await deleteDoc(docPago.ref);
+      // Verificación dura (evita "ficticio")
+      const check = await getDoc(ref);
+      if (check.exists()) {
+        console.error('El documento sigue existiendo tras deleteDoc:', refPath);
+        alert('Se intentó eliminar, pero el documento sigue existiendo. Revisa reglas o ruta.');
+        return;
       }
 
-      if (reporte.urlPDF) {
-        const pdfRef = ref(this.storage, reporte.urlPDF);
-        await deleteObject(pdfRef);
+      const key = this.keyDeFila(reporte);
+      this.reportes = this.reportes.filter(r => this.keyDeFila(r) !== key);
+      this.seleccion.delete(key);
+
+      alert('Registro eliminado correctamente.');
+    } catch (e: any) {
+      console.error('❌ Error eliminando registro:', e);
+      alert(`No se pudo eliminar en Firebase: ${e?.code ?? e?.message ?? e}`);
+    }
+  }
+
+  // ==========================
+  // ELIMINAR (múltiple)
+  // ==========================
+  async eliminarSeleccionados() {
+    if (this.seleccion.size === 0) {
+      alert('No hay registros seleccionados.');
+      return;
+    }
+
+    const confirmar = confirm(`¿Eliminar ${this.seleccion.size} registros seleccionados?`);
+    if (!confirmar) return;
+
+    try {
+      this.cargandoEliminacion = true;
+
+      const keys = Array.from(this.seleccion);
+      const mapKeyToRow = new Map<string, ReporteListaRow>();
+      this.reportes.forEach(r => mapKeyToRow.set(this.keyDeFila(r), r));
+
+      for (const key of keys) {
+        const row = mapKeyToRow.get(key);
+        if (!row?.refPath) continue;
+        await deleteDoc(doc(this.firestore, row.refPath));
       }
 
-      const reporteRef = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${reporteId}`);
-      await deleteDoc(reporteRef);
+      const setKeys = new Set(keys);
+      this.reportes = this.reportes.filter(r => !setKeys.has(this.keyDeFila(r)));
+      this.limpiarSeleccion();
 
-      await this.cargarTodosLosReportes();
-      alert('Reporte eliminado exitosamente');
-    } catch (error) {
-      console.error('Error al eliminar reporte:', error);
-      alert('Ocurrió un error al eliminar el reporte');
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = `Se eliminaron ${keys.length} registros seleccionados.`;
+    } catch (e: any) {
+      console.error('❌ Error eliminando seleccionados:', e);
+      alert(`Error eliminando seleccionados: ${e?.code ?? e?.message ?? e}`);
+    } finally {
+      this.cargandoEliminacion = false;
     }
   }
 
@@ -862,6 +605,7 @@ export class ReporteListaComponent implements OnInit {
   }
 
   irAEditar(uid: string, id: string): void {
+    // id debe ser el docId real del registro (ej: ExpresoAntisana_E13)
     this.router.navigate([`/reportes/actualizar`, uid, id]);
   }
 
@@ -882,204 +626,131 @@ export class ReporteListaComponent implements OnInit {
   }
 
   // ==========================
-  // PDF Empresas (tu implementación se mantiene)
+  // PDFs Minutos / Administración (desde la vista actual)
   // ==========================
-  private agruparDatosParaPDF(): Map<string, Map<string, any>> {
-    const agrupado = new Map<string, Map<string, any>>();
-
-    for (const reporte of this.reportes) {
-      const unidad = reporte.unidad || 'SIN_UNIDAD';
-      const fecha = (reporte.fechaModificacion instanceof Date
-        ? reporte.fechaModificacion
-        : (reporte.fechaModificacion as any)?.toDate?.())?.toLocaleDateString('es-EC', {
-          month: '2-digit',
-          day: '2-digit'
-        }) ?? 'Sin Fecha';
-
-      if (!agrupado.has(unidad)) agrupado.set(unidad, new Map());
-      const fechasMap = agrupado.get(unidad)!;
-
-      if (!fechasMap.has(fecha)) {
-        fechasMap.set(fecha, {
-          minutosAtraso: 0,
-          minutosPagados: 0,
-          administracion: 0,
-          adminPagada: 0,
-          minutosBase: 0,
-          minBasePagados: 0,
-          multas: 0,
-          multasPagadas: 0
-        });
-      }
-
-      const valores = fechasMap.get(fecha)!;
-
-      valores.minutosAtraso += reporte.minutosAtraso || 0;
-      valores.minutosPagados += reporte.minutosPagados || 0;
-      valores.administracion += reporte.administracion || 0;
-      valores.adminPagada += reporte.adminPagada || 0;
-      valores.minutosBase += reporte.minutosBase || 0;
-      valores.minBasePagados += reporte.minBasePagados || 0;
-      valores.multas += reporte.multas || 0;
-      valores.multasPagadas += reporte.multasPagadas || 0;
+  imprimirPDFMinutosDesdeVista() {
+    if (this.reportes.length === 0) {
+      alert('No hay datos en la vista actual.');
+      return;
     }
-
-    return agrupado;
+    const docFecha = this.fechaPersonalizada
+      ? new Date(`${this.fechaPersonalizada}T12:00:00`)
+      : new Date();
+    this.generarPDFMinutos(this.reportes, docFecha);
   }
 
-  async generarReporteEmpresasPDF() {
-    this.cargandoPDF = true;
-    if (!this.empresaSeleccionada || this.errorFecha) {
-      this.cargandoPDF = false;
+  imprimirPDFAdministracionDesdeVista() {
+    if (this.reportes.length === 0) {
+      alert('No hay datos en la vista actual.');
+      return;
+    }
+    const docFecha = this.fechaPersonalizada
+      ? new Date(`${this.fechaPersonalizada}T12:00:00`)
+      : new Date();
+    this.generarPDFAdministracion(this.reportes, docFecha);
+  }
+
+  generarPDFMinutos(data: any[], fecha: Date) {
+    const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
+    if (filtrado.length === 0) {
+      alert('No hay valores de minutos para imprimir en esta vista.');
       return;
     }
 
-    const inicio = new Date(`${this.fechaInicio}T12:00:00`);
-    const fin = new Date(`${this.fechaFin}T12:00:00`);
+    const docPdf = new jsPDF();
+    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    const fechaEmision = new Date();
-    const docPDF = new jsPDF({ orientation: 'landscape' });
+    const logo1 = new Image();
+    logo1.src = '/assets/img/LogoPintag.png';
+    const logo2 = new Image();
+    logo2.src = '/assets/img/LogoAntisana.png';
 
-    docPDF.setFontSize(18);
-    docPDF.text(`Reporte ${this.empresaSeleccionada}`, 105, 20, { align: 'center' });
+    docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
+    docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
 
-    docPDF.setFontSize(12);
-    docPDF.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
-    docPDF.text(`Fecha de finalización: ${fin.toLocaleDateString('es-EC')}`, 15, 36);
-    docPDF.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString('es-EC')}`, 15, 42);
+    docPdf.setFontSize(16);
+    docPdf.text('Minutos', 105, 45, { align: 'center' });
 
-    const fechasArray: string[] = [];
-    let actual = new Date(inicio);
-    while (actual <= fin) {
-      fechasArray.push(actual.toLocaleDateString('es-EC', {
-        month: '2-digit',
-        day: '2-digit'
-      }));
-      actual.setDate(actual.getDate() + 1);
-    }
+    docPdf.setFontSize(11);
+    docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
 
-    const unidades = [...new Set(this.reportes.map(r => r.unidad))]
-      .filter(Boolean)
-      .sort((a, b) => {
-        const numA = parseInt(String(a).replace(/\D/g, '')) || 0;
-        const numB = parseInt(String(b).replace(/\D/g, '')) || 0;
-        return numA - numB;
-      });
+    docPdf.setFontSize(10);
+    docPdf.text('Consorcio Píntag Expresso', 135, 55);
+    docPdf.text('Píntag, Antisana S2-138', 135, 60);
+    docPdf.text('consorciopinexpres@hotmail.com', 135, 65);
 
-    const agrupado = this.agruparDatosParaPDF();
+    const cuerpo = filtrado.map(item => [
+      item.codigo || item.unidad || '',
+      item.propietarioNombre || item.nombre || '',
+      `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
+      ''
+    ]);
 
-    const modulos = [
-      { nombre: 'Minutos', campo: 'minutosAtraso', pagado: 'minutosPagados' },
-      { nombre: 'Administración', campo: 'administracion', pagado: 'adminPagada' },
-      { nombre: 'Minutos Base', campo: 'minutosBase', pagado: 'minBasePagados' },
-      { nombre: 'Multas', campo: 'multas', pagado: 'multasPagadas' }
-    ];
+    const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
 
-    let currentY = 50;
-    const resumenFinal: [string, number, number, number][] = [];
-
-    for (const modulo of modulos) {
-      docPDF.setFontSize(14);
-      docPDF.text(`${modulo.nombre} Asignados`, 15, currentY);
-      currentY += 6;
-
-      let totalAsignado = 0;
-      let totalSaldo = 0;
-
-      const bodyAsignados: (string | number)[][] = [];
-
-      for (const unidad of unidades) {
-        const row: (string | number)[] = [unidad || ''];
-        let totalUnidad = 0;
-
-        for (const fecha of fechasArray) {
-          const datos = agrupado.get(unidad)?.get(fecha);
-          const valor = datos?.[modulo.campo] || 0;
-          row.push(`$${Math.round(valor)}`);
-          totalUnidad += valor;
-        }
-
-        row.push(`$${Math.round(totalUnidad)}`);
-        totalAsignado += totalUnidad;
-        bodyAsignados.push(row);
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      autoTable(docPDF, {
-        startY: currentY,
-        head: [['UNIDAD', ...fechasArray, 'TOTAL']],
-        body: bodyAsignados,
-        styles: { fontSize: 6.5, cellPadding: 1.5 },
-        headStyles: { fontSize: 7.5, fillColor: [41, 128, 185], halign: 'center' },
-        margin: { left: 15, right: 15 },
-        didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
-      });
-
-      docPDF.setFontSize(12);
-      docPDF.text(`${modulo.nombre} Adeudados`, 15, currentY);
-      currentY += 6;
-
-      const bodyAdeudados: (string | number)[][] = [];
-
-      for (const unidad of unidades) {
-        const row: (string | number)[] = [unidad || ''];
-        let totalUnidad = 0;
-
-        for (const fecha of fechasArray) {
-          const datos = agrupado.get(unidad)?.get(fecha);
-          const asignado = datos?.[modulo.campo] || 0;
-          const pagado = datos?.[modulo.pagado] || 0;
-          const saldo = asignado - pagado;
-          row.push(`$${Math.round(saldo)}`);
-          totalUnidad += saldo;
-        }
-
-        row.push(`$${Math.round(totalUnidad)}`);
-        totalSaldo += totalUnidad;
-        bodyAdeudados.push(row);
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      autoTable(docPDF, {
-        startY: currentY,
-        head: [['UNIDAD', ...fechasArray, 'TOTAL']],
-        body: bodyAdeudados,
-        styles: { fontSize: 6.5, cellPadding: 1.5 },
-        headStyles: { fontSize: 7.5, fillColor: [41, 128, 185], halign: 'center' },
-        margin: { left: 15, right: 15 },
-        didDrawPage: data => { if (data.cursor) currentY = data.cursor.y + 10; return true; }
-      });
-
-      const totalPagado = totalAsignado - totalSaldo;
-
-      resumenFinal.push([
-        modulo.nombre,
-        totalAsignado,
-        totalSaldo,
-        totalPagado
-      ]);
-    }
-
-    docPDF.setFontSize(14);
-    docPDF.text('Resumen Final por Módulo', 15, currentY);
-    currentY += 6;
-
-    autoTable(docPDF, {
-      startY: currentY,
-      head: [['MÓDULO', 'ASIGNADO TOTAL', 'SALDO TOTAL', 'PAGADO TOTAL']],
-      body: resumenFinal.map(([nombre, asignado, saldo, pagado]) => [
-        nombre,
-        `$${asignado.toFixed(2)}`,
-        `$${saldo.toFixed(2)}`,
-        `$${pagado.toFixed(2)}`
-      ]),
-      styles: { fontSize: 10 },
-      margin: { left: 15, right: 15 }
+    autoTable(docPdf, {
+      head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
+      body: cuerpo,
+      startY: 75,
+      styles: { fontSize: 10 }
     });
 
-    docPDF.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
-    this.cargandoPDF = false;
+    const finalY = (docPdf as any).lastAutoTable.finalY + 10;
+    docPdf.setFontSize(11);
+    docPdf.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, 15, finalY);
+
+    docPdf.save(`Minutos_${this.fechaPersonalizada || 'vista'}.pdf`);
+  }
+
+  generarPDFAdministracion(data: any[], fecha: Date) {
+    const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
+    if (filtrado.length === 0) {
+      alert('No hay valores de administración para imprimir en esta vista.');
+      return;
+    }
+
+    const docPdf = new jsPDF();
+    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const logo1 = new Image();
+    logo1.src = '/assets/img/LogoPintag.png';
+    const logo2 = new Image();
+    logo2.src = '/assets/img/LogoAntisana.png';
+
+    docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
+    docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+    docPdf.setFontSize(16);
+    docPdf.text('Administración', 105, 45, { align: 'center' });
+
+    docPdf.setFontSize(11);
+    docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+    docPdf.setFontSize(10);
+    docPdf.text('Consorcio Píntag Expresso', 135, 55);
+    docPdf.text('Píntag, Antisana S2-138', 135, 60);
+    docPdf.text('consorciopinexpres@hotmail.com', 135, 65);
+
+    const cuerpo = filtrado.map(item => [
+      item.codigo || item.unidad || '',
+      item.propietarioNombre || item.nombre || '',
+      `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
+      ''
+    ]);
+
+    const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
+
+    autoTable(docPdf, {
+      head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
+      body: cuerpo,
+      startY: 75,
+      styles: { fontSize: 10 }
+    });
+
+    const finalY = (docPdf as any).lastAutoTable.finalY + 10;
+    docPdf.setFontSize(11);
+    docPdf.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, 15, finalY);
+
+    docPdf.save(`Administracion_${this.fechaPersonalizada || 'vista'}.pdf`);
   }
 }

@@ -14,6 +14,9 @@
   border-radius: 12px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
   padding: 2rem;
+
+  /* clave para que el dropdown no sea recortado */
+  overflow: visible;
 }
 
 /* Título */
@@ -38,8 +41,47 @@ h2 {
   display: flex;
   flex-direction: column;
 
-  
+  /* clave: ancla el dropdown al input sin empujar el layout */
+  position: relative;
 }
+
+/* Etiquetas */
+label {
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: #1a1f20;
+  font-size: 0.95rem;
+}
+
+/* Inputs base */
+input[type="text"],
+input[type="number"],
+.input-text {
+  width: 100% !important;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+  border: 1px solid #d3d3d3;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+  display: block;
+  color: #1a1f20;
+}
+
+input:focus {
+  outline: none;
+  border-color: #2f8071;
+  background-color: #ffffff;
+}
+
+input[readonly] {
+  background-color: #e0e0e0;
+  color: #555;
+  cursor: not-allowed;
+}
+
+/* Date control (si lo usas con class form-control) */
 .form-control {
   width: 100%;
   padding: 0.6rem 0.8rem;
@@ -58,42 +100,116 @@ h2 {
   }
 
   &::-webkit-calendar-picker-indicator {
-    filter: invert(0.3); // cambia color de icono de calendario
+    filter: invert(0.3);
     cursor: pointer;
   }
 }
-/* Etiquetas */
-label {
-  font-weight: 600;
-  margin-bottom: 0.4rem;
-  color: #1a1f20;
-  font-size: 0.95rem;
-}
 
-/* Inputs */
-input[type="text"],
-input[type="number"],
-.input-text {
-  width: 100% !important; // 🔥 fuerza el mismo ancho
+/* Select (si todavía queda en otras vistas) */
+.select-unidad {
+  width: 100%;
   padding: 0.6rem 0.8rem;
   font-size: 0.95rem;
   border: 1px solid #d3d3d3;
   border-radius: 8px;
   background-color: #f9f9f9;
+  color: #1a1f20;
   transition: border-color 0.3s ease;
   box-sizing: border-box;
-  display: block;
-}
-input:focus {
-  outline: none;
-  border-color: #2f8071;
-  background-color: #ffffff;
+  appearance: none;
+
+  background-image: url("data:image/svg+xml,%3Csvg fill='%231a1f20' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5H7z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 1rem;
+
+  &:focus {
+    outline: none;
+    border-color: #2f8071;
+    background-color: #ffffff;
+  }
 }
 
-input[readonly] {
-  background-color: #e0e0e0;
-  color: #555;
-  cursor: not-allowed;
+/* =========================
+   DROPDOWN FLOTANTE (popover)
+   ========================= */
+.dropdown-resultados {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+
+  z-index: 9999;
+  background: #ffffff;
+
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+
+  max-height: 260px;
+  overflow: auto;
+
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+}
+
+.item-resultado {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  strong {
+    font-size: 0.95rem;
+    color: #1a1f20;
+  }
+
+  .sub {
+    font-size: 0.82rem;
+    color: rgba(26, 31, 32, 0.75);
+  }
+}
+
+.item-resultado:hover {
+  background: rgba(47, 128, 113, 0.10);
+}
+
+/* Panel de selección actual (debajo del input) */
+.seleccion-actual {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(47, 128, 113, 0.07);
+  border: 1px solid rgba(47, 128, 113, 0.25);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  small {
+    color: #1a1f20;
+  }
+}
+
+.btn-limpiar {
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  background: #d3d3d3;
+  color: #333;
+  cursor: pointer;
+  transition: 0.2s ease;
+
+  &:hover {
+    background: #bcbcbc;
+  }
 }
 
 /* Botones */
@@ -119,6 +235,11 @@ input[readonly] {
 
     &:hover {
       background-color: #26685c;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
   }
 
@@ -149,7 +270,15 @@ p {
   .form-group {
     flex: 1 1 100%;
   }
-
+.alerta-error {
+  margin-top: 10px;
+  padding: 10px;
+  background: #ffe6e6;
+  border: 1px solid #e74c3c;
+  color: #c0392b;
+  border-radius: 6px;
+  font-size: 14px;
+}
   .acciones-formulario {
     flex-direction: column;
     align-items: stretch;
@@ -157,28 +286,5 @@ p {
     button {
       width: 100%;
     }
-  }
-  }
-.select-unidad {
-  width: 100%;
-  padding: 0.6rem 0.8rem;
-  font-size: 0.95rem;
-  border: 1px solid #d3d3d3;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-  color: #1a1f20;
-  transition: border-color 0.3s ease;
-  box-sizing: border-box;
-  appearance: none;
-
-  background-image: url("data:image/svg+xml,%3Csvg fill='%231a1f20' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5H7z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.8rem center;
-  background-size: 1rem;
-
-  &:focus {
-    outline: none;
-    border-color: #2f8071;
-    background-color: #ffffff;
   }
 }
