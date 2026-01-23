@@ -1,93 +1,89 @@
-<body>
-  <!-- Overlay de carga -->
-  <div class="overlay-cargando" *ngIf="cargando">
-    <div class="spinner"></div>
+<!-- lista-reportes.component.html -->
+
+<div class="contenedor-reportes">
+
+  <!-- Barra superior -->
+  <div class="barra-superior">
+    <button class="btn-secundario" type="button" (click)="volver()">← Volver</button>
+
+    <div class="grupo-botones">
+      <button class="btn-primario" type="button" (click)="agregarDia()" [disabled]="creandoDia">
+        {{ creandoDia ? 'Creando día...' : 'Agregar día' }}
+      </button>
+
+      <button class="btn-secundario" type="button" (click)="mostrarFiltros = !mostrarFiltros">
+        Filtros
+      </button>
+
+      <button class="btn-primario" type="button" (click)="irANuevoRegistro()">
+        + Nuevo Registro
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel Filtros -->
+  <div class="panel-filtros" *ngIf="mostrarFiltros">
+    <div class="filtros-rapidos">
+      <button type="button" class="btn-chip" (click)="filtrarPor('hoy')">Hoy</button>
+      <button type="button" class="btn-chip" (click)="filtrarPor('semana')">Esta semana</button>
+      <button type="button" class="btn-chip" (click)="filtrarPor('mes')">Este mes</button>
+    </div>
+
+    <div class="filtro-fecha">
+      <label for="fechaPersonalizada">Fecha:</label>
+      <input
+        id="fechaPersonalizada"
+        type="date"
+        [(ngModel)]="fechaPersonalizada"
+        name="fechaPersonalizada"
+        class="input-fecha"
+      />
+      <button type="button" class="btn-secundario" (click)="filtrarPorFechaPersonalizada()">
+        Buscar
+      </button>
+    </div>
+
+    <hr class="separador" />
+
+    <!-- PDFs del día (usa la vista actual: this.reportes) -->
+    <div class="acciones-pdf">
+      <button type="button" class="btn-secundario" (click)="imprimirPDFMinutosDesdeVista()">
+        Imprimir PDF Minutos (vista)
+      </button>
+
+      <button type="button" class="btn-secundario" (click)="imprimirPDFAdministracionDesdeVista()">
+        Imprimir PDF Administración (vista)
+      </button>
+    </div>
+  </div>
+
+  <!-- Mensajes / Estado -->
+  <div class="estado-carga" *ngIf="cargando">
     <p>Cargando reportes...</p>
   </div>
 
-  <!-- Contenido principal -->
-  <div class="tabla-container" *ngIf="!cargando">
-    <h5>NÓMINA DE RECAUDACIÓN</h5>
-    <button class="boton-volver" (click)="volver()">← Volver</button>
+  <div class="mensaje-dia" *ngIf="mostrarMensajeDia && !cargando">
+    <p>{{ mensajeEstadoDia }}</p>
+  </div>
 
-   
-    <!-- Contenedor de acciones superior -->
-    <div class="acciones-globales">
-      <!-- Izquierda: Reporte Empresas -->
-      <div class="acciones-empresas" >
-        <button (click)="mostrarOpcionesEmpresa = !mostrarOpcionesEmpresa" >
-          <span class="material-icons">business</span>
-          Generar Reporte Empresas
-        </button>
-      </div>
+  <!-- Barra selección múltiple (sin checkboxes) -->
+  <div class="acciones-multiples" *ngIf="seleccionCount > 0 && !cargando">
+    <span class="seleccion-info">
+      Seleccionados: {{ seleccionCount }} / {{ reportes.length }}
+    </span>
 
-      <!-- Derecha: Filtros y nuevo registro -->
-      <div class="acciones-secundarias">
-        <button class="filtro" (click)="mostrarFiltros = !mostrarFiltros">
-          <span class="material-icons">filter_alt</span>
-        </button>
-        <button class="nuevo-registro" (click)="irANuevoRegistro()" [disabled]="esSocio">
-          <span class="material-icons">add</span>
-          Nuevo Registro
-        </button>
-      </div>
-    </div>
-    
-    <div *ngIf="mostrarOpcionesEmpresa" class="panel-empresa">
-      <!-- Botones de empresas -->
-      <div class="botones-empresa">
-        <button (click)="seleccionarEmpresa('Pintag')" [class.activa]="empresaSeleccionada === 'Pintag'">Pintag</button>
-        <button (click)="seleccionarEmpresa('Antisana')" [class.activa]="empresaSeleccionada === 'Antisana'">Antisana</button>
-      </div>
-    
-      <!-- Fechas -->
-      <div *ngIf="empresaSeleccionada" class="filtros-fecha">
-        <label>Fecha de inicio:</label>
-        <input type="date" [(ngModel)]="fechaInicio" (change)="validarRangoFechas()" />
-    
-        <label>Fecha de fin:</label>
-        <input type="date" [(ngModel)]="fechaFin" (change)="validarRangoFechas()" />
-    
-        <p class="error" *ngIf="errorFecha">{{ errorFecha }}</p>
-    
-        <button
-          class="generar-reporte"
-          (click)="generarReporteEmpresasPDF()"
-          [disabled]="!fechaInicio || !fechaFin || !!errorFecha"
-        >
-          <span class="material-icons">picture_as_pdf</span>
-          Generar PDF
-        </button>
-      </div>
-    </div>
+    <button class="btn-eliminar-multi" type="button" (click)="eliminarSeleccionados()">
+      Eliminar seleccionados
+    </button>
 
-    <!-- Panel de filtros -->
-    <div class="panel-filtros" *ngIf="mostrarFiltros">
-      <button (click)="filtrarPor('hoy')">Hoy</button>
-      <button (click)="filtrarPor('semana')">Esta semana</button>
-      <button (click)="filtrarPor('mes')">Este mes</button>
+    <button class="btn-limpiar-multi" type="button" (click)="limpiarSeleccion()">
+      Limpiar selección
+    </button>
+  </div>
 
-      <div class="filtro-personalizado">
-        <label for="fecha">Fecha personalizada:</label>
-        <input type="date" [(ngModel)]="fechaPersonalizada" id="fecha" />
-        <button (click)="filtrarPorFechaPersonalizada()">Buscar</button>
-        <div class="acciones-imprimir">
-          <button class="boton-imprimir" (click)="imprimirPDFMinutosDesdeVista()">
-            <span class="material-icons">schedule</span>
-            Imprimir Minutos 
-          </button>
-          <button class="boton-imprimir" (click)="imprimirPDFAdministracionDesdeVista()">
-            <span class="material-icons">receipt_long</span>
-            Imprimir Administración
-          </button>
-        </div>
-      </div>
-
-      <button class="limpiar" (click)="cargarTodosLosReportes()">Limpiar filtros</button>
-    </div>
-    
-    <!-- Tabla -->
-    <table *ngIf="reportes.length > 0">
+  <!-- Tabla -->
+  <div class="tabla-wrapper" *ngIf="!cargando">
+    <table class="tabla-reportes" *ngIf="reportes.length; else sinDatos">
       <thead>
         <tr>
           <th>Fecha</th>
@@ -101,32 +97,75 @@
           <th>Min. Base Pagados</th>
           <th>Multas</th>
           <th>Multas Pagadas</th>
-          <th>Acciones</th>
+          <th class="col-acciones">Acciones</th>
         </tr>
       </thead>
+
       <tbody>
-        <tr *ngFor="let reporte of reportes">
-          <td>{{ reporte.fechaModificacion | date: 'dd/MM/yyyy' }}</td>
-          <td data-label="Nombre">{{ reporte.nombre + ' ' + reporte.apellido }}</td>
-          <td data-label="Unidad">{{ reporte.unidad }}</td>
-          <td data-label="Min. Atraso">{{ reporte.minutosAtraso }}</td>
-          <td data-label="Min. Pagados">{{ reporte.minutosPagados }}</td>
-          <td data-label="Administración">{{ reporte.administracion }}</td>
-          <td data-label="Admin Pagada">{{ reporte.adminPagada }}</td>
-          <td data-label="Min. Base">{{ reporte.minutosBase }}</td>
-          <td data-label="Min. Base Pagados">{{ reporte.minBasePagados }}</td>
-          <td data-label="Multas">{{ reporte.multas }}</td>
-          <td data-label="Multas Pagadas">{{ reporte.multasPagadas }}</td>
-          <td class="acciones" data-label="Acciones">
-            <div class="acciones-contenedor">
-              <button class="editar" (click)="irAEditar(reporte.uid, reporte.id)" [disabled]="esSocio">
-                <span class="material-icons">edit</span>
+        <tr
+          *ngFor="let r of reportes; trackBy: trackByReporte"
+          (dblclick)="toggleSeleccionFila(r)"
+          [class.fila-seleccionada]="isSelected(r)"
+          title="Doble clic para seleccionar/deseleccionar"
+        >
+          <!-- Fecha -->
+          <td>
+            {{
+              (r.fechaModificacion ? (r.fechaModificacion | date:'yyyy-MM-dd') : (fechaPersonalizada || ''))
+            }}
+          </td>
+
+          <td class="col-nombre">{{ r.nombre }}</td>
+          <td>{{ r.unidad }}</td>
+
+          <td>{{ r.minutosAtraso }}</td>
+          <td>{{ r.minutosPagados }}</td>
+
+          <td>{{ r.administracion }}</td>
+          <td>{{ r.adminPagada }}</td>
+
+          <td>{{ r.minutosBase }}</td>
+          <td>{{ r.minBasePagados }}</td>
+
+          <td>{{ r.multas }}</td>
+          <td>{{ r.multasPagadas }}</td>
+
+          <td class="col-acciones">
+            <div class="acciones">
+              <!-- EDITAR -->
+              <button
+                type="button"
+                class="btn-icono editar"
+                title="Editar"
+                (click)="irAEditar(r.uid, r.id); $event.stopPropagation()"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.83H5v-.92l9.06-9.06.92.92L5.92 20.08zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
               </button>
-              <button class="pagar" (click)="irAPagar(reporte.uid, reporte.id)" [disabled]="esSocio">
-                <span class="material-icons">payments</span>
+
+              <!-- PAGAR -->
+              <button
+                type="button"
+                class="btn-icono pagar"
+                title="Pagar"
+                (click)="irAPagar(r.uid, r.id); $event.stopPropagation()"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4H4V6h16v2zm-8 8H6v-2h6v2z"/>
+                </svg>
               </button>
-               <button class="eliminar" (click)="eliminarReporte(reporte)">
-                <span class="material-icons">delete</span>
+
+              <!-- ELIMINAR -->
+              <button
+                type="button"
+                class="btn-icono eliminar"
+                title="Eliminar"
+                (click)="eliminarReporte(r); $event.stopPropagation()"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 7h12v14H6V7zm3-3h6l1 1h4v2H4V5h4l1-1z"/>
+                </svg>
               </button>
             </div>
           </td>
@@ -134,32 +173,17 @@
       </tbody>
     </table>
 
-    <div class="paginacion" *ngIf="modoActual === 'todos'">
-      <button (click)="cargarTodosLosReportes('anterior')" [disabled]="paginaActual <= 1">
-        ← Anterior
-      </button>
-      <span>Página {{ paginaActual }}</span>
-      <button (click)="cargarTodosLosReportes('siguiente')" [disabled]="!hayMasReportes">
-        Siguiente →
-      </button>
-    </div>
-    
-    <div *ngIf="cargandoPDF" class="overlay-cargando">
-      <div class="spinner-pdf">
-        <p>🌀 Generando PDF, por favor espera...</p>
+    <ng-template #sinDatos>
+      <div class="sin-datos">
+        <p>No hay registros para mostrar.</p>
       </div>
-    </div>
-
-    <!-- Botones inferiores -->
-    <div class="botones-inferiores">
-      <button (click)="irACuentasPorCobrar()">
-        <span class="material-icons">account_balance_wallet</span>
-        Cuentas por cobrar
-      </button>
-      <button (click)="irACierreCaja()">
-        <span class="material-icons">check_circle</span>
-        Cierre de Caja
-      </button>
-    </div>
+    </ng-template>
   </div>
-</body>
+
+  <div class="nota-ayuda" *ngIf="!cargando && reportes.length">
+    <small>
+      Tip: Doble clic sobre una fila para seleccionarla. Las filas seleccionadas se resaltan para eliminar en bloque.
+    </small>
+  </div>
+
+</div>

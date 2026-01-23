@@ -2,84 +2,168 @@
   <h2>Nuevo Registro</h2>
 
   <form (ngSubmit)="enviar()" #form="ngForm">
-    <!-- Nombre y Unidad -->
+
+    <!-- UNIDAD + NOMBRE -->
     <div class="row">
+      <!-- UNIDAD (buscador con sugerencias flotantes) -->
+      <div class="form-group">
+        <label for="unidadBuscador">Unidad</label>
+
+        <input
+          id="unidadBuscador"
+          class="input-text"
+          name="unidadBuscada"
+          [(ngModel)]="unidadBuscada"
+          placeholder="Seleccione una unidad"
+          autocomplete="off"
+          required
+          (focus)="mostrarUnidadesDisponibles()"
+          (click)="mostrarUnidadesDisponibles()"
+          (input)="filtrarPorUnidad()"
+          (blur)="cerrarDropdownConDelay()"
+        />
+
+        <!-- Dropdown flotante -->
+        <div class="dropdown-resultados" *ngIf="dropdownAbierto && unidadesFiltradas.length > 0">
+          <button
+            type="button"
+            class="item-resultado"
+            *ngFor="let u of unidadesFiltradas"
+            (mousedown)="seleccionarUnidad(u)"
+          >
+            <strong>Unidad {{ u.codigo }}</strong>
+            <span class="sub">— {{ u.propietarioNombre }} ({{ u.empresa }})</span>
+          </button>
+        </div>
+
+        <!-- Selección actual -->
+        <div class="seleccion-actual" *ngIf="unidadSeleccionada">
+          <small>
+            Seleccionado:
+            <strong>Unidad {{ unidadSeleccionada.codigo }}</strong>
+            — {{ unidadSeleccionada.propietarioNombre }} ({{ unidadSeleccionada.empresa }})
+          </small>
+          <button type="button" class="btn-limpiar" (click)="limpiarSeleccion()">
+            Quitar
+          </button>
+        </div>
+      </div>
+
+      <!-- NOMBRE (readonly) -->
       <div class="form-group">
         <label for="nombre">Nombre</label>
         <input
           id="nombre"
-          list="usuariosList"
-          [(ngModel)]="nombreBuscado"
-          name="nombre"
-          (input)="actualizarUsuarioSeleccionado()"
-          placeholder="Escriba un nombre"
-          required
           class="input-text"
-        />
-        <datalist id="usuariosList">
-          <option *ngFor="let u of usuarios" [value]="u.nombre + ' ' + u.apellido"></option>
-        </datalist>
-      </div>
-      <div class="form-group">
-        <label for="unidad">Unidad:</label>
-        <select
-          id="unidad"
-          [(ngModel)]="reporte.unidad"
-          name="unidad"
+          name="nombre"
+          [(ngModel)]="reporte.nombre"
+          placeholder="Se completa automáticamente"
+          readonly
           required
-          class="select-unidad"
-        >
-          <option value="">-- Selecciona una unidad --</option>
-          <option *ngFor="let unidad of unidadesDisponibles" [value]="unidad">
-            {{ unidad }}
-          </option>
-        </select>
+        />
       </div>
-      
     </div>
 
-    <!-- Administración y Minutos Base -->
+    <!-- APELLIDO + UNIDAD SELECCIONADA -->
+    <div class="row">
+      <div class="form-group">
+        <label for="apellido">Apellido</label>
+        <input
+          id="apellido"
+          class="input-text"
+          name="apellido"
+          [(ngModel)]="reporte.apellido"
+          placeholder="Se completa automáticamente"
+          readonly
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="unidadFinal">Unidad seleccionada</label>
+        <input
+          id="unidadFinal"
+          class="input-text"
+          name="unidadFinal"
+          [(ngModel)]="reporte.unidad"
+          readonly
+        />
+      </div>
+    </div>
+
+    <!-- ADMINISTRACIÓN + MIN BASE -->
     <div class="row">
       <div class="form-group">
         <label>Administración</label>
-        <input type="number" name="administracion" [(ngModel)]="reporte.administracion" required />
+        <input
+          type="number"
+          class="input-text"
+          name="administracion"
+          [(ngModel)]="reporte.administracion"
+          required
+        />
       </div>
 
       <div class="form-group">
         <label>Minutos Base</label>
-        <input type="number" name="minutosBase" [(ngModel)]="reporte.minutosBase" required />
+        <input
+          type="number"
+          class="input-text"
+          name="minutosBase"
+          [(ngModel)]="reporte.minutosBase"
+          required
+        />
       </div>
     </div>
 
-    <!-- Minutos Atraso y Multas -->
+    <!-- MIN ATRASO + MULTAS -->
     <div class="row">
       <div class="form-group">
         <label>Minutos Atraso</label>
-        <input type="number" name="minutosAtraso" [(ngModel)]="reporte.minutosAtraso" required />
+        <input
+          type="number"
+          class="input-text"
+          name="minutosAtraso"
+          [(ngModel)]="reporte.minutosAtraso"
+          required
+        />
       </div>
 
       <div class="form-group">
         <label>Multas</label>
-        <input type="number" name="multas" [(ngModel)]="reporte.multas" required />
+        <input
+          type="number"
+          class="input-text"
+          name="multas"
+          [(ngModel)]="reporte.multas"
+          required
+        />
       </div>
     </div>
+
+    <!-- FECHA -->
     <div class="form-group">
-      <label for="fecha">Fecha del reporte:</label>
+      <label for="fecha">Fecha del reporte</label>
       <input
         type="date"
         id="fecha"
-        [(ngModel)]="fechaInput"
-        name="fecha"
         class="form-control"
+        name="fecha"
+        [(ngModel)]="fechaInput"
         required
       />
     </div>
-    <!-- Botones -->
+
+    <!-- BOTONES -->
     <div class="acciones-formulario">
-      <button type="submit" class="guardar">💾 Guardar</button>
-      <button type="button" class="cancelar" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="guardar" [disabled]="!unidadSeleccionada">
+        💾 Guardar
+      </button>
+      <button type="button" class="cancelar" (click)="cancelar()">
+        Cancelar
+      </button>
     </div>
+
   </form>
 
-  <p *ngIf="resultado">✅ Reporte guardado con ID: {{ resultado }}</p>
+  <p *ngIf="resultado">✅ {{ resultado }}</p>
 </div>

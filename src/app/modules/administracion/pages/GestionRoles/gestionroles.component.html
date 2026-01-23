@@ -6,7 +6,20 @@
   <div class="spinner"></div>
   <p>Cargando usuarios...</p>
 </div>
-
+<!--------------------Prueba Sinc Unidades------------------>>
+<button
+  class="btn-sync"
+  (click)="sincronizarUnidades()"
+  [disabled]="sincronizandoUnidades"
+>
+  {{ sincronizandoUnidades ? 'Sincronizando...' : 'Sincronizar Unidades Globales' }}
+</button>
+<div *ngIf="resultadoSync" class="sync-result">
+  <p>Usuarios procesados: {{ resultadoSync.usuariosProcesados }}</p>
+  <p>Unidades creadas/actualizadas: {{ resultadoSync.creadas }}</p>
+  <p>Omitidas: {{ resultadoSync.omitidas }}</p>
+</div>
+<!--------------------------------Fin Prueba--------------->>
 <div *ngIf="!cargando">
 
   <div style="margin-bottom: 1rem;">
@@ -55,7 +68,7 @@
               </select>
             </td>
             <td>
-              <button class="btn-ver" 
+              <button class="btn-ver"
                       [disabled]="!usuario.estado || !usuario.nuevoRol || usuario.nuevoRol === usuario.rol || esSocio" (click)="guardarNuevoRol(usuario.uid, usuario.nuevoRol!)">
                 <span class="material-icons">save</span>
               </button>

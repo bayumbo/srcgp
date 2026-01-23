@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { UsuariosService, Usuario } from 'src/app/core/auth/services/usuarios.service';
 import { AuthService } from 'src/app/core/auth/services/auth.service'; // <-- Importa AuthService
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { UnidadesSyncService } from 'src/app/core/auth/services/unidades-sync.service';
 @Component({
   selector: 'app-gestionroles',
   standalone: true,
@@ -13,6 +14,8 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
   styleUrls: ['./gestionroles.component.scss']
 })
 export class GestionRolesComponent implements OnInit {
+  sincronizandoUnidades = false;
+  resultadoSync: any = null;
   todosLosUsuarios: Usuario[] = [];
   usuariosFiltrados: Usuario[] = [];
   usuariosPaginados: Usuario[] = [];
@@ -37,8 +40,27 @@ export class GestionRolesComponent implements OnInit {
     public usuariosService: UsuariosService,
     private router: Router,
     private authService: AuthService, // <-- Inyecta AuthService
-    private functions: Functions 
+    private functions: Functions,
+    private unidadesSyncService: UnidadesSyncService
   ) {}
+  async sincronizarUnidades() {
+    try {
+      this.sincronizandoUnidades = true;
+      this.resultadoSync = null;
+
+      const res = await this.unidadesSyncService.sincronizarUnidadesGlobales();
+      this.resultadoSync = res;
+
+      // aquí puede mostrar un toast o alert
+      alert(`Sincronización completa. Creadas/actualizadas: ${res.creadas}. Usuarios procesados: ${res.usuariosProcesados}`);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error al sincronizar unidades. Revise consola.');
+    } finally {
+      this.sincronizandoUnidades = false;
+    }
+  }
+
 
   ngOnInit(): void {
     // Suscribirse para obtener el rol del usuario actual desde AuthService
