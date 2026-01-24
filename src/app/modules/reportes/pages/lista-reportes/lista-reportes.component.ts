@@ -604,14 +604,46 @@ export class ReporteListaComponent implements OnInit {
     this.router.navigate(['/reportes/nuevo-registro']);
   }
 
-  irAEditar(uid: string, id: string): void {
-    // id debe ser el docId real del registro (ej: ExpresoAntisana_E13)
-    this.router.navigate([`/reportes/actualizar`, uid, id]);
+irAEditar(r: any): void {
+  const uid = r?.uid;
+  const refPath = r?.refPath;
+
+  if (!uid || !refPath) {
+    alert('❌ No se puede editar: faltan uid o refPath.');
+    return;
   }
 
-  irAPagar(uid: string, id: string): void {
-    this.router.navigate([`/reportes/realizar-pago`, uid, id]);
+  const safe = encodeURIComponent(refPath);
+
+  this.router.navigate(['/reportes/actualizar', uid, safe], {
+    queryParams: {
+      nombre: r?.propietarioNombre ?? r?.nombre ?? '',
+      apellido: r?.apellido ?? '',
+      unidad: r?.codigo ?? r?.unidad ?? ''
+    }
+  });
+}
+
+irAPagar(r: any): void {
+  const uid = r?.uid;
+  const refPath = r?.refPath;
+
+  if (!uid || !refPath) {
+    alert('❌ No se puede pagar: faltan uid o refPath.');
+    return;
   }
+
+  const safe = encodeURIComponent(refPath);
+
+  this.router.navigate(['/reportes/realizar-pago', uid, safe], {
+    queryParams: {
+      nombre: r?.propietarioNombre ?? r?.nombre ?? '',
+      apellido: r?.apellido ?? '',
+      unidad: r?.codigo ?? r?.unidad ?? ''
+    }
+  });
+}
+
 
   irACuentasPorCobrar() {
     this.router.navigate(['/reportes/cuentas-por-cobrar']);
