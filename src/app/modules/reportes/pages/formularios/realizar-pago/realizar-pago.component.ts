@@ -26,6 +26,10 @@ import { ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Storage } from '@angular/fire/storage';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { deleteDoc } from '@angular/fire/firestore';
+import { deleteObject } from '@angular/fire/storage';
+// ✅ Si no lo usas, mejor comenta o elimina para evitar warnings:
+// import QRCode from 'qrcode';
 
 type CampoClave = 'minutosAtraso' | 'administracion' | 'minutosBase' | 'multas';
 
@@ -33,6 +37,14 @@ type DeudaDetalleItem = {
   fecha: string;     // YYYY-MM-DD (fecha del reporte/deuda)
   monto: number;     // saldo pendiente para esa fecha y módulo
   pathDoc: string;   // ruta real: reportes_dia/{diaId}/unidades/{unidadId}
+};
+
+// ✅ Item que alimenta la tabla del PDF
+type PagoReciboItem = {
+  campo: CampoClave;
+  monto: number;
+  fecha: Timestamp;     // fecha de pago (cabecera)
+  fechaDeuda: string;   // ✅ fecha del reporte (columna Fecha de la tabla)
 };
 
 @Component({
@@ -49,14 +61,13 @@ export class RealizarPagoComponent implements OnInit {
   private storage = inject(Storage);
 
   uidUsuario: string = '';
-  reporteId: string = '';             // viene del route param (puede ser refPath codificado)
-  private pathActual: string = '';    // ✅ ruta real del doc en reportes_dia/.../unidades/...
+  reporteId: string = '';
+  private pathActual: string = '';
 
   registros: (NuevoRegistro & { id?: string }) | null = null;
 
   campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
 
-  // Historial (subcolección pagosTotales del doc actual)
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
     administracion: [],
@@ -64,7 +75,6 @@ export class RealizarPagoComponent implements OnInit {
     multas: []
   };
 
-  // ✅ Deuda acumulada (histórica) y desglose por fecha/path
   deudaHistorica: Record<CampoClave, number> = {
     minutosAtraso: 0,
     administracion: 0,
@@ -79,16 +89,49 @@ export class RealizarPagoComponent implements OnInit {
     multas: []
   };
 
-  /**
-   * ✅ Pagos por fila (por deuda histórica específica).
-   * Key: `${campo}__${pathDoc}` -> { [campo]: monto }
-   */
   pagosPorDeuda: Record<string, Partial<Record<CampoClave, number>>> = {};
+  pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
+  nuevoMonto: number = 0;               // input monto
 
   cargandoPago: boolean = false;
 
-  // Fecha de pago general (se mantiene el formato del PDF)
+  // Fecha de pago general (cabecera PDF)
   fechaSeleccionada: Date = new Date();
+
+  // Cache de assets
+  private logoPintagB64: string | null = null;
+  private logoAntisanaB64: string | null = null;
+  private busB64: string | null = null;
+
+  private recargarVistaActual(): void {
+  const url = this.router.url;
+
+  // Truco: navegar a una ruta dummy y volver, para forzar ngOnInit
+  this.router.navigateByUrl('/', { skipLocationChange: true }).then(() => {
+    this.router.navigateByUrl(url);
+  });
+}
+
+  private async assetB64(path: string): Promise<string> {
+    if (path.includes('LogoPintag') && this.logoPintagB64) return this.logoPintagB64;
+    if (path.includes('LogoAntisana') && this.logoAntisanaB64) return this.logoAntisanaB64;
+    if (path.includes('Bus.png') && this.busB64) return this.busB64;
+
+    const b64 = await this.cargarImagenBase64(path);
+    if (path.includes('LogoPintag')) this.logoPintagB64 = b64;
+    if (path.includes('LogoAntisana')) this.logoAntisanaB64 = b64;
+    if (path.includes('Bus.png')) this.busB64 = b64;
+    return b64;
+  }
+
+  private descargarPDFInstantaneo(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
 
   // =========================
   // INIT
@@ -105,10 +148,8 @@ export class RealizarPagoComponent implements OnInit {
     this.uidUsuario = uid;
     this.reporteId = decodeURIComponent(idRaw);
 
-    // ✅ Resolver la ruta real del doc
     this.pathActual = this.resolverPath(this.uidUsuario, this.reporteId);
 
-    // Cargar el registro (doc unidad del día)
     const refDoc = doc(this.firestore, this.pathActual);
     const snap = await getDoc(refDoc);
 
@@ -125,24 +166,15 @@ export class RealizarPagoComponent implements OnInit {
       id: snap.id
     };
 
-    // Fallback desde query params
     const qp = this.route.snapshot.queryParamMap;
     this.registros.nombre = (data.nombre ?? qp.get('nombre') ?? '').toString().trim();
     (this.registros as any).apellido = (data.apellido ?? qp.get('apellido') ?? '').toString().trim();
     this.registros.unidad = (data.codigo ?? data.unidad ?? qp.get('unidad') ?? '').toString().trim();
 
-    // 1) historial del doc actual
     await this.cargarPagosTotales();
-
-    // 2) deuda histórica + desglose (collectionGroup unidades)
     await this.cargarDeudaHistoricaAcumulada();
   }
 
-  /**
-   * 1) Si id ya viene como refPath real (reportes_dia/.../unidades/...), úsalo directo.
-   * 2) Si viene compuesto empresaKey_YYYY-MM-DD_unidadDocId, construye reportes_dia.
-   * 3) Si no, legacy.
-   */
   private resolverPath(uid: string, id: string): string {
     if (id.startsWith('reportes_dia/')) return id;
 
@@ -182,8 +214,6 @@ export class RealizarPagoComponent implements OnInit {
 
       this.pagosTotales[campo].push(...nuevosPagos);
     }
-
-    console.log('💰 Pagos cargados:', this.pagosTotales);
   }
 
   // =========================
@@ -194,17 +224,15 @@ export class RealizarPagoComponent implements OnInit {
 
     const codigo = ((this.registros as any)?.codigo ?? this.registros?.unidad ?? '').toString().trim();
     const empresa = ((this.registros as any)?.empresa ?? '').toString().trim();
-    const fechaActual = ((this.registros as any)?.fecha ?? '').toString().trim(); // YYYY-MM-DD
+    const fechaActual = ((this.registros as any)?.fecha ?? '').toString().trim();
 
     if (!codigo || !empresa || !fechaActual) return;
 
-    // reset
     for (const c of this.campos) {
       this.deudaHistorica[c] = 0;
       this.deudaDetalle[c] = [];
     }
 
-    // Históricos (días anteriores)
     const q = query(
       collectionGroup(this.firestore, 'unidades'),
       where('empresa', '==', empresa),
@@ -219,7 +247,7 @@ export class RealizarPagoComponent implements OnInit {
       const fecha = (d?.fecha ?? '').toString().trim();
       if (!fecha) return;
 
-      const pathDoc = s.ref.path; // ✅ ruta real del doc histórico
+      const pathDoc = s.ref.path;
 
       for (const campo of this.campos) {
         const total = Number(d?.[campo] ?? 0);
@@ -234,12 +262,10 @@ export class RealizarPagoComponent implements OnInit {
       }
     });
 
-    // Ordenar por fecha asc
     for (const campo of this.campos) {
       this.deudaDetalle[campo].sort((a, b) => a.fecha.localeCompare(b.fecha));
     }
 
-    // Incluir el día actual (doc cargado), usando pathActual
     const reg: any = this.registros;
     const fechaHoy = (reg?.fecha ?? fechaActual).toString().trim();
 
@@ -261,7 +287,7 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   // =========================
-  // PAGO POR FILA (por deuda histórica)
+  // PAGO POR FILA
   // =========================
   private keyDeuda(campo: CampoClave, item: DeudaDetalleItem): string {
     return `${campo}__${item.pathDoc}__${item.fecha}`;
@@ -275,14 +301,12 @@ export class RealizarPagoComponent implements OnInit {
   setPagoFila(campo: CampoClave, item: DeudaDetalleItem, valor: any): void {
     const k = this.keyDeuda(campo, item);
     const num = Math.max(Number(valor ?? 0), 0);
-
     if (!this.pagosPorDeuda[k]) this.pagosPorDeuda[k] = {};
-    // limitar al pendiente de esa fila
     this.pagosPorDeuda[k][campo] = Math.min(num, item.monto);
   }
 
   // =========================
-  // CÁLCULOS (deuda y totales)
+  // CÁLCULOS
   // =========================
   private campoPagadoKey(
     campo: CampoClave
@@ -293,10 +317,6 @@ export class RealizarPagoComponent implements OnInit {
     return 'multasPagadas';
   }
 
-  /**
-   * Deuda del día actual (doc actual).
-   * OJO: aquí se calcula contra el acumulado del doc unidad (rápido).
-   */
   private calcularDeudaDelDia(registro: any, campo: CampoClave): number {
     const total = Number(registro?.[campo] ?? 0);
     const pagadoKey = this.campoPagadoKey(campo);
@@ -304,10 +324,6 @@ export class RealizarPagoComponent implements OnInit {
     return Math.max(total - pagado, 0);
   }
 
-  /**
-   * Total acumulado “visible” en la tarjeta (históricos + hoy).
-   * (Si en tu HTML estás mostrando deuda acumulada, úsala.)
-   */
   calcularDeudaAcumulada(campo: CampoClave): number {
     const historica = Number(this.deudaHistorica?.[campo] ?? 0);
     const hoy = this.registros ? this.calcularDeudaDelDia(this.registros as any, campo) : 0;
@@ -322,9 +338,6 @@ export class RealizarPagoComponent implements OnInit {
     return this.filtrarPagosPorRegistro(campo, registroId).reduce((acc, p) => acc + p.cantidad, 0);
   }
 
-  /**
-   * Total a pagar = suma de todos los inputs por fila (capados al pendiente).
-   */
   calcularTotalGeneral(): number {
     let total = 0;
     for (const campo of this.campos) {
@@ -335,8 +348,175 @@ export class RealizarPagoComponent implements OnInit {
     return total;
   }
 
+  async eliminarPago(pagoId: string): Promise<void> {
+  if (!pagoId) return;
+
+  const ok = confirm('¿Seguro que deseas eliminar este pago? Esta acción no se puede deshacer.');
+  if (!ok) return;
+
+  try {
+    // ✅ Ruta del doc del pago (si tu historial viene del doc actual, es pathActual)
+    const pagoPath = `${this.pathActual}/pagosTotales/${pagoId}`;
+    const pagoRef = doc(this.firestore, pagoPath);
+
+    const snap = await getDoc(pagoRef);
+    if (!snap.exists()) {
+      alert('El pago ya no existe o no se encontró.');
+      return;
+    }
+
+    const data: any = snap.data();
+    const detalles: Partial<Record<CampoClave, number>> = data?.detalles ?? {};
+    const urlPDF: string | null = data?.urlPDF ?? null;
+
+    // ✅ Preparar decrementos en el doc unidad
+    // OJO: el doc unidad es this.pathActual
+    const updates: any = {
+      updatedAt: serverTimestamp(),
+      fechaModificacion: serverTimestamp()
+    };
+
+    // Restar de los acumulados pagados (adminPagada/minBasePagados/minutosPagados/multasPagadas)
+    (Object.keys(detalles) as CampoClave[]).forEach((campo) => {
+      const monto = Number(detalles[campo] ?? 0);
+      if (monto > 0) {
+        const pagadoKey = this.campoPagadoKey(campo);
+        updates[pagadoKey] = increment(-monto); // ✅ resta
+      }
+    });
+
+    // 1) actualizar unidad (restar pagos)
+    await updateDoc(doc(this.firestore, this.pathActual), updates);
+
+    // 2) eliminar doc pago
+    await deleteDoc(pagoRef);
+
+    // 3) (opcional) eliminar PDF asociado si existe
+    // Solo si quieres que “limpie” storage también.
+    if (urlPDF) {
+      try {
+        // Si urlPDF es una downloadURL, puedes borrarlo si guardas también la ruta.
+        // Si NO guardas ruta, lo más estable es guardar `storagePath` dentro del doc pago.
+        // Aun así, intento borrar desde URL si es compatible en tu caso.
+        const objRef = ref(this.storage, urlPDF);
+        await deleteObject(objRef);
+      } catch (e) {
+        // No bloqueamos por errores de Storage (puede fallar si no hay path)
+        console.warn('No se pudo eliminar el PDF en Storage (revisar storagePath):', e);
+      }
+    }
+
+    alert('✅ Pago eliminado correctamente.');
+
+    // 4) recargar UI
+  this.recargarVistaActual();
+
+  } catch (error) {
+    console.error('❌ Error eliminando pago:', error);
+    alert('Ocurrió un error al eliminar el pago.');
+  }
+}
+
+esPagoEnEdicion(pago: { id: string }, campo: CampoClave): boolean {
+  return !!this.pagoEnEdicion && this.pagoEnEdicion.id === pago.id && this.pagoEnEdicion.campo === campo;
+}
+
+iniciarEdicion(pago: { id: string; cantidad: number; fecha: any }, campo: CampoClave): void {
+  this.pagoEnEdicion = { id: pago.id, campo };
+
+  // monto actual
+  this.nuevoMonto = Number(pago.cantidad ?? 0);
+
+  // fecha actual (Timestamp -> YYYY-MM-DD)
+  const dt: Date =
+    typeof pago.fecha?.toDate === 'function'
+      ? pago.fecha.toDate()
+      : (pago.fecha instanceof Date ? pago.fecha : new Date());
+
+}
+
+cancelarEdicion(): void {
+  this.pagoEnEdicion = null;
+  this.nuevoMonto = 0;
+
+}
+
+async guardarEdicion(): Promise<void> {
+  if (!this.pagoEnEdicion) return;
+
+  const { id, campo } = this.pagoEnEdicion;
+
+  // Validaciones
+  const montoNuevo = Math.max(Number(this.nuevoMonto ?? 0), 0);
+
+
+  try {
+    // Doc pago (siempre cuelga del doc actual)
+    const pagoPath = `${this.pathActual}/pagosTotales/${id}`;
+    const pagoRef = doc(this.firestore, pagoPath);
+
+    const snap = await getDoc(pagoRef);
+    if (!snap.exists()) {
+      alert('El pago no existe o ya fue eliminado.');
+      this.cancelarEdicion();
+      return;
+    }
+
+    const data: any = snap.data();
+    const detalles = (data?.detalles ?? {}) as Partial<Record<CampoClave, number>>;
+
+    const montoAnterior = Number(detalles?.[campo] ?? 0);
+
+    // Delta para ajustar acumulado en el doc unidad
+    const delta = montoNuevo - montoAnterior;
+
+    // 1) Ajustar acumulado pagado en el doc unidad (adminPagada/minBasePagados/minutosPagados/multasPagadas)
+    if (delta !== 0) {
+      const pagadoKey = this.campoPagadoKey(campo);
+      await updateDoc(doc(this.firestore, this.pathActual), {
+        [pagadoKey]: increment(delta),
+        updatedAt: serverTimestamp(),
+        fechaModificacion: serverTimestamp()
+      } as any);
+    }
+
+    // 2) Actualizar doc pago (detalles + total + fecha)
+    const detallesNuevos: Partial<Record<CampoClave, number>> = { ...detalles };
+    detallesNuevos[campo] = montoNuevo;
+
+    const totalNuevo =
+      Number(detallesNuevos.administracion ?? 0) +
+      Number(detallesNuevos.minutosBase ?? 0) +
+      Number(detallesNuevos.minutosAtraso ?? 0) +
+      Number(detallesNuevos.multas ?? 0);
+
+    // Si el total queda en 0, borramos el doc pago (opcional, recomendado)
+    if (totalNuevo <= 0) {
+      await deleteDoc(pagoRef);
+    } else {
+      await updateDoc(pagoRef, {
+ // si tú manejas ambos campos, mantenlos iguales
+        detalles: detallesNuevos,
+        total: totalNuevo,
+        updatedAt: serverTimestamp()
+      } as any);
+    }
+
+    // 3) Refrescar UI
+    await this.cargarPagosTotales();
+    await this.cargarDeudaHistoricaAcumulada();
+
+this.cancelarEdicion();
+alert('✅ Pago actualizado correctamente.');
+this.recargarVistaActual();
+  } catch (err) {
+    console.error('❌ Error guardando edición:', err);
+    alert('Ocurrió un error al editar el pago.');
+  }
+}
+
   // =========================
-  // GUARDAR PAGOS (aplicar a cada doc histórico)
+  // GUARDAR PAGOS
   // =========================
   async guardarPagosGenerales() {
     if (this.cargandoPago) return;
@@ -348,7 +528,6 @@ export class RealizarPagoComponent implements OnInit {
         return;
       }
 
-      // 1) recolectar pagos ingresados (>0)
       const aplicaciones: Array<{
         campo: CampoClave;
         monto: number;
@@ -376,26 +555,25 @@ export class RealizarPagoComponent implements OnInit {
         return;
       }
 
-      // 2) fecha de pago (general, para mantener estructura del PDF)
       const fechaPagoStr = this.obtenerFechaISODesdeDate(this.fechaSeleccionada);
       const [y, m, d] = fechaPagoStr.split('-').map(Number);
       const fechaPago = Timestamp.fromDate(new Date(y, m - 1, d));
 
-      // 3) agrupar por doc histórico (pathDoc)
+      // ✅ existe en este scope y la firma lo acepta como opcional
+      const qrLink = `${window.location.origin}/recibos/pendiente`;
+
       const porDoc = new Map<string, Array<{ campo: CampoClave; monto: number; fechaDeuda: string }>>();
       for (const a of aplicaciones) {
         if (!porDoc.has(a.pathDoc)) porDoc.set(a.pathDoc, []);
         porDoc.get(a.pathDoc)!.push({ campo: a.campo, monto: a.monto, fechaDeuda: a.fechaDeuda });
       }
 
-      // 4) Totales por campo (para PDF fijo y control)
       const detallesTotalesPorCampo: Partial<Record<CampoClave, number>> = {};
       for (const a of aplicaciones) {
         detallesTotalesPorCampo[a.campo] = Number(detallesTotalesPorCampo[a.campo] ?? 0) + a.monto;
       }
       const totalPago = Object.values(detallesTotalesPorCampo).reduce((acc, v) => acc + Number(v ?? 0), 0);
 
-      // 5) Pendientes “totales” antes del pago (sumando el desglose actual)
       const pendientesAntes: Record<CampoClave, number> = {
         administracion: 0,
         minutosBase: 0,
@@ -407,7 +585,6 @@ export class RealizarPagoComponent implements OnInit {
         pendientesAntes[campo] = this.getDeudaDetalle(campo).reduce((acc, it) => acc + Number(it.monto ?? 0), 0);
       }
 
-      // 6) Ejecutar escritura por cada doc histórico
       const pagosCreados: { pathPagoDoc: string }[] = [];
 
       for (const [pathDoc, items] of porDoc.entries()) {
@@ -419,7 +596,6 @@ export class RealizarPagoComponent implements OnInit {
           total += it.monto;
         }
 
-        // 6.1 crear doc de pago
         const refPagos = collection(this.firestore, `${pathDoc}/pagosTotales`);
         const docRef = await addDoc(refPagos, {
           fecha: fechaPago,
@@ -427,14 +603,13 @@ export class RealizarPagoComponent implements OnInit {
           total,
           urlPDF: null,
           fechaPago,
-          aplicaciones: items, // auditoría: a qué deudas/fechas se aplicó
+          aplicaciones: items,
           createdAt: serverTimestamp(),
           uidCobrador: this.uidUsuario
         });
 
         pagosCreados.push({ pathPagoDoc: `${pathDoc}/pagosTotales/${docRef.id}` });
 
-        // 6.2 incrementar agregados del doc unidad
         const incUpdates: any = {
           updatedAt: serverTimestamp(),
           fechaModificacion: serverTimestamp()
@@ -451,53 +626,52 @@ export class RealizarPagoComponent implements OnInit {
         await updateDoc(doc(this.firestore, pathDoc), incUpdates);
       }
 
-      // 7) Confirmación + PDF fijo (misma estructura)
-      alert('✅ Pagos aplicados correctamente. Generando recibo en segundo plano...');
+      alert('✅ Pagos aplicados correctamente. Generando recibo...');
 
-      // Generar PDF con estructura fija:
-      // - Detalles por módulo (sumados)
-      // - Fecha de pago por módulo = fecha seleccionada (misma para todos)
-      const pagosConFechas = (Object.keys(detallesTotalesPorCampo) as CampoClave[])
-        .filter(c => Number(detallesTotalesPorCampo[c] ?? 0) > 0)
-        .map(c => ({ campo: c, monto: Number(detallesTotalesPorCampo[c] ?? 0), fecha: fechaPago }));
+      const pagosConFechas: PagoReciboItem[] = aplicaciones.map(a => ({
+        campo: a.campo,
+        monto: a.monto,
+        fecha: fechaPago,
+        fechaDeuda: a.fechaDeuda
+      }));
 
-      // Pendientes después (acumulado total - pago total por módulo)
       const pendientesDespues: Record<CampoClave, number> = {
         administracion: 0,
         minutosBase: 0,
         minutosAtraso: 0,
         multas: 0
       };
+
       for (const campo of this.campos) {
         const pagadoCampo = Number(detallesTotalesPorCampo[campo] ?? 0);
         pendientesDespues[campo] = Math.max(Number(pendientesAntes[campo] ?? 0) - pagadoCampo, 0);
       }
 
-      // PDF en segundo plano + actualizar url en TODOS los docs de pago creados
-      this.generarReciboYSubirPDF(this.uidUsuario, this.registros.id ?? 'pago', {
-        nombre: (this.registros as any)?.nombre ?? '',
-        apellido: (this.registros as any)?.apellido ?? '',
-        unidad: (this.registros as any)?.unidad ?? (this.registros as any)?.codigo ?? '',
-        total: totalPago,
-        detalles: detallesTotalesPorCampo,
-        pagosConFechas,
-        pendientesDespues // ✅ mantiene la tabla de pendientes con cifras coherentes
+      const unidadTicket =
+      (this.registros?.unidad ?? '').toString().trim() ||
+      ((this.registros as any)?.codigo ?? '').toString().trim() ||
+      '---';
+
+
+      // ✅ Genera PDF y luego actualiza urlPDF en los pagos
+    this.generarReciboYSubirPDF(this.uidUsuario, this.registros.id ?? 'pago', {
+      nombre: (this.registros as any)?.nombre ?? '',
+      apellido: (this.registros as any)?.apellido ?? '',
+      unidad: unidadTicket, // ✅ usar la unidad correcta aquí
+      total: totalPago,
+      detalles: detallesTotalesPorCampo,
+      pagosConFechas,
+      pendientesDespues
+    })
+      .then(async (urlPDF) => {
+        for (const p of pagosCreados) {
+          await updateDoc(doc(this.firestore, p.pathPagoDoc), { urlPDF });
+        }
       })
-        .then(async (urlPDF) => {
-          for (const p of pagosCreados) {
-            await updateDoc(doc(this.firestore, p.pathPagoDoc), { urlPDF });
-          }
-          console.log('📄 Recibo PDF generado y URL actualizada en pagos');
-        })
-        .catch(err => console.error('❌ Error generando el PDF:', err));
+      .catch(err => console.error('❌ Error generando el PDF:', err));
 
-      // 8) limpiar inputs y recargar
       this.pagosPorDeuda = {};
-      await this.cargarPagosTotales();
-      await this.cargarDeudaHistoricaAcumulada();
-
-      // (si quieres volver automáticamente)
-      // this.router.navigate(['/reportes/lista-reportes']);
+this.recargarVistaActual();
 
     } catch (error) {
       console.error('❌ Error al guardar los pagos:', error);
@@ -508,140 +682,251 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   // =========================
-  // PDF (estructura fija; solo cambia el cálculo interno)
+  // PDF
   // =========================
-  async generarReciboYSubirPDF(
-    uid: string,
-    reporteId: string,
-    datos: {
-      nombre: string;
-      apellido: string;
-      unidad: string;
-      total: number;
-      detalles: Partial<Record<CampoClave, number>>;
-      pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[];
-      pendientesDespues: Record<CampoClave, number>;
-    }
-  ): Promise<string> {
+async generarReciboYSubirPDF(
+  uid: string,
+  reporteId: string,
+  datos: {
+    nombre: string;
+    apellido: string;
+    unidad: string; // ✅ E01/E13
+    total: number;
+    detalles: Partial<Record<CampoClave, number>>;
+    pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp; fechaDeuda?: string }[];
+    pendientesDespues: Record<CampoClave, number>;
+  }
+): Promise<string> {
 
-    const fechaActual = datos.pagosConFechas[0]?.fecha.toDate() || new Date();
-    const fechaTexto = fechaActual.toLocaleDateString('es-EC', {
+  // =========================
+  // FORMATO TICKET 80mm
+  // =========================
+  const pdfDoc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: [80, 297] // Roll Paper 80 x 297 mm
+  });
+
+  const W = 80;
+  const margin = 4;
+
+  // =========================
+  // FECHA / HORA (LOCAL)
+  // =========================
+  // Nota: esto usa la hora local del navegador (tu PC). Para forzar Ecuador:
+  // usamos timeZone: 'America/Guayaquil'
+    const emisionNow = new Date();
+
+    // (opcional) mantenemos fechaPagoDate solo como fallback para la tabla si falta fechaDeuda
+    const fechaPagoDate = datos.pagosConFechas?.[0]?.fecha?.toDate?.() ?? emisionNow;
+
+    const fechaTexto = new Intl.DateTimeFormat('es-EC', {
+      timeZone: 'America/Guayaquil',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
-    });
-    const horaTexto = fechaActual.toLocaleTimeString('es-EC', {
+      day: '2-digit'
+    }).format(emisionNow);
+
+    const horaTexto = new Intl.DateTimeFormat('es-EC', {
+      timeZone: 'America/Guayaquil',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      hour12: false
+    }).format(emisionNow);
+  // =========================
+  // CABECERA (UNIDAD GRANDE + BLOQUE DERECHO)
+  // =========================
+  const unidadTicket = (datos.unidad ?? '').toString().trim().toUpperCase() || '---';
 
-    const campos: CampoClave[] = ['administracion', 'minutosBase', 'minutosAtraso', 'multas'];
+  // Unidad grande (izquierda)
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(22);
+  pdfDoc.text(unidadTicket, margin, 12);
 
-    const tablaPagoActual: any[] = [];
-    for (const pago of datos.pagosConFechas) {
-      const fechaDelPago = pago.fecha.toDate().toLocaleDateString('es-EC', {
+  // Bloque derecho (empresa + contacto) con WRAP para 80mm
+  pdfDoc.setFont('helvetica', 'normal');
+  pdfDoc.setFontSize(6.5);
+
+  const empresa1 = 'Consorcio Pintag Expresso';
+  const empresa2 = 'Pintag, Antisana S2-138';
+  const email    = 'consorciopinxpres@hotmail.com';
+
+  const rightX = W - margin;
+
+  pdfDoc.text(empresa1, rightX, 10.5, { align: 'right' });
+
+  const wrapRight = (txt: string, y: number) => {
+    const maxW = 44; // ancho máximo del bloque derecho
+    const lines = pdfDoc.splitTextToSize(txt, maxW);
+    pdfDoc.text(lines, rightX, y, { align: 'right' });
+  };
+
+  wrapRight(empresa2, 13.5);
+  wrapRight(email,   17.0);
+
+  const yFecha = 20.5;
+  // Fecha/hora (izquierda, debajo)
+  pdfDoc.setFontSize(6.7);
+  pdfDoc.text(`Fecha de emisión: ${fechaTexto}`, margin, yFecha);
+  pdfDoc.text(`Hora de emisión:  ${horaTexto}`,  margin, yFecha + 3);
+
+  // Línea separadora
+  pdfDoc.setDrawColor(180);
+  pdfDoc.line(margin, 24, W - margin, 24);
+
+  // =========================
+  // TABLA PRINCIPAL (DESCRIPCIÓN / FECHA(=fechaDeuda) / VALOR)
+  // =========================
+  const tablaPagoActual: any[] = [];
+
+  for (const pago of (datos.pagosConFechas ?? [])) {
+    // Fecha que se muestra en la tabla: FECHA DEL REPORTE (fechaDeuda)
+    let fechaReporteTexto = '';
+
+    if (pago.fechaDeuda) {
+      const [yy, mm, dd] = pago.fechaDeuda.split('-').map(Number);
+      const fechaReporte = new Date(yy, (mm || 1) - 1, dd || 1);
+
+      fechaReporteTexto = new Intl.DateTimeFormat('es-EC', {
+        timeZone: 'America/Guayaquil',
         year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-
-      const descripcion =
-        pago.campo === 'administracion' ? 'Administración' :
-        pago.campo === 'minutosBase' ? 'Minutos Base' :
-        pago.campo === 'minutosAtraso' ? 'Minutos Atraso' :
-        'Multas';
-
-      tablaPagoActual.push([
-        descripcion,
-        fechaDelPago,
-        `$${pago.monto.toFixed(2)}`
-      ]);
+        month: 'short',
+        day: '2-digit'
+      }).format(fechaReporte);
+    } else {
+      // Fallback: no debería pasar, pero evita errores
+      fechaReporteTexto = new Intl.DateTimeFormat('es-EC', {
+        timeZone: 'America/Guayaquil',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit'
+      }).format(fechaPagoDate);
     }
-    tablaPagoActual.push(['TOTAL', '', `$${datos.total.toFixed(2)}`]);
 
-    const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
-    const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
+    const descripcion =
+      pago.campo === 'administracion' ? 'Administración' :
+      pago.campo === 'minutosBase' ? 'Minutos Base' :
+      pago.campo === 'minutosAtraso' ? 'Minutos' :
+      'Multas';
 
-    const pdfDoc = new jsPDF();
-
-    pdfDoc.addImage(logoPintag, 'PNG', 10, 10, 30, 30);
-    pdfDoc.addImage(logoExpress, 'PNG', 170, 10, 30, 30);
-
-    pdfDoc.setFontSize(18);
-    pdfDoc.text('Consorcio Pintag Expresso', 60, 20);
-    pdfDoc.setFontSize(10);
-    pdfDoc.text('Pintag, Antisana S2-138', 80, 26);
-    pdfDoc.text('consorciopinxpres@hotmail.com', 70, 31);
-
-    pdfDoc.setFontSize(18);
-    pdfDoc.text(`BUS ${datos.unidad}`, 20, 45);
-
-    pdfDoc.setFontSize(11);
-    pdfDoc.text(`Fecha de emisión: ${fechaTexto}`, 130, 45);
-    pdfDoc.text(`Hora de emisión: ${horaTexto}`, 130, 51);
-
-    autoTable(pdfDoc, {
-      startY: 60,
-      head: [['Descripción', 'Fecha', 'Valor']],
-      body: tablaPagoActual,
-      styles: { fontSize: 11, halign: 'right' },
-      headStyles: { fillColor: [30, 144, 255], halign: 'center' }
-    });
-
-    const yFinal = (pdfDoc as any).lastAutoTable?.finalY || 100;
-
-    // ✅ tabla de pendientes (mantiene estructura, con cifras coherentes post-pago)
-    autoTable(pdfDoc, {
-      startY: yFinal + 15,
-      head: [['Descripción', 'Pendiente']],
-      body: [
-        ['Administración', `$${Number(datos.pendientesDespues.administracion ?? 0).toFixed(2)}`],
-        ['Minutos Base', `$${Number(datos.pendientesDespues.minutosBase ?? 0).toFixed(2)}`],
-        ['Minutos Atraso', `$${Number(datos.pendientesDespues.minutosAtraso ?? 0).toFixed(2)}`],
-        ['Multas', `$${Number(datos.pendientesDespues.multas ?? 0).toFixed(2)}`]
-      ],
-      styles: { fontSize: 11, halign: 'right', textColor: 'black' },
-      headStyles: { halign: 'center', fillColor: [240, 240, 240] }
-    });
-
-    const yFinal2 = (pdfDoc as any).lastAutoTable?.finalY || yFinal + 40;
-
-    const busImage = await this.cargarImagenBase64('/assets/img/Bus.png');
-    const busImg = new Image();
-    busImg.src = busImage;
-    await new Promise(resolve => (busImg.onload = resolve));
-
-    const originalWidth = busImg.width;
-    const originalHeight = busImg.height;
-    const displayWidth = 30;
-    const displayHeight = (originalHeight / originalWidth) * displayWidth;
-    const centerX = (210 - displayWidth) / 2;
-
-    pdfDoc.addImage(busImage, 'PNG', centerX, yFinal2 + 10, displayWidth, displayHeight);
-
-    const texto = 'Escanea el código para descargar tu recibo';
-    pdfDoc.setFontSize(10);
-    pdfDoc.setTextColor(0);
-    const textWidth = pdfDoc.getTextWidth(texto);
-    pdfDoc.text(texto, (210 - textWidth) / 2, yFinal2 + displayHeight + 25);
-
-    const pdfBlob = pdfDoc.output('blob');
-    const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
-    const storageRef = ref(this.storage, fileName);
-    await uploadBytes(storageRef, pdfBlob);
-    const pdfUrl = await getDownloadURL(storageRef);
-
-    const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(pdfUrl)}`;
-    const qrBase64 = await this.cargarImagenBase64(qrURL);
-    const qrSize = 30;
-    pdfDoc.addImage(qrBase64, 'PNG', (210 - qrSize) / 2, yFinal2 + displayHeight + 30, qrSize, qrSize);
-
-    setTimeout(() => {
-      pdfDoc.save(`${fechaTexto}_${datos.unidad.replace(/\s+/g, '_')}_${datos.nombre.replace(/\s+/g, '_')}_${datos.apellido.replace(/\s+/g, '_')}.pdf`);
-    }, 500);
-
-    return pdfUrl;
+    tablaPagoActual.push([
+      descripcion,
+      fechaReporteTexto,
+      `$ ${Number(pago.monto ?? 0).toFixed(2)}`
+    ]);
   }
+
+  tablaPagoActual.push(['TOTAL', '', `$ ${Number(datos.total ?? 0).toFixed(2)}`]);
+
+  autoTable(pdfDoc, {
+    startY: 27,
+    head: [['DESCRIPCIÓN', 'FECHA', 'VALOR']],
+    body: tablaPagoActual,
+    theme: 'plain',
+    styles: {
+      fontSize: 7,
+      cellPadding: { top: 0.8, right: 0.8, bottom: 0.8, left: 0.8 },
+      overflow: 'linebreak'
+    },
+    headStyles: { fontStyle: 'bold', textColor: 120 },
+    tableWidth: W - (margin * 2),
+    columnStyles: {
+      0: { halign: 'left',  cellWidth: 34 },
+      1: { halign: 'left',  cellWidth: 22 },
+      2: { halign: 'right', cellWidth: 16, fontStyle: 'bold' }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  const yFinal = (pdfDoc as any).lastAutoTable?.finalY || 60;
+
+  // Línea separadora
+  pdfDoc.setDrawColor(180);
+  pdfDoc.line(margin, yFinal + 2, W - margin, yFinal + 2);
+
+  // =========================
+  // LOGOS CENTRADOS (SIN DESBORDAR)
+  // =========================
+  const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
+  const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
+
+  const selloW = 20;
+  const gap = 6;
+  const totalSellos = (selloW * 2) + gap;
+  const xSellos = (W - totalSellos) / 2;
+  const ySellos = yFinal + 6;
+
+  pdfDoc.addImage(logoPintag, 'PNG', xSellos, ySellos, selloW, selloW);
+  pdfDoc.addImage(logoExpress, 'PNG', xSellos + selloW + gap, ySellos, selloW, selloW);
+
+  const yDespuesSellos = ySellos + selloW + 6;
+
+  // =========================
+  // TABLA SALDOS (SALDO / TOTAL)
+  // =========================
+  autoTable(pdfDoc, {
+    startY: yDespuesSellos,
+    head: [['SALDO', 'TOTAL']],
+    body: [
+      ['ADMINISTRACIÓN', `$ ${Number(datos.pendientesDespues.administracion ?? 0).toFixed(2)}`],
+      ['MINUTOS',        `$ ${Number(datos.pendientesDespues.minutosAtraso ?? 0).toFixed(2)}`],
+      ['MINUTOS BASE',   `$ ${Number(datos.pendientesDespues.minutosBase ?? 0).toFixed(2)}`],
+      ['MULTAS',         `$ ${Number(datos.pendientesDespues.multas ?? 0).toFixed(2)}`]
+    ],
+    theme: 'plain',
+    styles: { fontSize: 7, cellPadding: 1.0 },
+    headStyles: { fontStyle: 'bold', textColor: 120 },
+    tableWidth: W - (margin * 2),
+    columnStyles: {
+      0: { halign: 'left',  cellWidth: 46 },
+      1: { halign: 'right', cellWidth: 26 }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  const yFinal2 = (pdfDoc as any).lastAutoTable?.finalY || (yDespuesSellos + 40);
+
+  // Línea + footer como en ticket
+  pdfDoc.setDrawColor(180);
+  pdfDoc.line(margin, yFinal2 + 2, W - margin, yFinal2 + 2);
+
+  pdfDoc.setFontSize(6);
+  pdfDoc.setTextColor(150);
+  pdfDoc.text(
+    'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+    margin,
+    yFinal2 + 6,
+    { maxWidth: W - (margin * 2) }
+  );
+
+  // =========================
+  // GUARDAR + SUBIR (SIN QR)
+  // =========================
+  const pdfBlob = pdfDoc.output('blob');
+  const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
+
+  const storageRef = ref(this.storage, fileName);
+  await uploadBytes(storageRef, pdfBlob);
+  const pdfUrl = await getDownloadURL(storageRef);
+
+  // Descarga instantánea (sin setTimeout)
+  const safeUnidad = unidadTicket.replace(/\s+/g, '_');
+  const safeNombre = (datos.nombre ?? '').toString().trim().replace(/\s+/g, '_');
+  const safeApellido = (datos.apellido ?? '').toString().trim().replace(/\s+/g, '_');
+  const fechaISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(emisionNow); // YYYY-MM-DD
+  const pdfBlobLocal = pdfDoc.output('blob');
+  const pdfURLLocal = URL.createObjectURL(pdfBlobLocal);
+
+  // abre en nueva pestaña
+  window.open(pdfURLLocal, '_blank');
+
+  // (opcional) liberar memoria luego
+  setTimeout(() => {
+    URL.revokeObjectURL(pdfURLLocal);
+  }, 60_000);
+
+  return pdfUrl;
+}
 
   // =========================
   // UTILIDADES
@@ -652,7 +937,12 @@ export class RealizarPagoComponent implements OnInit {
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
-
+private dateToISO(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
   cargarImagenBase64(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();

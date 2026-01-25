@@ -4,31 +4,31 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ReportesService } from 'src/app/modules/reportes/services/reportes.service';
 import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
-import { AuthService } from 'src/app/core/auth/services/auth.service'; 
+import { AuthService } from 'src/app/core/auth/services/auth.service';
 import { forkJoin, firstValueFrom, take, } from 'rxjs'; // ⬅️ Add this import
 
 @Component({
-  selector: 'app-cuentas-por-cobrar',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './cuentas-por-cobrar.component.html',
-  styleUrls: ['./cuentas-por-cobrar.component.scss']
+selector: 'app-cuentas-por-cobrar',
+standalone: true,
+imports: [CommonModule, FormsModule],
+templateUrl: './cuentas-por-cobrar.component.html',
+styleUrls: ['./cuentas-por-cobrar.component.scss']
 })
 export class CuentasPorCobrarComponent implements OnInit {
-  esSocio: boolean = false;
-  filtro: string = '';
-  listaUnidades: { unidad: string; nombre: string; uid: string }[] = []; // ⬅️ Added uid
-  unidadSeleccionada: string | null = null;
-  reportesSeleccionados: ReporteConPagos[] = [];
-  reportesConFechaConvertida: any[] = []; 
-  error: string = '';
+ esSocio: boolean = false;
+filtro: string = '';
+listaUnidades: { unidad: string; nombre: string; uid: string }[] = []; // ⬅️ Added uid
+unidadSeleccionada: string | null = null;
+reportesSeleccionados: ReporteConPagos[] = [];
+  reportesConFechaConvertida: any[] = [];
+error: string = '';
   cargandoUnidades: boolean = false;
   cargandoReportes: boolean = false;
-  constructor(
-    private reportesService: ReportesService,
-    private router: Router,
-    private authService: AuthService
-  ) {}
+constructor(
+private reportesService: ReportesService,
+private router: Router,
+private authService: AuthService
+) {}
 
 async ngOnInit(): Promise<void> {
     this.cargandoUnidades = true;
@@ -39,7 +39,7 @@ async ngOnInit(): Promise<void> {
                 this.reportesService.obtenerTodasLasUnidadesConNombre()
             ])
         );
-        
+
         this.esSocio = role === 'socio';
         this.listaUnidades = unidades;
     } catch (error) {
@@ -61,7 +61,7 @@ async seleccionarUnidad(unidad: string, uid: string) {
 
       if (reportes && reportes.length > 0) {
         this.reportesSeleccionados = reportes;
-        
+
         // ➡️ Convierte el Timestamp a Date aquí para mostrarlo en el HTML
         this.reportesConFechaConvertida = this.reportesSeleccionados.map(r => ({
             ...r,

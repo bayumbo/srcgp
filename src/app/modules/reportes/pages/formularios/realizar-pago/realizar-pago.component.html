@@ -9,6 +9,12 @@
     <p><strong>Nombre:</strong> {{ registros.nombre }} {{ registros.apellido }}</p>
     <p><strong>Unidad:</strong> {{ registros.unidad }}</p>
   </div>
+<div class="acciones-iniciales">
+    <button class="volver" type="button" (click)="volver()">
+  <span class="material-icons">arrow_back_ios_new</span>
+  Volver
+</button>
+</div>
 
   <!-- =========================
        MÓDULOS DE PAGO
@@ -28,25 +34,73 @@
 
           <tbody>
             <!-- Historial de pagos (solo lectura, doc actual) -->
-            <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registros.id!)">
-              <td>{{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}</td>
-              <td>{{ pago.cantidad }}</td>
-            </tr>
+            <thead>
 
-            <tr *ngIf="filtrarPagosPorRegistro(campo, registros.id!).length === 0">
-              <td colspan="2">Sin pagos registrados</td>
-            </tr>
+</thead>
 
-            <tr>
-              <td><strong>Total pagado:</strong></td>
-              <td><strong>{{ calcularTotalPagado(campo, registros.id!) }}</strong></td>
-            </tr>
+<tbody>
+  <!-- Historial de pagos -->
+  <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registros.id!)">
+    <td>{{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}</td>
+    <td>{{ pago.cantidad }}</td>
 
-            <!-- Deuda acumulada (histórica + día actual) -->
-            <tr>
-              <td><strong>Deuda:</strong></td>
-              <td>{{ calcularDeudaAcumulada(campo) }}</td>
-            </tr>
+    <td class="accion-editar">
+      <!-- Si NO está en edición: muestra botones -->
+      <ng-container *ngIf="!esPagoEnEdicion(pago, campo); else bloqueEdicion">
+        <button type="button" (click)="iniciarEdicion(pago, campo)">
+          <span class="material-icons">edit</span>
+        </button>
+
+        <button type="button" class="btn-eliminar" (click)="eliminarPago(pago.id)">
+          <span class="material-icons">delete</span>
+        </button>
+      </ng-container>
+
+      <!-- Si SÍ está en edición: muestra inputs + guardar/cancelar -->
+      <ng-template #bloqueEdicion>
+  <div class="edicion-inline">
+    <!-- Monto -->
+    <input
+      type="number"
+      min="0"
+      class="input-edicion"
+      [(ngModel)]="nuevoMonto"
+      placeholder="Monto"
+    />
+
+    <!-- Fecha SOLO LECTURA -->
+    <span class="fecha-fixed">
+      {{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}
+    </span>
+
+    <!-- Acciones -->
+    <button type="button" class="btn-guardar" (click)="guardarEdicion()">
+      <span class="material-icons">save</span>
+    </button>
+
+    <button type="button" class="btn-cancelar" (click)="cancelarEdicion()">
+      <span class="material-icons">close</span>
+    </button>
+  </div>
+</ng-template>
+    </td>
+  </tr>
+
+  <tr *ngIf="filtrarPagosPorRegistro(campo, registros.id!).length === 0">
+    <td colspan="3">Sin pagos registrados</td>
+  </tr>
+
+  <tr>
+    <td><strong>Total pagado:</strong></td>
+    <td><strong>{{ calcularTotalPagado(campo, registros.id!) }}</strong></td>
+    <td></td>
+  </tr>
+
+  <tr>
+    <td><strong>Deuda:</strong></td>
+    <td>{{ calcularDeudaAcumulada(campo) }}</td>
+    <td></td>
+  </tr>
 
             <!-- =========================
                  DESGLOSE POR FECHA
@@ -99,10 +153,7 @@
        ACCIONES
        ========================= -->
   <div class="acciones-finales">
-    <button class="volver" type="button" (click)="volver()">
-      <span class="material-icons">arrow_back_ios_new</span>
-      Volver
-    </button>
+
 
     <button
       class="guardar"

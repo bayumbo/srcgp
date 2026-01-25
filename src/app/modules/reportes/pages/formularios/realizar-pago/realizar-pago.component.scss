@@ -82,8 +82,6 @@
    TABLA
    ========================= */
 .tabla-pagos {
-  width: 100%;
-  overflow: hidden;
 
   table {
     width: 100%;
@@ -93,6 +91,7 @@
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(8, 10, 16, 0.75);
+    table-layout: fixed;
   }
 
   thead th {
@@ -121,10 +120,57 @@
     background: rgba(255, 255, 255, 0.03);
   }
 
-  /* Filas resumen */
   tbody tr td strong {
     color: #ffffff;
   }
+}
+
+/* =========================
+   ACCIONES DE TABLA: SOLO ICONOS (EDITAR / ELIMINAR)
+   SOLO DENTRO DE LA TABLA, NO AFECTA BOTONES FINALES
+   ========================= */
+.tabla-pagos td.accion-editar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.tabla-pagos td.accion-editar button {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 2px !important;
+  margin: 0;
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  color: rgba(255, 255, 255, 0.92);
+  opacity: 0.85;
+
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.tabla-pagos td.accion-editar button:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.tabla-pagos td.accion-editar button:active {
+  transform: scale(0.98);
+}
+
+.tabla-pagos td.accion-editar button .material-icons {
+  font-size: 20px;
+}
+
+/* Si quieres que eliminar sea un poco distinto (rojo suave) */
+.tabla-pagos td.accion-editar .btn-eliminar {
+  color: rgba(255, 107, 107, 0.95);
 }
 
 /* =========================
@@ -154,7 +200,6 @@
   overflow: auto;
   padding-right: 6px;
 
-  /* Scroll suave */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.04);
 
@@ -171,7 +216,6 @@
   }
 }
 
-/* Cada item: Fecha | Pendiente | Input */
 .deuda-detalle-item {
   display: grid;
   grid-template-columns: 1fr 72px 84px;
@@ -198,7 +242,6 @@
   }
 }
 
-/* Input pago por fila */
 .input-pago-fila {
   width: 100%;
   padding: 7px 8px;
@@ -221,7 +264,7 @@
 }
 
 /* =========================
-   RESUMEN + BOTONES
+   RESUMEN + BOTONES FINALES
    ========================= */
 .resumen-total {
   margin-top: 16px;
@@ -248,6 +291,32 @@
     color: #ffffff;
   }
 }
+
+.acciones-iniciales{
+    margin-top: 14px;
+  gap: 10px;
+
+.volver {
+      border: none;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    transition: transform 0.08s ease, opacity 0.2s ease;
+    background: rgba(0, 0, 0, 0.668);
+    color: #ffffff;
+    border-radius: 12px;
+    justify-content: left;
+    &:hover {
+      background: rgba(8, 20, 10, 0.477);
+    }
+  }
+}
+
 
 .acciones-finales {
   margin-top: 14px;
@@ -278,15 +347,6 @@
     }
   }
 
-  .volver {
-    background: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.10);
-    }
-  }
 
   .guardar {
     background: rgba(59, 130, 246, 0.95);
