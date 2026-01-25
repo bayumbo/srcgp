@@ -6,6 +6,9 @@ import {
   getDoc,
   collection,
   getDocs,
+  collectionGroup,
+  query,
+  where,
   Timestamp,
   addDoc,
   updateDoc,
@@ -26,6 +29,12 @@ import autoTable from 'jspdf-autotable';
 
 type CampoClave = 'minutosAtraso' | 'administracion' | 'minutosBase' | 'multas';
 
+type DeudaDetalleItem = {
+  fecha: string;     // YYYY-MM-DD (fecha del reporte/deuda)
+  monto: number;     // saldo pendiente para esa fecha y módulo
+  pathDoc: string;   // ruta real: reportes_dia/{diaId}/unidades/{unidadId}
+};
+
 @Component({
   selector: 'app-realizar-pago',
   standalone: true,
@@ -45,6 +54,9 @@ export class RealizarPagoComponent implements OnInit {
 
   registros: (NuevoRegistro & { id?: string }) | null = null;
 
+  campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
+
+  // Historial (subcolección pagosTotales del doc actual)
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
     administracion: [],
@@ -52,17 +64,35 @@ export class RealizarPagoComponent implements OnInit {
     multas: []
   };
 
-  pagosActuales: Record<string, Partial<Record<CampoClave, number>>> = {};
-  fechasPagosActuales: Record<string, Partial<Record<CampoClave, string>>> = {};
-  campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
+  // ✅ Deuda acumulada (histórica) y desglose por fecha/path
+  deudaHistorica: Record<CampoClave, number> = {
+    minutosAtraso: 0,
+    administracion: 0,
+    minutosBase: 0,
+    multas: 0
+  };
 
-  pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
-  nuevoMonto: number | null = null;
-  fechaEnEdicion: string | null = null;
+  deudaDetalle: Record<CampoClave, DeudaDetalleItem[]> = {
+    minutosAtraso: [],
+    administracion: [],
+    minutosBase: [],
+    multas: []
+  };
+
+  /**
+   * ✅ Pagos por fila (por deuda histórica específica).
+   * Key: `${campo}__${pathDoc}` -> { [campo]: monto }
+   */
+  pagosPorDeuda: Record<string, Partial<Record<CampoClave, number>>> = {};
 
   cargandoPago: boolean = false;
+
+  // Fecha de pago general (se mantiene el formato del PDF)
   fechaSeleccionada: Date = new Date();
 
+  // =========================
+  // INIT
+  // =========================
   async ngOnInit(): Promise<void> {
     const idRaw = this.route.snapshot.paramMap.get('id');
     const uid = this.route.snapshot.paramMap.get('uid');
@@ -75,7 +105,7 @@ export class RealizarPagoComponent implements OnInit {
     this.uidUsuario = uid;
     this.reporteId = decodeURIComponent(idRaw);
 
-    // ✅ Resolver la ruta real del doc (preferencia: refPath real)
+    // ✅ Resolver la ruta real del doc
     this.pathActual = this.resolverPath(this.uidUsuario, this.reporteId);
 
     // Cargar el registro (doc unidad del día)
@@ -95,30 +125,17 @@ export class RealizarPagoComponent implements OnInit {
       id: snap.id
     };
 
-    // Fallback informativo desde query params (si no estuviera guardado)
+    // Fallback desde query params
     const qp = this.route.snapshot.queryParamMap;
     this.registros.nombre = (data.nombre ?? qp.get('nombre') ?? '').toString().trim();
-    this.registros.apellido = (data.apellido ?? qp.get('apellido') ?? '').toString().trim();
-    // En tu nueva DB, el código de unidad suele estar en "codigo"
+    (this.registros as any).apellido = (data.apellido ?? qp.get('apellido') ?? '').toString().trim();
     this.registros.unidad = (data.codigo ?? data.unidad ?? qp.get('unidad') ?? '').toString().trim();
 
-    // Inicializar estructuras para HTML
-    if (this.registros.id) {
-      this.pagosActuales[this.registros.id] = {};
-      this.fechasPagosActuales[this.registros.id] = {};
-    }
-
-    // Cargar historial
+    // 1) historial del doc actual
     await this.cargarPagosTotales();
 
-    // Fechas por defecto por módulo
-    if (this.registros?.id) {
-      for (const campo of this.campos) {
-        if (!this.fechasPagosActuales[this.registros.id][campo]) {
-          this.fechasPagosActuales[this.registros.id][campo] = this.obtenerFechaActual();
-        }
-      }
-    }
+    // 2) deuda histórica + desglose (collectionGroup unidades)
+    await this.cargarDeudaHistoricaAcumulada();
   }
 
   /**
@@ -139,22 +156,11 @@ export class RealizarPagoComponent implements OnInit {
     return `usuarios/${uid}/reportesDiarios/${id}`;
   }
 
-  obtenerFechaActual(): string {
-    const hoy = new Date();
-    const year = hoy.getFullYear();
-    const month = String(hoy.getMonth() + 1).padStart(2, '0');
-    const day = String(hoy.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
   // =========================
-  // HISTORIAL DE PAGOS
+  // HISTORIAL DE PAGOS (doc actual)
   // =========================
   async cargarPagosTotales() {
-    for (const campo of this.campos) {
-      this.pagosTotales[campo] = [];
-    }
-
+    for (const campo of this.campos) this.pagosTotales[campo] = [];
     if (!this.registros?.id) return;
 
     const reporteId = this.registros.id;
@@ -181,21 +187,131 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   // =========================
-  // CÁLCULOS DE DEUDA / TOTAL
+  // DEUDA HISTÓRICA + DESGLOSE POR FECHA (collectionGroup)
   // =========================
-  private campoPagadoKey(campo: CampoClave): 'adminPagada' | 'minBasePagados' | 'minutosPagados' | 'multasPagadas' {
+  private async cargarDeudaHistoricaAcumulada(): Promise<void> {
+    if (!this.registros) return;
+
+    const codigo = ((this.registros as any)?.codigo ?? this.registros?.unidad ?? '').toString().trim();
+    const empresa = ((this.registros as any)?.empresa ?? '').toString().trim();
+    const fechaActual = ((this.registros as any)?.fecha ?? '').toString().trim(); // YYYY-MM-DD
+
+    if (!codigo || !empresa || !fechaActual) return;
+
+    // reset
+    for (const c of this.campos) {
+      this.deudaHistorica[c] = 0;
+      this.deudaDetalle[c] = [];
+    }
+
+    // Históricos (días anteriores)
+    const q = query(
+      collectionGroup(this.firestore, 'unidades'),
+      where('empresa', '==', empresa),
+      where('codigo', '==', codigo),
+      where('fecha', '<', fechaActual)
+    );
+
+    const snap = await getDocs(q);
+
+    snap.forEach(s => {
+      const d: any = s.data();
+      const fecha = (d?.fecha ?? '').toString().trim();
+      if (!fecha) return;
+
+      const pathDoc = s.ref.path; // ✅ ruta real del doc histórico
+
+      for (const campo of this.campos) {
+        const total = Number(d?.[campo] ?? 0);
+        const pagadoKey = this.campoPagadoKey(campo);
+        const pagado = Number(d?.[pagadoKey] ?? 0);
+        const pendiente = Math.max(total - pagado, 0);
+
+        if (pendiente > 0) {
+          this.deudaHistorica[campo] += pendiente;
+          this.deudaDetalle[campo].push({ fecha, monto: pendiente, pathDoc });
+        }
+      }
+    });
+
+    // Ordenar por fecha asc
+    for (const campo of this.campos) {
+      this.deudaDetalle[campo].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    }
+
+    // Incluir el día actual (doc cargado), usando pathActual
+    const reg: any = this.registros;
+    const fechaHoy = (reg?.fecha ?? fechaActual).toString().trim();
+
+    for (const campo of this.campos) {
+      const pendienteHoy = this.calcularDeudaDelDia(reg, campo);
+      if (pendienteHoy > 0) {
+        this.deudaDetalle[campo].push({ fecha: fechaHoy, monto: pendienteHoy, pathDoc: this.pathActual });
+      }
+    }
+  }
+
+  getDeudaDetalle(campo: CampoClave): DeudaDetalleItem[] {
+    return this.deudaDetalle?.[campo] ?? [];
+  }
+
+  getDeudaDetalleLimitado(campo: CampoClave, max = 50): DeudaDetalleItem[] {
+    const arr = this.getDeudaDetalle(campo);
+    return arr.length > max ? arr.slice(arr.length - max) : arr;
+  }
+
+  // =========================
+  // PAGO POR FILA (por deuda histórica)
+  // =========================
+  private keyDeuda(campo: CampoClave, item: DeudaDetalleItem): string {
+    return `${campo}__${item.pathDoc}__${item.fecha}`;
+  }
+
+  getPagoFila(campo: CampoClave, item: DeudaDetalleItem): number {
+    const k = this.keyDeuda(campo, item);
+    return Number(this.pagosPorDeuda[k]?.[campo] ?? 0);
+  }
+
+  setPagoFila(campo: CampoClave, item: DeudaDetalleItem, valor: any): void {
+    const k = this.keyDeuda(campo, item);
+    const num = Math.max(Number(valor ?? 0), 0);
+
+    if (!this.pagosPorDeuda[k]) this.pagosPorDeuda[k] = {};
+    // limitar al pendiente de esa fila
+    this.pagosPorDeuda[k][campo] = Math.min(num, item.monto);
+  }
+
+  // =========================
+  // CÁLCULOS (deuda y totales)
+  // =========================
+  private campoPagadoKey(
+    campo: CampoClave
+  ): 'adminPagada' | 'minBasePagados' | 'minutosPagados' | 'multasPagadas' {
     if (campo === 'administracion') return 'adminPagada';
     if (campo === 'minutosBase') return 'minBasePagados';
     if (campo === 'minutosAtraso') return 'minutosPagados';
     return 'multasPagadas';
   }
 
-  calcularDeuda(registro: any, campo: CampoClave): number {
-    // ✅ Ahora la deuda se calcula contra el acumulado del doc unidad (rápido)
+  /**
+   * Deuda del día actual (doc actual).
+   * OJO: aquí se calcula contra el acumulado del doc unidad (rápido).
+   */
+  private calcularDeudaDelDia(registro: any, campo: CampoClave): number {
     const total = Number(registro?.[campo] ?? 0);
     const pagadoKey = this.campoPagadoKey(campo);
     const pagado = Number(registro?.[pagadoKey] ?? 0);
     return Math.max(total - pagado, 0);
+  }
+
+  /**
+   * Total acumulado “visible” en la tarjeta (históricos + hoy).
+   * (Si en tu HTML estás mostrando deuda acumulada, úsala.)
+   */
+  calcularDeudaAcumulada(campo: CampoClave): number {
+    const historica = Number(this.deudaHistorica?.[campo] ?? 0);
+    const hoy = this.registros ? this.calcularDeudaDelDia(this.registros as any, campo) : 0;
+    return historica + hoy;
   }
 
   filtrarPagosPorRegistro(campo: CampoClave, registroId: string): PagoPorModulo[] {
@@ -203,135 +319,185 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   calcularTotalPagado(campo: CampoClave, registroId: string): number {
-    return this.filtrarPagosPorRegistro(campo, registroId)
-      .reduce((acc, p) => acc + p.cantidad, 0);
+    return this.filtrarPagosPorRegistro(campo, registroId).reduce((acc, p) => acc + p.cantidad, 0);
   }
 
+  /**
+   * Total a pagar = suma de todos los inputs por fila (capados al pendiente).
+   */
   calcularTotalGeneral(): number {
     let total = 0;
-
-    if (this.registros) {
-      const registro: any = this.registros;
-      for (const campo of this.campos) {
-        const deuda = this.calcularDeuda(registro, campo);
-        const actual = this.pagosActuales[registro.id!]?.[campo] ?? 0;
-        total += Math.min(deuda, actual);
+    for (const campo of this.campos) {
+      for (const item of this.getDeudaDetalle(campo)) {
+        total += Math.min(this.getPagoFila(campo, item), item.monto);
       }
     }
-
     return total;
   }
 
-  validarPago(reporteId: string, campo: CampoClave) {
-    if (!this.registros) return;
-
-    const registro: any = this.registros;
-
-    if (registro.id === reporteId) {
-      const deuda = this.calcularDeuda(registro, campo);
-      const actual = this.pagosActuales[reporteId]?.[campo] ?? 0;
-      if (actual > deuda) {
-        this.pagosActuales[reporteId][campo] = deuda;
-      }
-    }
-  }
-
   // =========================
-  // GUARDAR PAGO (EVENTO + AGREGADOS)
+  // GUARDAR PAGOS (aplicar a cada doc histórico)
   // =========================
   async guardarPagosGenerales() {
     if (this.cargandoPago) return;
     this.cargandoPago = true;
 
     try {
-      if (!this.registros?.id) {
+      if (!this.registros) {
         alert('Registro no encontrado');
         return;
       }
 
-      const registro: any = this.registros;
-
-      const detalles: Partial<Record<CampoClave, number>> = {};
-      const pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[] = [];
-      let tienePago = false;
-      let total = 0;
+      // 1) recolectar pagos ingresados (>0)
+      const aplicaciones: Array<{
+        campo: CampoClave;
+        monto: number;
+        pathDoc: string;
+        fechaDeuda: string;
+      }> = [];
 
       for (const campo of this.campos) {
-        const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
-        if (monto > 0) {
-          tienePago = true;
-          detalles[campo] = monto;
-          total += monto;
-
-          const fechaPagoRegistro = this.fechasPagosActuales[registro.id!]?.[campo];
-          if (!fechaPagoRegistro) continue;
-
-          const [year, month, day] = fechaPagoRegistro.split('-').map(Number);
-          const fecha = Timestamp.fromDate(new Date(year, month - 1, day));
-          pagosConFechas.push({ campo, monto, fecha });
+        const items = this.getDeudaDetalle(campo);
+        for (const item of items) {
+          const monto = this.getPagoFila(campo, item);
+          if (monto > 0) {
+            aplicaciones.push({
+              campo,
+              monto,
+              pathDoc: item.pathDoc,
+              fechaDeuda: item.fecha
+            });
+          }
         }
       }
 
-      if (!tienePago || pagosConFechas.length === 0) {
-        alert('⚠️ Ingresa al menos un monto de pago y su fecha.');
+      if (aplicaciones.length === 0) {
+        alert('⚠️ Ingresa al menos un pago en alguna fecha.');
         return;
       }
 
-      // ✅ Guardar en subcolección de pagos del doc unidad
-      const refPagos = collection(this.firestore, `${this.pathActual}/pagosTotales`);
+      // 2) fecha de pago (general, para mantener estructura del PDF)
+      const fechaPagoStr = this.obtenerFechaISODesdeDate(this.fechaSeleccionada);
+      const [y, m, d] = fechaPagoStr.split('-').map(Number);
+      const fechaPago = Timestamp.fromDate(new Date(y, m - 1, d));
 
-      const docRef = await addDoc(refPagos, {
-        fecha: pagosConFechas[0].fecha, // fecha principal (compatibilidad)
-        detalles,
-        total,
-        urlPDF: null,
-        fechasPorModulo: pagosConFechas.reduce((acc, p) => ({ ...acc, [p.campo]: p.fecha }), {}),
-        createdAt: serverTimestamp(),
-        uidCobrador: this.uidUsuario
-      });
+      // 3) agrupar por doc histórico (pathDoc)
+      const porDoc = new Map<string, Array<{ campo: CampoClave; monto: number; fechaDeuda: string }>>();
+      for (const a of aplicaciones) {
+        if (!porDoc.has(a.pathDoc)) porDoc.set(a.pathDoc, []);
+        porDoc.get(a.pathDoc)!.push({ campo: a.campo, monto: a.monto, fechaDeuda: a.fechaDeuda });
+      }
 
-      // ✅ Actualizar agregados en el doc unidad (O(1))
-      const incUpdates: any = {
-        updatedAt: serverTimestamp(),
-        fechaModificacion: serverTimestamp()
+      // 4) Totales por campo (para PDF fijo y control)
+      const detallesTotalesPorCampo: Partial<Record<CampoClave, number>> = {};
+      for (const a of aplicaciones) {
+        detallesTotalesPorCampo[a.campo] = Number(detallesTotalesPorCampo[a.campo] ?? 0) + a.monto;
+      }
+      const totalPago = Object.values(detallesTotalesPorCampo).reduce((acc, v) => acc + Number(v ?? 0), 0);
+
+      // 5) Pendientes “totales” antes del pago (sumando el desglose actual)
+      const pendientesAntes: Record<CampoClave, number> = {
+        administracion: 0,
+        minutosBase: 0,
+        minutosAtraso: 0,
+        multas: 0
       };
 
       for (const campo of this.campos) {
-        const monto = detalles[campo] ?? 0;
-        if (monto > 0) {
-          const pagadoKey = this.campoPagadoKey(campo);
-          incUpdates[pagadoKey] = increment(monto);
-        }
+        pendientesAntes[campo] = this.getDeudaDetalle(campo).reduce((acc, it) => acc + Number(it.monto ?? 0), 0);
       }
 
-      await updateDoc(doc(this.firestore, this.pathActual), incUpdates);
+      // 6) Ejecutar escritura por cada doc histórico
+      const pagosCreados: { pathPagoDoc: string }[] = [];
 
-      // ✅ Actualizar en memoria para que la deuda se refleje inmediatamente si vuelves
+      for (const [pathDoc, items] of porDoc.entries()) {
+        const detalles: Partial<Record<CampoClave, number>> = {};
+        let total = 0;
+
+        for (const it of items) {
+          detalles[it.campo] = Number(detalles[it.campo] ?? 0) + it.monto;
+          total += it.monto;
+        }
+
+        // 6.1 crear doc de pago
+        const refPagos = collection(this.firestore, `${pathDoc}/pagosTotales`);
+        const docRef = await addDoc(refPagos, {
+          fecha: fechaPago,
+          detalles,
+          total,
+          urlPDF: null,
+          fechaPago,
+          aplicaciones: items, // auditoría: a qué deudas/fechas se aplicó
+          createdAt: serverTimestamp(),
+          uidCobrador: this.uidUsuario
+        });
+
+        pagosCreados.push({ pathPagoDoc: `${pathDoc}/pagosTotales/${docRef.id}` });
+
+        // 6.2 incrementar agregados del doc unidad
+        const incUpdates: any = {
+          updatedAt: serverTimestamp(),
+          fechaModificacion: serverTimestamp()
+        };
+
+        for (const c of Object.keys(detalles) as CampoClave[]) {
+          const monto = Number(detalles[c] ?? 0);
+          if (monto > 0) {
+            const pagadoKey = this.campoPagadoKey(c);
+            incUpdates[pagadoKey] = increment(monto);
+          }
+        }
+
+        await updateDoc(doc(this.firestore, pathDoc), incUpdates);
+      }
+
+      // 7) Confirmación + PDF fijo (misma estructura)
+      alert('✅ Pagos aplicados correctamente. Generando recibo en segundo plano...');
+
+      // Generar PDF con estructura fija:
+      // - Detalles por módulo (sumados)
+      // - Fecha de pago por módulo = fecha seleccionada (misma para todos)
+      const pagosConFechas = (Object.keys(detallesTotalesPorCampo) as CampoClave[])
+        .filter(c => Number(detallesTotalesPorCampo[c] ?? 0) > 0)
+        .map(c => ({ campo: c, monto: Number(detallesTotalesPorCampo[c] ?? 0), fecha: fechaPago }));
+
+      // Pendientes después (acumulado total - pago total por módulo)
+      const pendientesDespues: Record<CampoClave, number> = {
+        administracion: 0,
+        minutosBase: 0,
+        minutosAtraso: 0,
+        multas: 0
+      };
       for (const campo of this.campos) {
-        const monto = detalles[campo] ?? 0;
-        if (monto > 0) {
-          const pagadoKey = this.campoPagadoKey(campo);
-          registro[pagadoKey] = Number(registro[pagadoKey] ?? 0) + Number(monto);
-        }
+        const pagadoCampo = Number(detallesTotalesPorCampo[campo] ?? 0);
+        pendientesDespues[campo] = Math.max(Number(pendientesAntes[campo] ?? 0) - pagadoCampo, 0);
       }
 
-      alert('✅ Pago registrado correctamente. Generando recibo en segundo plano...');
-      this.router.navigate(['/reportes/lista-reportes']);
-
-      // PDF en segundo plano + actualizar URL
-      this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
-        nombre: registro.nombre,
-        apellido: registro.apellido,
-        unidad: registro.unidad,
-        total,
-        detalles,
-        pagosConFechas
+      // PDF en segundo plano + actualizar url en TODOS los docs de pago creados
+      this.generarReciboYSubirPDF(this.uidUsuario, this.registros.id ?? 'pago', {
+        nombre: (this.registros as any)?.nombre ?? '',
+        apellido: (this.registros as any)?.apellido ?? '',
+        unidad: (this.registros as any)?.unidad ?? (this.registros as any)?.codigo ?? '',
+        total: totalPago,
+        detalles: detallesTotalesPorCampo,
+        pagosConFechas,
+        pendientesDespues // ✅ mantiene la tabla de pendientes con cifras coherentes
       })
         .then(async (urlPDF) => {
-          await updateDoc(doc(this.firestore, `${this.pathActual}/pagosTotales/${docRef.id}`), { urlPDF });
-          console.log('📄 Recibo PDF generado y URL actualizada');
+          for (const p of pagosCreados) {
+            await updateDoc(doc(this.firestore, p.pathPagoDoc), { urlPDF });
+          }
+          console.log('📄 Recibo PDF generado y URL actualizada en pagos');
         })
         .catch(err => console.error('❌ Error generando el PDF:', err));
+
+      // 8) limpiar inputs y recargar
+      this.pagosPorDeuda = {};
+      await this.cargarPagosTotales();
+      await this.cargarDeudaHistoricaAcumulada();
+
+      // (si quieres volver automáticamente)
+      // this.router.navigate(['/reportes/lista-reportes']);
 
     } catch (error) {
       console.error('❌ Error al guardar los pagos:', error);
@@ -342,88 +508,7 @@ export class RealizarPagoComponent implements OnInit {
   }
 
   // =========================
-  // EDITAR PAGO (HISTORIAL)
-  // =========================
-  iniciarEdicion(pago: PagoPorModulo, campo: CampoClave) {
-    this.pagoEnEdicion = { id: pago.id, campo };
-    this.nuevoMonto = pago.cantidad;
-    const fecha = pago.fecha.toDate();
-    this.fechaEnEdicion = fecha.toISOString().substring(0, 10);
-  }
-
-  esPagoEnEdicion(pago: PagoPorModulo, campo: CampoClave): boolean {
-    return this.pagoEnEdicion?.id === pago.id && this.pagoEnEdicion?.campo === campo;
-  }
-
-  cancelarEdicion() {
-    this.pagoEnEdicion = null;
-    this.nuevoMonto = null;
-    this.fechaEnEdicion = null;
-  }
-
-  /**
-   * ⚠️ Nota:
-   * Editar un pago histórico implica ajustar agregados (adminPagada, etc.)
-   * Aquí lo hacemos calculando delta = nuevo - anterior y aplicando increment(delta).
-   */
-  async guardarEdicion() {
-    if (!this.pagoEnEdicion || this.nuevoMonto == null || this.nuevoMonto < 0) return;
-
-    const { id, campo } = this.pagoEnEdicion;
-
-    const pago = this.campos
-      .flatMap(c => this.pagosTotales[c])
-      .find(p => p.id === id);
-
-    if (!pago) return;
-
-    const cantidadAnterior = Number(pago.cantidad ?? 0);
-    const cantidadNueva = Number(this.nuevoMonto ?? 0);
-    const delta = cantidadNueva - cantidadAnterior;
-
-    const updateData: any = {
-      [`detalles.${campo}`]: cantidadNueva,
-      updatedAt: serverTimestamp()
-    };
-
-    if (this.fechaEnEdicion) {
-      const [year, month, day] = this.fechaEnEdicion.split('-').map(Number);
-      const nuevaFecha = new Date(year, month - 1, day);
-      updateData.fecha = Timestamp.fromDate(nuevaFecha);
-    }
-
-    try {
-      // 1) actualizar doc de pago (subcolección en doc unidad)
-      await updateDoc(doc(this.firestore, `${this.pathActual}/pagosTotales/${pago.id}`), updateData);
-
-      // 2) ajustar agregado del doc unidad
-      if (delta !== 0) {
-        const pagadoKey = this.campoPagadoKey(campo);
-        await updateDoc(doc(this.firestore, this.pathActual), {
-          [pagadoKey]: increment(delta),
-          updatedAt: serverTimestamp(),
-          fechaModificacion: serverTimestamp()
-        });
-
-        // 3) reflejar en memoria
-        if (this.registros) {
-          const reg: any = this.registros;
-          reg[pagadoKey] = Number(reg[pagadoKey] ?? 0) + delta;
-        }
-      }
-
-      alert('✅ Pago actualizado');
-      await this.cargarPagosTotales();
-
-      this.cancelarEdicion();
-    } catch (error) {
-      console.error('❌ Error al actualizar pago:', error);
-      alert('Error al actualizar el pago.');
-    }
-  }
-
-  // =========================
-  // PDF (SIN CAMBIOS ESTRUCTURALES)
+  // PDF (estructura fija; solo cambia el cálculo interno)
   // =========================
   async generarReciboYSubirPDF(
     uid: string,
@@ -435,6 +520,7 @@ export class RealizarPagoComponent implements OnInit {
       total: number;
       detalles: Partial<Record<CampoClave, number>>;
       pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[];
+      pendientesDespues: Record<CampoClave, number>;
     }
   ): Promise<string> {
 
@@ -450,25 +536,6 @@ export class RealizarPagoComponent implements OnInit {
     });
 
     const campos: CampoClave[] = ['administracion', 'minutosBase', 'minutosAtraso', 'multas'];
-
-    const pendientes: Record<CampoClave, number> = {
-      administracion: 0,
-      minutosBase: 0,
-      minutosAtraso: 0,
-      multas: 0
-    };
-
-    const registro: any = this.registros;
-    if (!registro) throw new Error('Registro no encontrado en memoria');
-
-    for (const campo of campos) {
-      const totalCampo = Number(registro[campo] ?? 0);
-      const pagadoKey = this.campoPagadoKey(campo);
-      const pagadoAnterior = Number(registro[pagadoKey] ?? 0);
-      const pagadoNuevo = Number(datos.detalles?.[campo] ?? 0);
-
-      pendientes[campo] = Math.max(totalCampo - (pagadoAnterior + pagadoNuevo), 0);
-    }
 
     const tablaPagoActual: any[] = [];
     for (const pago of datos.pagosConFechas) {
@@ -523,14 +590,15 @@ export class RealizarPagoComponent implements OnInit {
 
     const yFinal = (pdfDoc as any).lastAutoTable?.finalY || 100;
 
+    // ✅ tabla de pendientes (mantiene estructura, con cifras coherentes post-pago)
     autoTable(pdfDoc, {
       startY: yFinal + 15,
       head: [['Descripción', 'Pendiente']],
       body: [
-        ['Administración', `$${pendientes.administracion.toFixed(2)}`],
-        ['Minutos Base', `$${pendientes.minutosBase.toFixed(2)}`],
-        ['Minutos Atraso', `$${pendientes.minutosAtraso.toFixed(2)}`],
-        ['Multas', `$${pendientes.multas.toFixed(2)}`]
+        ['Administración', `$${Number(datos.pendientesDespues.administracion ?? 0).toFixed(2)}`],
+        ['Minutos Base', `$${Number(datos.pendientesDespues.minutosBase ?? 0).toFixed(2)}`],
+        ['Minutos Atraso', `$${Number(datos.pendientesDespues.minutosAtraso ?? 0).toFixed(2)}`],
+        ['Multas', `$${Number(datos.pendientesDespues.multas ?? 0).toFixed(2)}`]
       ],
       styles: { fontSize: 11, halign: 'right', textColor: 'black' },
       headStyles: { halign: 'center', fillColor: [240, 240, 240] }
@@ -573,6 +641,16 @@ export class RealizarPagoComponent implements OnInit {
     }, 500);
 
     return pdfUrl;
+  }
+
+  // =========================
+  // UTILIDADES
+  // =========================
+  private obtenerFechaISODesdeDate(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   cargarImagenBase64(url: string): Promise<string> {

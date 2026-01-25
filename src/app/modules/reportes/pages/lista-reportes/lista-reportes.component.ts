@@ -625,21 +625,21 @@ irAEditar(r: any): void {
 }
 
 irAPagar(r: any): void {
-  const uid = r?.uid;
-  const refPath = r?.refPath;
+  const uid = (r?.uid ?? '').toString().trim();
+  const refPath = (r?.refPath ?? '').toString().trim(); // debe ser: reportes_dia/.../unidades/...
 
   if (!uid || !refPath) {
     alert('❌ No se puede pagar: faltan uid o refPath.');
     return;
   }
 
-  const safe = encodeURIComponent(refPath);
+  const safeId = encodeURIComponent(refPath);
 
-  this.router.navigate(['/reportes/realizar-pago', uid, safe], {
+  this.router.navigate(['/reportes/realizar-pago', uid, safeId], {
     queryParams: {
-      nombre: r?.propietarioNombre ?? r?.nombre ?? '',
-      apellido: r?.apellido ?? '',
-      unidad: r?.codigo ?? r?.unidad ?? ''
+      nombre: (r?.propietarioNombre ?? r?.nombre ?? '').toString(),
+      apellido: (r?.apellido ?? '').toString(),
+      unidad: (r?.codigo ?? r?.unidad ?? '').toString()
     }
   });
 }
