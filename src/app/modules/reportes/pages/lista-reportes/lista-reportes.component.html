@@ -1,4 +1,20 @@
 <!-- lista-reportes.component.html -->
+<div class="modulos-barra">
+  <button
+    class="modulo-btn"
+    [class.activo]="moduloActivo === 'cobros'"
+    (click)="irACuentasPorCobrar()">
+    Cuentas por cobrar
+  </button>
+
+  <button
+    class="modulo-btn"
+    [class.activo]="moduloActivo === 'cierre'"
+    (click)="irACierreCaja()">
+    Cierre de caja
+  </button>
+</div>
+
 
 <div class="contenedor-reportes">
 
@@ -187,3 +203,4 @@
   </div>
 
 </div>
+

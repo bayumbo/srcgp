@@ -6,6 +6,35 @@
   box-sizing: border-box;
   font-family: 'Segoe UI', sans-serif;
 }
+.modulos-barra {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin-bottom: 16px;
+  background-color: #e9ecef;
+  border-radius: 10px solid ;
+  overflow: hidden;
+}
+
+.modulo-btn {
+  padding: 14px 0;
+  border: 1px #8da19c solid;
+  background-color: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.modulo-btn:hover {
+  background-color: #9ab4b4dd;
+}
+
+.modulo-btn.activo {
+  background-color: #2f7d6d; // verde institucional
+  color: #ffffff;
+}
 
 /* =========================
    CONTENEDOR GENERAL

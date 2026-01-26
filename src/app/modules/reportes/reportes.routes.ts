@@ -30,6 +30,12 @@ export const REPORTES_ROUTES: Routes = [
     import('./pages/formularios/realizar-pago/realizar-pago.component')
       .then(m => m.RealizarPagoComponent)
   },
+    {
+    path: 'realizar-pago-dia/:diaId/:unidadDocId',
+    loadComponent: () =>
+      import('./pages/formularios/realizar-pago/realizar-pago.component')
+        .then(m => m.RealizarPagoComponent)
+  },
   {
     path: 'cuentas-por-cobrar',
     loadComponent: () =>

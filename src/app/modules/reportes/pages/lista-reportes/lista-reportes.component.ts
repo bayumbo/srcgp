@@ -643,7 +643,7 @@ irAPagar(r: any): void {
     }
   });
 }
-
+moduloActivo: 'cobros' | 'cierre' | null = null;
 
   irACuentasPorCobrar() {
     this.router.navigate(['/reportes/cuentas-por-cobrar']);
