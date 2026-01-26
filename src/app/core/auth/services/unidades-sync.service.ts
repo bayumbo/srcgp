@@ -9,7 +9,9 @@ import {
   writeBatch,
   serverTimestamp,
   DocumentData,
+  orderBy,
 } from '@angular/fire/firestore';
+import { UnidadFS } from './unidad.service';
 
 type Empresa = 'General Pintag' | 'Expreso Antisana' | 'Administración';
 
@@ -31,6 +33,30 @@ export class UnidadesSyncService {
     // En su data actual, el doc de subcolección tiene: { nombre: "P03" }
     const codigo = String(raw?.nombre ?? raw?.codigo ?? '').trim();
     return codigo;
+  }
+  async obtenerUnidadesPorPropietario(uidPropietario: string, empresa?: string): Promise<UnidadFS[]> {
+    const ref = collection(this.firestore, 'unidades');
+
+    const q = empresa
+      ? query(ref, where('uidPropietario', '==', uidPropietario), where('empresa', '==', empresa), orderBy('numeroOrden', 'asc'))
+      : query(ref, where('uidPropietario', '==', uidPropietario), orderBy('numeroOrden', 'asc'));
+
+    const snap = await getDocs(q);
+
+    return snap.docs.map(d => {
+      const data = d.data() as any;
+      return {
+        id: d.id,
+        codigo: data.codigo || '',
+        empresa: data.empresa || '',
+        estado: data.estado ?? true,
+        numeroOrden: data.numeroOrden ?? 0,
+        propietarioNombre: data.propietarioNombre || '',
+        uidPropietario: data.uidPropietario || '',
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      } as UnidadFS;
+    });
   }
 
   async sincronizarUnidadesGlobales(): Promise<{ creadas: number; omitidas: number; usuariosProcesados: number }> {
