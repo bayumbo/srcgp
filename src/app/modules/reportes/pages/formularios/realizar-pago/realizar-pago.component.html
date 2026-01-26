@@ -4,17 +4,26 @@
     <h4>Gestión de Pago</h4>
   </div>
 
+  <!-- Información del usuario -->
   <div class="info-usuario" *ngIf="registros">
-    <p><strong>Nombre:</strong> {{ registros.nombre }}  {{ registros.apellido }}</p>
+    <p><strong>Nombre:</strong> {{ registros.nombre }} {{ registros.apellido }}</p>
     <p><strong>Unidad:</strong> {{ registros.unidad }}</p>
   </div>
+<div class="acciones-iniciales">
+    <button class="volver" type="button" (click)="volver()">
+  <span class="material-icons">arrow_back_ios_new</span>
+  Volver
+</button>
+</div>
 
-  <!-- Contenedor de los módulos -->
-   <div class="contenedor-modulos" *ngIf="registros">
+  <!-- =========================
+       MÓDULOS DE PAGO
+       ========================= -->
+  <div class="contenedor-modulos" *ngIf="registros">
     <div class="modulo" *ngFor="let campo of campos">
       <h3>{{ campo | titlecase }}</h3>
 
-      <div class="tabla-pagos" *ngIf="registros">
+      <div class="tabla-pagos">
         <table>
           <thead>
             <tr>
@@ -22,96 +31,136 @@
               <th>Pagado</th>
             </tr>
           </thead>
+
           <tbody>
-            <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registros.id!)">
-               <td>
-                <span *ngIf="!esPagoEnEdicion(pago, campo)">
-                    {{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}
-                </span>
-                <input *ngIf="esPagoEnEdicion(pago, campo)" 
-                      type="date" 
-                      [(ngModel)]="fechaEnEdicion">
-              </td> 
-            
-              <td class="celda-pago-editable">
-                <!-- Contenedor fijo -->
-                <div class="pago-campo">
-                  <!-- Valor o input -->
-                  <span *ngIf="!esPagoEnEdicion(pago, campo)">{{ pago.cantidad }}</span>
-                  <input *ngIf="esPagoEnEdicion(pago, campo)" type="number" [(ngModel)]="nuevoMonto" />
-                </div>
-            
-                <!-- Botones superpuestos -->
-                <div class="acciones-edicion" *ngIf="esPagoEnEdicion(pago, campo)">
-                  <button (click)="guardarEdicion()">
-                    <span class="material-icons">save</span>
-                  </button>
-                  <button (click)="cancelarEdicion()">
-                    <span class="material-icons">cancel</span>
-                  </button>
-                </div>
-            
-                <div class="accion-editar" *ngIf="!esPagoEnEdicion(pago, campo)">
-                  <button (click)="iniciarEdicion(pago, campo)">
-                    <span class="material-icons">edit</span>
-                  </button>
-                  
+            <!-- Historial de pagos (solo lectura, doc actual) -->
+            <thead>
+
+</thead>
+
+<tbody>
+  <!-- Historial de pagos -->
+  <tr class="fila-pago" *ngFor="let pago of filtrarPagosPorRegistro(campo, registros.id!)">
+    <td>{{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}</td>
+    <td>{{ pago.cantidad }}</td>
+
+    <td class="accion-editar">
+      <!-- Si NO está en edición: muestra botones -->
+      <ng-container *ngIf="!esPagoEnEdicion(pago, campo); else bloqueEdicion">
+        <button type="button" (click)="iniciarEdicion(pago, campo)">
+          <span class="material-icons">edit</span>
+        </button>
+
+        <button type="button" class="btn-eliminar" (click)="eliminarPago(pago.id)">
+          <span class="material-icons">delete</span>
+        </button>
+      </ng-container>
+
+      <!-- Si SÍ está en edición: muestra inputs + guardar/cancelar -->
+      <ng-template #bloqueEdicion>
+  <div class="edicion-inline">
+    <!-- Monto -->
+    <input
+      type="number"
+      min="0"
+      class="input-edicion"
+      [(ngModel)]="nuevoMonto"
+      placeholder="Monto"
+    />
+
+    <!-- Fecha SOLO LECTURA -->
+    <span class="fecha-fixed">
+      {{ pago.fecha.toDate() | date:'dd/MM/yyyy' }}
+    </span>
+
+    <!-- Acciones -->
+    <button type="button" class="btn-guardar" (click)="guardarEdicion()">
+      <span class="material-icons">save</span>
+    </button>
+
+    <button type="button" class="btn-cancelar" (click)="cancelarEdicion()">
+      <span class="material-icons">close</span>
+    </button>
+  </div>
+</ng-template>
+    </td>
+  </tr>
+
+  <tr *ngIf="filtrarPagosPorRegistro(campo, registros.id!).length === 0">
+    <td colspan="3">Sin pagos registrados</td>
+  </tr>
+
+  <tr>
+    <td><strong>Total pagado:</strong></td>
+    <td><strong>{{ calcularTotalPagado(campo, registros.id!) }}</strong></td>
+    <td></td>
+  </tr>
+
+  <tr>
+    <td><strong>Deuda:</strong></td>
+    <td>{{ calcularDeudaAcumulada(campo) }}</td>
+    <td></td>
+  </tr>
+
+            <!-- =========================
+                 DESGLOSE POR FECHA
+                 PAGO POR FILA
+                 ========================= -->
+            <tr *ngIf="getDeudaDetalle(campo).length > 0">
+              <td colspan="2" class="deuda-detalle-cell">
+                <div class="deuda-detalle">
+                  <div class="deuda-detalle-titulo">Desglose por fecha</div>
+
+                  <div class="deuda-detalle-lista">
+                    <div
+                      class="deuda-detalle-item"
+                      *ngFor="let item of getDeudaDetalleLimitado(campo, 50)"
+                    >
+                      <span class="fecha">{{ item.fecha }}</span>
+                      <span class="monto">{{ item.monto }}</span>
+
+                      <!-- Input de pago por deuda específica -->
+                      <input
+                        type="number"
+                        class="input-pago-fila"
+                        min="0"
+                        [max]="item.monto"
+                        [ngModel]="getPagoFila(campo, item)"
+                        (ngModelChange)="setPagoFila(campo, item, $event)"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>
-            
-            
-            <tr *ngIf="filtrarPagosPorRegistro(campo, registros.id!).length === 0">
-              <td colspan="2">Sin pagos registrados</td>
-            </tr>
-            <tr>
-              <td><strong>Total pagado:</strong></td>
-              <td><strong>{{ calcularTotalPagado(campo, registros.id!) }}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Deuda:</strong></td>
-              <td><strong>{{ calcularDeuda(registros, campo) }}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Pago actual:</strong></td>
-              <td>
-                <input
-                  type="number"
-                  min="0"
-                  [max]="calcularDeuda(registros, campo)"
-                  [(ngModel)]="pagosActuales[registros.id!][campo]"
-                  (ngModelChange)="validarPago(registros.id!, campo)"
-                  placeholder="Ingresar"
-                />
-              </td>
-            </tr>
-            <tr  >
-              <td><strong>Fecha de pago:</strong></td>
-              <td class="celda-input-fecha">
-                <input
-                  type="date"
-                  class="form-control"
-                  [(ngModel)]="fechasPagosActuales[registros.id!][campo]"
-                  [value]="fechasPagosActuales[registros.id!][campo] || obtenerFechaActual()"
-                />
-              </td>
-            </tr>
+
           </tbody>
         </table>
       </div>
     </div>
   </div>
 
+  <!-- =========================
+       RESUMEN
+       ========================= -->
   <div class="resumen-total">
     <h3>Total a pagar:</h3>
     <p class="total-pagar">${{ calcularTotalGeneral() }}</p>
   </div>
 
+  <!-- =========================
+       ACCIONES
+       ========================= -->
   <div class="acciones-finales">
-    <button class="volver" (click)="volver()">
-      <span class="material-icons">arrow_back_ios_new</span> Volver
-    </button>
-    <button class="guardar" (click)="guardarPagosGenerales()" [disabled]="cargandoPago">
+
+
+    <button
+      class="guardar"
+      type="button"
+      (click)="guardarPagosGenerales()"
+      [disabled]="cargandoPago"
+    >
       <span class="material-icons">
         {{ cargandoPago ? 'hourglass_top' : 'task_alt' }}
       </span>

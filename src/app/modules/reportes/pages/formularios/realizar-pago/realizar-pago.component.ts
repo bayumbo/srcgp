@@ -6,12 +6,14 @@ import {
   getDoc,
   collection,
   getDocs,
+  collectionGroup,
+  query,
+  where,
   Timestamp,
   addDoc,
-  collection as fsCollection,
   updateDoc,
-  setDoc,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -19,14 +21,31 @@ import { FormsModule } from '@angular/forms';
 import { NuevoRegistro } from 'src/app/core/interfaces/reportes.interface';
 import { PagoPorModulo } from 'src/app/core/interfaces/pagoPorModulo.interface';
 import { DocumentoPago } from 'src/app/core/interfaces/documentoPago.interface';
+
 import { ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Storage } from '@angular/fire/storage';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-
+import { deleteDoc } from '@angular/fire/firestore';
+import { deleteObject } from '@angular/fire/storage';
+// ✅ Si no lo usas, mejor comenta o elimina para evitar warnings:
+// import QRCode from 'qrcode';
 
 type CampoClave = 'minutosAtraso' | 'administracion' | 'minutosBase' | 'multas';
+
+type DeudaDetalleItem = {
+  fecha: string;     // YYYY-MM-DD (fecha del reporte/deuda)
+  monto: number;     // saldo pendiente para esa fecha y módulo
+  pathDoc: string;   // ruta real: reportes_dia/{diaId}/unidades/{unidadId}
+};
+
+// ✅ Item que alimenta la tabla del PDF
+type PagoReciboItem = {
+  campo: CampoClave;
+  monto: number;
+  fecha: Timestamp;     // fecha de pago (cabecera)
+  fechaDeuda: string;   // ✅ fecha del reporte (columna Fecha de la tabla)
+};
 
 @Component({
   selector: 'app-realizar-pago',
@@ -43,7 +62,11 @@ export class RealizarPagoComponent implements OnInit {
 
   uidUsuario: string = '';
   reporteId: string = '';
-  registros: NuevoRegistro | null = null;
+  private pathActual: string = '';
+
+  registros: (NuevoRegistro & { id?: string }) | null = null;
+
+  campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
 
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
@@ -52,85 +75,129 @@ export class RealizarPagoComponent implements OnInit {
     multas: []
   };
 
-  pagosActuales: Record<string, Partial<Record<CampoClave, number>>> = {};
-  fechasPagosActuales: Record<string, Partial<Record<CampoClave, string>>> = {};
-  campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
-  pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
-  nuevoMonto: number | null = null;
-  fechaEnEdicion: string | null = null;
+  deudaHistorica: Record<CampoClave, number> = {
+    minutosAtraso: 0,
+    administracion: 0,
+    minutosBase: 0,
+    multas: 0
+  };
 
+  deudaDetalle: Record<CampoClave, DeudaDetalleItem[]> = {
+    minutosAtraso: [],
+    administracion: [],
+    minutosBase: [],
+    multas: []
+  };
+
+  pagosPorDeuda: Record<string, Partial<Record<CampoClave, number>>> = {};
+  pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
+  nuevoMonto: number = 0;               // input monto
+
+  cargandoPago: boolean = false;
+
+  // Fecha de pago general (cabecera PDF)
+  fechaSeleccionada: Date = new Date();
+
+  // Cache de assets
+  private logoPintagB64: string | null = null;
+  private logoAntisanaB64: string | null = null;
+  private busB64: string | null = null;
+
+  private recargarVistaActual(): void {
+  const url = this.router.url;
+
+  // Truco: navegar a una ruta dummy y volver, para forzar ngOnInit
+  this.router.navigateByUrl('/', { skipLocationChange: true }).then(() => {
+    this.router.navigateByUrl(url);
+  });
+}
+
+  private async assetB64(path: string): Promise<string> {
+    if (path.includes('LogoPintag') && this.logoPintagB64) return this.logoPintagB64;
+    if (path.includes('LogoAntisana') && this.logoAntisanaB64) return this.logoAntisanaB64;
+    if (path.includes('Bus.png') && this.busB64) return this.busB64;
+
+    const b64 = await this.cargarImagenBase64(path);
+    if (path.includes('LogoPintag')) this.logoPintagB64 = b64;
+    if (path.includes('LogoAntisana')) this.logoAntisanaB64 = b64;
+    if (path.includes('Bus.png')) this.busB64 = b64;
+    return b64;
+  }
+
+  private descargarPDFInstantaneo(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  // =========================
+  // INIT
+  // =========================
   async ngOnInit(): Promise<void> {
-    const id = this.route.snapshot.paramMap.get('id');
+    const idRaw = this.route.snapshot.paramMap.get('id');
     const uid = this.route.snapshot.paramMap.get('uid');
 
-    if (!id || !uid) {
+    if (!idRaw || !uid) {
       this.router.navigate(['/reportes/lista-reportes']);
       return;
     }
 
     this.uidUsuario = uid;
-    this.reporteId = id;
+    this.reporteId = decodeURIComponent(idRaw);
 
-    const ref = doc(this.firestore, `usuarios/${uid}/reportesDiarios/${id}`);
-    const snap = await getDoc(ref);
+    this.pathActual = this.resolverPath(this.uidUsuario, this.reporteId);
+
+    const refDoc = doc(this.firestore, this.pathActual);
+    const snap = await getDoc(refDoc);
 
     if (!snap.exists()) {
       alert('Registro no encontrado');
+      this.router.navigate(['/reportes/lista-reportes']);
       return;
     }
 
+    const data = snap.data() as any;
+
     this.registros = {
-      ...(snap.data() as NuevoRegistro),
+      ...(data as NuevoRegistro),
       id: snap.id
     };
 
-    // ✅ AÑADE ESTE CÓDIGO para inicializar los objetos
-    // Esto previene que el HTML intente acceder a propiedades de un objeto 'undefined'
-    if (this.registros.id) {
-      this.pagosActuales[this.registros.id] = {};
-      this.fechasPagosActuales[this.registros.id] = {};
-    }
-
-    this.pagosTotales = {
-      minutosAtraso: [],
-      administracion: [],
-      minutosBase: [],
-      multas: []
-    };
+    const qp = this.route.snapshot.queryParamMap;
+    this.registros.nombre = (data.nombre ?? qp.get('nombre') ?? '').toString().trim();
+    (this.registros as any).apellido = (data.apellido ?? qp.get('apellido') ?? '').toString().trim();
+    this.registros.unidad = (data.codigo ?? data.unidad ?? qp.get('unidad') ?? '').toString().trim();
 
     await this.cargarPagosTotales();
-    
-    if (this.registros?.id) {
-  for (const campo of this.campos) {
-    if (!this.fechasPagosActuales[this.registros.id][campo]) {
-      this.fechasPagosActuales[this.registros.id][campo] = this.obtenerFechaActual();
+    await this.cargarDeudaHistoricaAcumulada();
+  }
+
+  private resolverPath(uid: string, id: string): string {
+    if (id.startsWith('reportes_dia/')) return id;
+
+    const partes = (id ?? '').split('_');
+    if (partes.length >= 3) {
+      const unidadId = partes[partes.length - 1];
+      const diaId = partes.slice(0, partes.length - 1).join('_');
+      return `reportes_dia/${diaId}/unidades/${unidadId}`;
     }
-  }
-}
-  }  
 
-  obtenerFechaActual(): string {
-  const hoy = new Date();
-  const year = hoy.getFullYear();
-  const month = String(hoy.getMonth() + 1).padStart(2, '0');
-  const day = String(hoy.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-async cargarPagosTotales() {
-  // Limpia el estado de pagos anteriores
-  for (const campo of this.campos) {
-    this.pagosTotales[campo as CampoClave] = [];
+    return `usuarios/${uid}/reportesDiarios/${id}`;
   }
 
-  // ✅ Usamos la variable 'registros' directamente
-  if (this.registros) {
-    const reporteId = this.registros.id!;
-    const ref = collection(
-      this.firestore,
-      `usuarios/${this.uidUsuario}/reportesDiarios/${reporteId}/pagosTotales`
-    );
+  // =========================
+  // HISTORIAL DE PAGOS (doc actual)
+  // =========================
+  async cargarPagosTotales() {
+    for (const campo of this.campos) this.pagosTotales[campo] = [];
+    if (!this.registros?.id) return;
 
-    const snap = await getDocs(ref);
+    const reporteId = this.registros.id;
+    const refPagos = collection(this.firestore, `${this.pathActual}/pagosTotales`);
+    const snap = await getDocs(refPagos);
 
     const pagos: DocumentoPago[] = snap.docs.map(d => ({
       id: d.id,
@@ -138,272 +205,750 @@ async cargarPagosTotales() {
     }));
 
     for (const campo of this.campos) {
-      const nuevosPagos = pagos
-        .flatMap(p => {
-          const cantidad = p.detalles?.[campo] ?? 0;
-          return cantidad > 0
-            ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
-            : [];
-        });
+      const nuevosPagos = pagos.flatMap(p => {
+        const cantidad = p.detalles?.[campo] ?? 0;
+        return cantidad > 0
+          ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
+          : [];
+      });
 
-      this.pagosTotales[campo as CampoClave].push(...nuevosPagos);
+      this.pagosTotales[campo].push(...nuevosPagos);
     }
   }
 
-  console.log('💰 Pagos cargados:', this.pagosTotales);
-}
-  cargandoPago: boolean = false;
-  fechaSeleccionada: Date = new Date();
+  // =========================
+  // DEUDA HISTÓRICA + DESGLOSE POR FECHA (collectionGroup)
+  // =========================
+  private async cargarDeudaHistoricaAcumulada(): Promise<void> {
+    if (!this.registros) return;
 
-  async guardarPagosGenerales() {
-  if (this.cargandoPago) return;
-  this.cargandoPago = true;
+    const codigo = ((this.registros as any)?.codigo ?? this.registros?.unidad ?? '').toString().trim();
+    const empresa = ((this.registros as any)?.empresa ?? '').toString().trim();
+    const fechaActual = ((this.registros as any)?.fecha ?? '').toString().trim();
 
-  try {
-    if (this.registros) {
-      const registro = this.registros;
-      const detalles: Partial<Record<CampoClave, number>> = {};
-      const pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[] = [];
-      let tienePago = false;
-      let total = 0;
+    if (!codigo || !empresa || !fechaActual) return;
+
+    for (const c of this.campos) {
+      this.deudaHistorica[c] = 0;
+      this.deudaDetalle[c] = [];
+    }
+
+    const q = query(
+      collectionGroup(this.firestore, 'unidades'),
+      where('empresa', '==', empresa),
+      where('codigo', '==', codigo),
+      where('fecha', '<', fechaActual)
+    );
+
+    const snap = await getDocs(q);
+
+    snap.forEach(s => {
+      const d: any = s.data();
+      const fecha = (d?.fecha ?? '').toString().trim();
+      if (!fecha) return;
+
+      const pathDoc = s.ref.path;
 
       for (const campo of this.campos) {
-        const monto = this.pagosActuales[registro.id!]?.[campo] ?? 0;
-        if (monto > 0) {
-          tienePago = true;
-          detalles[campo] = monto;
-          total += monto;
+        const total = Number(d?.[campo] ?? 0);
+        const pagadoKey = this.campoPagadoKey(campo);
+        const pagado = Number(d?.[pagadoKey] ?? 0);
+        const pendiente = Math.max(total - pagado, 0);
 
-          const fechaPagoRegistro = this.fechasPagosActuales[registro.id!]?.[campo];
-          if (!fechaPagoRegistro) continue;
+        if (pendiente > 0) {
+          this.deudaHistorica[campo] += pendiente;
+          this.deudaDetalle[campo].push({ fecha, monto: pendiente, pathDoc });
+        }
+      }
+    });
 
-          const [year, month, day] = fechaPagoRegistro.split('-').map(Number);
-          const fecha = Timestamp.fromDate(new Date(year, month - 1, day));
-          pagosConFechas.push({ campo, monto, fecha });
+    for (const campo of this.campos) {
+      this.deudaDetalle[campo].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    }
+
+    const reg: any = this.registros;
+    const fechaHoy = (reg?.fecha ?? fechaActual).toString().trim();
+
+    for (const campo of this.campos) {
+      const pendienteHoy = this.calcularDeudaDelDia(reg, campo);
+      if (pendienteHoy > 0) {
+        this.deudaDetalle[campo].push({ fecha: fechaHoy, monto: pendienteHoy, pathDoc: this.pathActual });
+      }
+    }
+  }
+
+  getDeudaDetalle(campo: CampoClave): DeudaDetalleItem[] {
+    return this.deudaDetalle?.[campo] ?? [];
+  }
+
+  getDeudaDetalleLimitado(campo: CampoClave, max = 50): DeudaDetalleItem[] {
+    const arr = this.getDeudaDetalle(campo);
+    return arr.length > max ? arr.slice(arr.length - max) : arr;
+  }
+
+  // =========================
+  // PAGO POR FILA
+  // =========================
+  private keyDeuda(campo: CampoClave, item: DeudaDetalleItem): string {
+    return `${campo}__${item.pathDoc}__${item.fecha}`;
+  }
+
+  getPagoFila(campo: CampoClave, item: DeudaDetalleItem): number {
+    const k = this.keyDeuda(campo, item);
+    return Number(this.pagosPorDeuda[k]?.[campo] ?? 0);
+  }
+
+  setPagoFila(campo: CampoClave, item: DeudaDetalleItem, valor: any): void {
+    const k = this.keyDeuda(campo, item);
+    const num = Math.max(Number(valor ?? 0), 0);
+    if (!this.pagosPorDeuda[k]) this.pagosPorDeuda[k] = {};
+    this.pagosPorDeuda[k][campo] = Math.min(num, item.monto);
+  }
+
+  // =========================
+  // CÁLCULOS
+  // =========================
+  private campoPagadoKey(
+    campo: CampoClave
+  ): 'adminPagada' | 'minBasePagados' | 'minutosPagados' | 'multasPagadas' {
+    if (campo === 'administracion') return 'adminPagada';
+    if (campo === 'minutosBase') return 'minBasePagados';
+    if (campo === 'minutosAtraso') return 'minutosPagados';
+    return 'multasPagadas';
+  }
+
+  private calcularDeudaDelDia(registro: any, campo: CampoClave): number {
+    const total = Number(registro?.[campo] ?? 0);
+    const pagadoKey = this.campoPagadoKey(campo);
+    const pagado = Number(registro?.[pagadoKey] ?? 0);
+    return Math.max(total - pagado, 0);
+  }
+
+  calcularDeudaAcumulada(campo: CampoClave): number {
+    const historica = Number(this.deudaHistorica?.[campo] ?? 0);
+    const hoy = this.registros ? this.calcularDeudaDelDia(this.registros as any, campo) : 0;
+    return historica + hoy;
+  }
+
+  filtrarPagosPorRegistro(campo: CampoClave, registroId: string): PagoPorModulo[] {
+    return this.pagosTotales[campo]?.filter(p => p.reporteId === registroId) || [];
+  }
+
+  calcularTotalPagado(campo: CampoClave, registroId: string): number {
+    return this.filtrarPagosPorRegistro(campo, registroId).reduce((acc, p) => acc + p.cantidad, 0);
+  }
+
+  calcularTotalGeneral(): number {
+    let total = 0;
+    for (const campo of this.campos) {
+      for (const item of this.getDeudaDetalle(campo)) {
+        total += Math.min(this.getPagoFila(campo, item), item.monto);
+      }
+    }
+    return total;
+  }
+
+  async eliminarPago(pagoId: string): Promise<void> {
+  if (!pagoId) return;
+
+  const ok = confirm('¿Seguro que deseas eliminar este pago? Esta acción no se puede deshacer.');
+  if (!ok) return;
+
+  try {
+    // ✅ Ruta del doc del pago (si tu historial viene del doc actual, es pathActual)
+    const pagoPath = `${this.pathActual}/pagosTotales/${pagoId}`;
+    const pagoRef = doc(this.firestore, pagoPath);
+
+    const snap = await getDoc(pagoRef);
+    if (!snap.exists()) {
+      alert('El pago ya no existe o no se encontró.');
+      return;
+    }
+
+    const data: any = snap.data();
+    const detalles: Partial<Record<CampoClave, number>> = data?.detalles ?? {};
+    const urlPDF: string | null = data?.urlPDF ?? null;
+
+    // ✅ Preparar decrementos en el doc unidad
+    // OJO: el doc unidad es this.pathActual
+    const updates: any = {
+      updatedAt: serverTimestamp(),
+      fechaModificacion: serverTimestamp()
+    };
+
+    // Restar de los acumulados pagados (adminPagada/minBasePagados/minutosPagados/multasPagadas)
+    (Object.keys(detalles) as CampoClave[]).forEach((campo) => {
+      const monto = Number(detalles[campo] ?? 0);
+      if (monto > 0) {
+        const pagadoKey = this.campoPagadoKey(campo);
+        updates[pagadoKey] = increment(-monto); // ✅ resta
+      }
+    });
+
+    // 1) actualizar unidad (restar pagos)
+    await updateDoc(doc(this.firestore, this.pathActual), updates);
+
+    // 2) eliminar doc pago
+    await deleteDoc(pagoRef);
+
+    // 3) (opcional) eliminar PDF asociado si existe
+    // Solo si quieres que “limpie” storage también.
+    if (urlPDF) {
+      try {
+        // Si urlPDF es una downloadURL, puedes borrarlo si guardas también la ruta.
+        // Si NO guardas ruta, lo más estable es guardar `storagePath` dentro del doc pago.
+        // Aun así, intento borrar desde URL si es compatible en tu caso.
+        const objRef = ref(this.storage, urlPDF);
+        await deleteObject(objRef);
+      } catch (e) {
+        // No bloqueamos por errores de Storage (puede fallar si no hay path)
+        console.warn('No se pudo eliminar el PDF en Storage (revisar storagePath):', e);
+      }
+    }
+
+    alert('✅ Pago eliminado correctamente.');
+
+    // 4) recargar UI
+  this.recargarVistaActual();
+
+  } catch (error) {
+    console.error('❌ Error eliminando pago:', error);
+    alert('Ocurrió un error al eliminar el pago.');
+  }
+}
+
+esPagoEnEdicion(pago: { id: string }, campo: CampoClave): boolean {
+  return !!this.pagoEnEdicion && this.pagoEnEdicion.id === pago.id && this.pagoEnEdicion.campo === campo;
+}
+
+iniciarEdicion(pago: { id: string; cantidad: number; fecha: any }, campo: CampoClave): void {
+  this.pagoEnEdicion = { id: pago.id, campo };
+
+  // monto actual
+  this.nuevoMonto = Number(pago.cantidad ?? 0);
+
+  // fecha actual (Timestamp -> YYYY-MM-DD)
+  const dt: Date =
+    typeof pago.fecha?.toDate === 'function'
+      ? pago.fecha.toDate()
+      : (pago.fecha instanceof Date ? pago.fecha : new Date());
+
+}
+
+cancelarEdicion(): void {
+  this.pagoEnEdicion = null;
+  this.nuevoMonto = 0;
+
+}
+
+async guardarEdicion(): Promise<void> {
+  if (!this.pagoEnEdicion) return;
+
+  const { id, campo } = this.pagoEnEdicion;
+
+  // Validaciones
+  const montoNuevo = Math.max(Number(this.nuevoMonto ?? 0), 0);
+
+
+  try {
+    // Doc pago (siempre cuelga del doc actual)
+    const pagoPath = `${this.pathActual}/pagosTotales/${id}`;
+    const pagoRef = doc(this.firestore, pagoPath);
+
+    const snap = await getDoc(pagoRef);
+    if (!snap.exists()) {
+      alert('El pago no existe o ya fue eliminado.');
+      this.cancelarEdicion();
+      return;
+    }
+
+    const data: any = snap.data();
+    const detalles = (data?.detalles ?? {}) as Partial<Record<CampoClave, number>>;
+
+    const montoAnterior = Number(detalles?.[campo] ?? 0);
+
+    // Delta para ajustar acumulado en el doc unidad
+    const delta = montoNuevo - montoAnterior;
+
+    // 1) Ajustar acumulado pagado en el doc unidad (adminPagada/minBasePagados/minutosPagados/multasPagadas)
+    if (delta !== 0) {
+      const pagadoKey = this.campoPagadoKey(campo);
+      await updateDoc(doc(this.firestore, this.pathActual), {
+        [pagadoKey]: increment(delta),
+        updatedAt: serverTimestamp(),
+        fechaModificacion: serverTimestamp()
+      } as any);
+    }
+
+    // 2) Actualizar doc pago (detalles + total + fecha)
+    const detallesNuevos: Partial<Record<CampoClave, number>> = { ...detalles };
+    detallesNuevos[campo] = montoNuevo;
+
+    const totalNuevo =
+      Number(detallesNuevos.administracion ?? 0) +
+      Number(detallesNuevos.minutosBase ?? 0) +
+      Number(detallesNuevos.minutosAtraso ?? 0) +
+      Number(detallesNuevos.multas ?? 0);
+
+    // Si el total queda en 0, borramos el doc pago (opcional, recomendado)
+    if (totalNuevo <= 0) {
+      await deleteDoc(pagoRef);
+    } else {
+      await updateDoc(pagoRef, {
+ // si tú manejas ambos campos, mantenlos iguales
+        detalles: detallesNuevos,
+        total: totalNuevo,
+        updatedAt: serverTimestamp()
+      } as any);
+    }
+
+    // 3) Refrescar UI
+    await this.cargarPagosTotales();
+    await this.cargarDeudaHistoricaAcumulada();
+
+this.cancelarEdicion();
+alert('✅ Pago actualizado correctamente.');
+this.recargarVistaActual();
+  } catch (err) {
+    console.error('❌ Error guardando edición:', err);
+    alert('Ocurrió un error al editar el pago.');
+  }
+}
+
+  // =========================
+  // GUARDAR PAGOS
+  // =========================
+  async guardarPagosGenerales() {
+    if (this.cargandoPago) return;
+    this.cargandoPago = true;
+
+    try {
+      if (!this.registros) {
+        alert('Registro no encontrado');
+        return;
+      }
+
+      const aplicaciones: Array<{
+        campo: CampoClave;
+        monto: number;
+        pathDoc: string;
+        fechaDeuda: string;
+      }> = [];
+
+      for (const campo of this.campos) {
+        const items = this.getDeudaDetalle(campo);
+        for (const item of items) {
+          const monto = this.getPagoFila(campo, item);
+          if (monto > 0) {
+            aplicaciones.push({
+              campo,
+              monto,
+              pathDoc: item.pathDoc,
+              fechaDeuda: item.fecha
+            });
+          }
         }
       }
 
-      if (tienePago && pagosConFechas.length > 0) {
-        const ref = collection(
-          this.firestore,
-          `usuarios/${this.uidUsuario}/reportesDiarios/${registro.id}/pagosTotales`
-        );
+      if (aplicaciones.length === 0) {
+        alert('⚠️ Ingresa al menos un pago en alguna fecha.');
+        return;
+      }
 
-        // 1️⃣ Guardar inmediatamente el pago (sin PDF aún)
-        const docRef = await addDoc(ref, {
-          fecha: pagosConFechas[0].fecha,
+      const fechaPagoStr = this.obtenerFechaISODesdeDate(this.fechaSeleccionada);
+      const [y, m, d] = fechaPagoStr.split('-').map(Number);
+      const fechaPago = Timestamp.fromDate(new Date(y, m - 1, d));
+
+      // ✅ existe en este scope y la firma lo acepta como opcional
+      const qrLink = `${window.location.origin}/recibos/pendiente`;
+
+      const porDoc = new Map<string, Array<{ campo: CampoClave; monto: number; fechaDeuda: string }>>();
+      for (const a of aplicaciones) {
+        if (!porDoc.has(a.pathDoc)) porDoc.set(a.pathDoc, []);
+        porDoc.get(a.pathDoc)!.push({ campo: a.campo, monto: a.monto, fechaDeuda: a.fechaDeuda });
+      }
+
+      const detallesTotalesPorCampo: Partial<Record<CampoClave, number>> = {};
+      for (const a of aplicaciones) {
+        detallesTotalesPorCampo[a.campo] = Number(detallesTotalesPorCampo[a.campo] ?? 0) + a.monto;
+      }
+      const totalPago = Object.values(detallesTotalesPorCampo).reduce((acc, v) => acc + Number(v ?? 0), 0);
+
+      const pendientesAntes: Record<CampoClave, number> = {
+        administracion: 0,
+        minutosBase: 0,
+        minutosAtraso: 0,
+        multas: 0
+      };
+
+      for (const campo of this.campos) {
+        pendientesAntes[campo] = this.getDeudaDetalle(campo).reduce((acc, it) => acc + Number(it.monto ?? 0), 0);
+      }
+
+      const pagosCreados: { pathPagoDoc: string }[] = [];
+
+      for (const [pathDoc, items] of porDoc.entries()) {
+        const detalles: Partial<Record<CampoClave, number>> = {};
+        let total = 0;
+
+        for (const it of items) {
+          detalles[it.campo] = Number(detalles[it.campo] ?? 0) + it.monto;
+          total += it.monto;
+        }
+
+        const refPagos = collection(this.firestore, `${pathDoc}/pagosTotales`);
+        const docRef = await addDoc(refPagos, {
+          fecha: fechaPago,
           detalles,
           total,
           urlPDF: null,
-          fechasPorModulo: pagosConFechas.reduce((acc, p) => ({ ...acc, [p.campo]: p.fecha }), {})
+          fechaPago,
+          aplicaciones: items,
+          createdAt: serverTimestamp(),
+          uidCobrador: this.uidUsuario
         });
-        
 
-        // 2️⃣ Liberar el botón y navegar ya
-        alert('✅ Pago registrado correctamente. Generando recibo en segundo plano...');
-        this.router.navigate(['/reportes/lista-reportes']);
-        this.cargandoPago = false;
+        pagosCreados.push({ pathPagoDoc: `${pathDoc}/pagosTotales/${docRef.id}` });
 
-        // 3️⃣ Generar PDF en segundo plano
-        this.generarReciboYSubirPDF(this.uidUsuario, registro.id!, {
-          nombre: registro.nombre,
-          apellido: registro.apellido,
-          unidad: registro.unidad,
-          total,
-          detalles,
-          pagosConFechas
-        })
-        .then(async (urlPDF) => {
-          // Actualiza el documento con el link del PDF
-          await updateDoc(doc(this.firestore, ref.path, docRef.id), { urlPDF });
-          console.log('📄 Recibo PDF generado y URL actualizada');
-        })
-        .catch(err => {
-          console.error('❌ Error generando el PDF:', err);
-        });
+        const incUpdates: any = {
+          updatedAt: serverTimestamp(),
+          fechaModificacion: serverTimestamp()
+        };
+
+        for (const c of Object.keys(detalles) as CampoClave[]) {
+          const monto = Number(detalles[c] ?? 0);
+          if (monto > 0) {
+            const pagadoKey = this.campoPagadoKey(c);
+            incUpdates[pagadoKey] = increment(monto);
+          }
+        }
+
+        await updateDoc(doc(this.firestore, pathDoc), incUpdates);
       }
+
+      alert('✅ Pagos aplicados correctamente. Generando recibo...');
+
+      const pagosConFechas: PagoReciboItem[] = aplicaciones.map(a => ({
+        campo: a.campo,
+        monto: a.monto,
+        fecha: fechaPago,
+        fechaDeuda: a.fechaDeuda
+      }));
+
+      const pendientesDespues: Record<CampoClave, number> = {
+        administracion: 0,
+        minutosBase: 0,
+        minutosAtraso: 0,
+        multas: 0
+      };
+
+      for (const campo of this.campos) {
+        const pagadoCampo = Number(detallesTotalesPorCampo[campo] ?? 0);
+        pendientesDespues[campo] = Math.max(Number(pendientesAntes[campo] ?? 0) - pagadoCampo, 0);
+      }
+
+      const unidadTicket =
+      (this.registros?.unidad ?? '').toString().trim() ||
+      ((this.registros as any)?.codigo ?? '').toString().trim() ||
+      '---';
+
+
+      // ✅ Genera PDF y luego actualiza urlPDF en los pagos
+    this.generarReciboYSubirPDF(this.uidUsuario, this.registros.id ?? 'pago', {
+      nombre: (this.registros as any)?.nombre ?? '',
+      apellido: (this.registros as any)?.apellido ?? '',
+      unidad: unidadTicket, // ✅ usar la unidad correcta aquí
+      total: totalPago,
+      detalles: detallesTotalesPorCampo,
+      pagosConFechas,
+      pendientesDespues
+    })
+      .then(async (urlPDF) => {
+        for (const p of pagosCreados) {
+          await updateDoc(doc(this.firestore, p.pathPagoDoc), { urlPDF });
+        }
+      })
+      .catch(err => console.error('❌ Error generando el PDF:', err));
+
+      this.pagosPorDeuda = {};
+this.recargarVistaActual();
+
+    } catch (error) {
+      console.error('❌ Error al guardar los pagos:', error);
+      alert('Ocurrió un error al guardar los pagos.');
+    } finally {
+      this.cargandoPago = false;
     }
-  } catch (error) {
-    console.error('❌ Error al guardar los pagos:', error);
-    alert('Ocurrió un error al guardar los pagos.');
-  } finally {
-    this.cargandoPago = false;
   }
-}
 
-  /*---------------------------------- Lógica generar recibo y formato----------------------*/
-  
-  async generarReciboYSubirPDF(
-    uid: string,
-    reporteId: string,
-    datos: {
-      nombre: string;
-      apellido: string;
-      unidad: string;
-      total: number;
-      detalles: Partial<Record<CampoClave, number>>;
-      // ✅ EL PARÁMETRO AHORA ES UN ARRAY DE PAGOS, CADA UNO CON SU FECHA.
-      pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp }[];
-    }
-    
-  ): Promise<string> {
+  // =========================
+  // PDF
+  // =========================
+async generarReciboYSubirPDF(
+  uid: string,
+  reporteId: string,
+  datos: {
+    nombre: string;
+    apellido: string;
+    unidad: string; // ✅ E01/E13
+    total: number;
+    detalles: Partial<Record<CampoClave, number>>;
+    pagosConFechas: { campo: CampoClave; monto: number; fecha: Timestamp; fechaDeuda?: string }[];
+    pendientesDespues: Record<CampoClave, number>;
+  }
+): Promise<string> {
 
-    // ✅ Usamos la fecha del primer pago del array como la fecha de emisión del recibo
-    const fechaActual = datos.pagosConFechas[0]?.fecha.toDate() || new Date();
-    const fechaTexto = fechaActual.toLocaleDateString('es-EC', {
+  // =========================
+  // FORMATO TICKET 80mm
+  // =========================
+  const pdfDoc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: [80, 297] // Roll Paper 80 x 297 mm
+  });
+
+  const W = 80;
+  const margin = 4;
+
+  // =========================
+  // FECHA / HORA (LOCAL)
+  // =========================
+  // Nota: esto usa la hora local del navegador (tu PC). Para forzar Ecuador:
+  // usamos timeZone: 'America/Guayaquil'
+    const emisionNow = new Date();
+
+    // (opcional) mantenemos fechaPagoDate solo como fallback para la tabla si falta fechaDeuda
+    const fechaPagoDate = datos.pagosConFechas?.[0]?.fecha?.toDate?.() ?? emisionNow;
+
+    const fechaTexto = new Intl.DateTimeFormat('es-EC', {
+      timeZone: 'America/Guayaquil',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
-    });
-    const horaTexto = fechaActual.toLocaleTimeString('es-EC', {
+      day: '2-digit'
+    }).format(emisionNow);
+
+    const horaTexto = new Intl.DateTimeFormat('es-EC', {
+      timeZone: 'America/Guayaquil',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      hour12: false
+    }).format(emisionNow);
+  // =========================
+  // CABECERA (UNIDAD GRANDE + BLOQUE DERECHO)
+  // =========================
+  const unidadTicket = (datos.unidad ?? '').toString().trim().toUpperCase() || '---';
 
-    const campos: CampoClave[] = ['administracion', 'minutosBase', 'minutosAtraso', 'multas'];
+  // Unidad grande (izquierda)
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(22);
+  pdfDoc.text(unidadTicket, margin, 12);
 
-    const pendientes: Record<CampoClave, number> = {
-      administracion: 0,
-      minutosBase: 0,
-      minutosAtraso: 0,
-      multas: 0
-    };
+  // Bloque derecho (empresa + contacto) con WRAP para 80mm
+  pdfDoc.setFont('helvetica', 'normal');
+  pdfDoc.setFontSize(6.5);
 
-    const registro = this.registros; // Ya tienes el objeto 'registro' aquí
-    if (!registro) throw new Error('Registro no encontrado en memoria');
-          
-    for (const campo of campos) {
-      const totalCampo = registro[campo] ?? 0;
-      const pagadoAnterior = this.calcularTotalPagado(campo, reporteId);
-      const pagadoNuevo = datos.detalles?.[campo] ?? 0;
+  const empresa1 = 'Consorcio Pintag Expresso';
+  const empresa2 = 'Pintag, Antisana S2-138';
+  const email    = 'consorciopinxpres@hotmail.com';
 
-      pendientes[campo] = Math.max(totalCampo - (pagadoAnterior + pagadoNuevo), 0);
-    }
+  const rightX = W - margin;
 
-    // ✅ Creamos la tabla del pago actual iterando sobre el array 'pagosConFechas'
-    const tablaPagoActual = [];
-    for (const pago of datos.pagosConFechas) {
-      const fechaDelPago = pago.fecha.toDate().toLocaleDateString('es-EC', {
+  pdfDoc.text(empresa1, rightX, 10.5, { align: 'right' });
+
+  const wrapRight = (txt: string, y: number) => {
+    const maxW = 44; // ancho máximo del bloque derecho
+    const lines = pdfDoc.splitTextToSize(txt, maxW);
+    pdfDoc.text(lines, rightX, y, { align: 'right' });
+  };
+
+  wrapRight(empresa2, 13.5);
+  wrapRight(email,   17.0);
+
+  const yFecha = 20.5;
+  // Fecha/hora (izquierda, debajo)
+  pdfDoc.setFontSize(6.7);
+  pdfDoc.text(`Fecha de emisión: ${fechaTexto}`, margin, yFecha);
+  pdfDoc.text(`Hora de emisión:  ${horaTexto}`,  margin, yFecha + 3);
+
+  // Línea separadora
+  pdfDoc.setDrawColor(180);
+  pdfDoc.line(margin, 24, W - margin, 24);
+
+  // =========================
+  // TABLA PRINCIPAL (DESCRIPCIÓN / FECHA(=fechaDeuda) / VALOR)
+  // =========================
+  const tablaPagoActual: any[] = [];
+
+  for (const pago of (datos.pagosConFechas ?? [])) {
+    // Fecha que se muestra en la tabla: FECHA DEL REPORTE (fechaDeuda)
+    let fechaReporteTexto = '';
+
+    if (pago.fechaDeuda) {
+      const [yy, mm, dd] = pago.fechaDeuda.split('-').map(Number);
+      const fechaReporte = new Date(yy, (mm || 1) - 1, dd || 1);
+
+      fechaReporteTexto = new Intl.DateTimeFormat('es-EC', {
+        timeZone: 'America/Guayaquil',
         year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-      
-      const descripcion = 
-        pago.campo === 'administracion' ? 'Administración' :
-        pago.campo === 'minutosBase' ? 'Minutos Base' :
-        pago.campo === 'minutosAtraso' ? 'Minutos Atraso' :
-        'Multas';
-      
-      tablaPagoActual.push([
-        descripcion,
-        fechaDelPago,
-        `$${pago.monto.toFixed(2)}`
-      ]);
+        month: 'short',
+        day: '2-digit'
+      }).format(fechaReporte);
+    } else {
+      // Fallback: no debería pasar, pero evita errores
+      fechaReporteTexto = new Intl.DateTimeFormat('es-EC', {
+        timeZone: 'America/Guayaquil',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit'
+      }).format(fechaPagoDate);
     }
-    tablaPagoActual.push(['TOTAL', '', `$${datos.total.toFixed(2)}`]);
 
-    // Cargar logos
-    const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
-    const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
+    const descripcion =
+      pago.campo === 'administracion' ? 'Administración' :
+      pago.campo === 'minutosBase' ? 'Minutos Base' :
+      pago.campo === 'minutosAtraso' ? 'Minutos' :
+      'Multas';
 
-    const pdfDoc = new jsPDF();
-
-    // 🖼 Logos
-    pdfDoc.addImage(logoPintag, 'PNG', 10, 10, 30, 30);
-    pdfDoc.addImage(logoExpress, 'PNG', 170, 10, 30, 30);
-
-    // 🧾 Encabezado
-    pdfDoc.setFontSize(18);
-    pdfDoc.text('Consorcio Pintag Expresso', 60, 20);
-    pdfDoc.setFontSize(10);
-    pdfDoc.text('Pintag, Antisana S2-138', 80, 26);
-    pdfDoc.text('consorciopinxpres@hotmail.com', 70, 31);
-    pdfDoc.text(``, 20, 45);
-    // 🚍 Datos principales
-    pdfDoc.setFontSize(18);
-    pdfDoc.text(`BUS ${datos.unidad}`, 20, 45);
-    
-    pdfDoc.setFontSize(11);
-    pdfDoc.text(`Fecha de emisión: ${fechaTexto}`, 130, 45);
-    pdfDoc.text(`Hora de emisión: ${horaTexto}`, 130, 51);
-
-    // 🧾 Tabla de pagos realizados
-    autoTable(pdfDoc, {
-      startY: 60,
-      head: [['Descripción', 'Fecha', 'Valor']],
-      // ✅ Usamos el array tablaPagoActual que ahora contiene las fechas individuales
-      body: tablaPagoActual,
-      styles: { fontSize: 11, halign: 'right' },
-      headStyles: { fillColor: [30, 144, 255], halign: 'center' }
-    });
-
-    const yFinal = (pdfDoc as any).lastAutoTable?.finalY || 100;
-
-    // 📊 Tabla de valores pendientes
-    autoTable(pdfDoc, {
-      startY: yFinal + 15,
-      head: [['Descripción', 'Pendiente']],
-      body: [
-        ['Administración', `$${pendientes.administracion.toFixed(2)}`],
-        ['Minutos Base', `$${pendientes.minutosBase.toFixed(2)}`],
-        ['Minutos Atraso', `$${pendientes.minutosAtraso.toFixed(2)}`],
-        ['Multas', `$${pendientes.multas.toFixed(2)}`]
-      ],
-      styles: { fontSize: 11, halign: 'right', textColor: 'black' },
-      headStyles: { halign: 'center', fillColor: [240, 240, 240] }
-    });
-
-    const yFinal2 = (pdfDoc as any).lastAutoTable?.finalY || yFinal + 40;
-
-    // 🚌 Imagen del bus con proporción original y centrado
-    const busImage = await this.cargarImagenBase64('/assets/img/Bus.png');
-    const busImg = new Image();
-    busImg.src = busImage;
-    await new Promise(resolve => (busImg.onload = resolve));
-    const originalWidth = busImg.width;
-    const originalHeight = busImg.height;
-    const displayWidth = 30;
-    const displayHeight = (originalHeight / originalWidth) * displayWidth;
-    const centerX = (210 - displayWidth) / 2;
-    pdfDoc.addImage(busImage, 'PNG', centerX, yFinal2 + 10, displayWidth, displayHeight);
-
-    // 📄 Texto de QR centrado
-    const texto = 'Escanea el código para descargar tu recibo';
-    pdfDoc.setFontSize(10);
-    pdfDoc.setTextColor(0);
-    const textWidth = pdfDoc.getTextWidth(texto);
-    pdfDoc.text(texto, (210 - textWidth) / 2, yFinal2 + displayHeight + 25);
-
-    // 🔳 Código QR centrado
-    const pdfBlob = pdfDoc.output('blob');
-    const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
-    const storageRef = ref(this.storage, fileName);
-    await uploadBytes(storageRef, pdfBlob);
-    const pdfUrl = await getDownloadURL(storageRef);
-    const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(pdfUrl)}`;
-    const qrBase64 = await this.cargarImagenBase64(qrURL);
-    const qrSize = 30;
-    pdfDoc.addImage(qrBase64, 'PNG', (210 - qrSize) / 2, yFinal2 + displayHeight + 30, qrSize, qrSize);
-
-    // 💾 Guardar localmente
-        
-    setTimeout(() => {
-      pdfDoc.save(`${fechaTexto}_
-      ${datos.unidad.replace(/\s+/g, '_')}_
-      ${datos.nombre.replace(/\s+/g, '_')}_
-      ${datos.apellido.replace(/\s+/g, '_')}.pdf`);
-    }, 500); // medio segundo después, opcional
-
-    return pdfUrl;
+    tablaPagoActual.push([
+      descripcion,
+      fechaReporteTexto,
+      `$ ${Number(pago.monto ?? 0).toFixed(2)}`
+    ]);
   }
-  
+
+  tablaPagoActual.push(['TOTAL', '', `$ ${Number(datos.total ?? 0).toFixed(2)}`]);
+
+  autoTable(pdfDoc, {
+    startY: 27,
+    head: [['DESCRIPCIÓN', 'FECHA', 'VALOR']],
+    body: tablaPagoActual,
+    theme: 'plain',
+    styles: {
+      fontSize: 7,
+      cellPadding: { top: 0.8, right: 0.8, bottom: 0.8, left: 0.8 },
+      overflow: 'linebreak'
+    },
+    headStyles: { fontStyle: 'bold', textColor: 120 },
+    tableWidth: W - (margin * 2),
+    columnStyles: {
+      0: { halign: 'left',  cellWidth: 34 },
+      1: { halign: 'left',  cellWidth: 22 },
+      2: { halign: 'right', cellWidth: 16, fontStyle: 'bold' }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  const yFinal = (pdfDoc as any).lastAutoTable?.finalY || 60;
+
+  // Línea separadora
+  pdfDoc.setDrawColor(180);
+  pdfDoc.line(margin, yFinal + 2, W - margin, yFinal + 2);
+
+  // =========================
+  // LOGOS CENTRADOS (SIN DESBORDAR)
+  // =========================
+  const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
+  const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
+
+  const selloW = 20;
+  const gap = 6;
+  const totalSellos = (selloW * 2) + gap;
+  const xSellos = (W - totalSellos) / 2;
+  const ySellos = yFinal + 6;
+
+  pdfDoc.addImage(logoPintag, 'PNG', xSellos, ySellos, selloW, selloW);
+  pdfDoc.addImage(logoExpress, 'PNG', xSellos + selloW + gap, ySellos, selloW, selloW);
+
+  const yDespuesSellos = ySellos + selloW + 6;
+
+  // =========================
+  // TABLA SALDOS (SALDO / TOTAL)
+  // =========================
+  autoTable(pdfDoc, {
+    startY: yDespuesSellos,
+    head: [['SALDO', 'TOTAL']],
+    body: [
+      ['ADMINISTRACIÓN', `$ ${Number(datos.pendientesDespues.administracion ?? 0).toFixed(2)}`],
+      ['MINUTOS',        `$ ${Number(datos.pendientesDespues.minutosAtraso ?? 0).toFixed(2)}`],
+      ['MINUTOS BASE',   `$ ${Number(datos.pendientesDespues.minutosBase ?? 0).toFixed(2)}`],
+      ['MULTAS',         `$ ${Number(datos.pendientesDespues.multas ?? 0).toFixed(2)}`]
+    ],
+    theme: 'plain',
+    styles: { fontSize: 7, cellPadding: 1.0 },
+    headStyles: { fontStyle: 'bold', textColor: 120 },
+    tableWidth: W - (margin * 2),
+    columnStyles: {
+      0: { halign: 'left',  cellWidth: 46 },
+      1: { halign: 'right', cellWidth: 26 }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  const yFinal2 = (pdfDoc as any).lastAutoTable?.finalY || (yDespuesSellos + 40);
+
+  // Línea + footer como en ticket
+  pdfDoc.setDrawColor(180);
+  pdfDoc.line(margin, yFinal2 + 2, W - margin, yFinal2 + 2);
+
+  pdfDoc.setFontSize(6);
+  pdfDoc.setTextColor(150);
+  pdfDoc.text(
+    'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+    margin,
+    yFinal2 + 6,
+    { maxWidth: W - (margin * 2) }
+  );
+
+  // =========================
+  // GUARDAR + SUBIR (SIN QR)
+  // =========================
+  const pdfBlob = pdfDoc.output('blob');
+  const fileName = `recibos/${uid}_${reporteId}_${Date.now()}.pdf`;
+
+  const storageRef = ref(this.storage, fileName);
+  await uploadBytes(storageRef, pdfBlob);
+  const pdfUrl = await getDownloadURL(storageRef);
+
+  // Descarga instantánea (sin setTimeout)
+  const safeUnidad = unidadTicket.replace(/\s+/g, '_');
+  const safeNombre = (datos.nombre ?? '').toString().trim().replace(/\s+/g, '_');
+  const safeApellido = (datos.apellido ?? '').toString().trim().replace(/\s+/g, '_');
+  const fechaISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(emisionNow); // YYYY-MM-DD
+  const pdfBlobLocal = pdfDoc.output('blob');
+  const pdfURLLocal = URL.createObjectURL(pdfBlobLocal);
+
+  // abre en nueva pestaña
+  window.open(pdfURLLocal, '_blank');
+
+  // (opcional) liberar memoria luego
+  setTimeout(() => {
+    URL.revokeObjectURL(pdfURLLocal);
+  }, 60_000);
+
+  return pdfUrl;
+}
+
+  // =========================
+  // UTILIDADES
+  // =========================
+  private obtenerFechaISODesdeDate(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+private dateToISO(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
   cargarImagenBase64(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'Anonymous';
       img.src = url;
-  
+
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
@@ -413,137 +958,11 @@ async cargarPagosTotales() {
         const dataURL = canvas.toDataURL('image/png');
         resolve(dataURL);
       };
-  
+
       img.onerror = (err) => reject(err);
     });
   }
-  
-  /*-------------------------------Fin recibo pdf----------------------------*/
 
-
-  calcularDeuda(registro: NuevoRegistro, campo: CampoClave): number {
-    const total = registro[campo as keyof NuevoRegistro] as number;
-    const pagado = this.pagosTotales[campo]
-      .filter(p => p.reporteId === registro.id)
-      .reduce((acc, p) => acc + p.cantidad, 0);
-    return Math.max(total - pagado, 0);
-  }
-
-  filtrarPagosPorRegistro(campo: CampoClave, registroId: string): PagoPorModulo[] {
-    return this.pagosTotales[campo]?.filter(p => p.reporteId === registroId) || [];
-  }
-
-  calcularTotalPagado(campo: CampoClave, registroId: string): number {
-    return this.filtrarPagosPorRegistro(campo, registroId)
-      .reduce((acc, p) => acc + p.cantidad, 0);
-  }
-
-  calcularTotalGeneral(): number {
-    let total = 0;
-    
-    // ✅ Verifica si el objeto existe antes de continuar
-    if (this.registros) {
-      const registro = this.registros; // ✅ Usa una variable para mayor claridad
-      for (const campo of this.campos) {
-        const deuda = this.calcularDeuda(registro, campo);
-        const actual = this.pagosActuales[registro.id!]?.[campo] ?? 0;
-        total += Math.min(deuda, actual);
-      }
-    }
-
-    return total;
-  }
-
-  validarPago(reporteId: string, campo: CampoClave) {
-    // ✅ Verifica si el objeto existe
-    if (this.registros) {
-      const registro = this.registros; // ✅ Usamos el objeto directamente
-      
-      // ✅ Aquí ya no necesitas buscar el registro, ya lo tienes.
-      // Solo debes validar que el id que recibes sea el mismo.
-      if (registro.id === reporteId) {
-        const deuda = this.calcularDeuda(registro, campo);
-        const actual = this.pagosActuales[reporteId]?.[campo] ?? 0;
-        if (actual > deuda) {
-          this.pagosActuales[reporteId][campo] = deuda;
-        }
-      }
-    }
-  }
-
-  async editarPago(pago: PagoPorModulo, campo: CampoClave) {
-    const nuevoValor = prompt(`Editar monto de ${campo}`, pago.cantidad.toString());
-  
-    if (nuevoValor === null) return; // cancelado
-    const cantidad = Number(nuevoValor);
-  
-    if (isNaN(cantidad) || cantidad < 0) {
-      alert('⚠️ Valor inválido');
-      return;
-    }
-  
-    const ref = doc(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${pago.reporteId}/pagosTotales/${pago.id}`);
-  
-    try {
-      await updateDoc(ref, {
-        [`detalles.${campo}`]: cantidad
-      });
-  
-      alert('✅ Pago actualizado');
-      await this.cargarPagosTotales(); // actualiza la vista
-    } catch (error) {
-      console.error('❌ Error al actualizar pago:', error);
-      alert('Error al actualizar el pago.');
-    }
-  }
-
-  iniciarEdicion(pago: PagoPorModulo, campo: CampoClave) {
-    this.pagoEnEdicion = { id: pago.id, campo };
-    this.nuevoMonto = pago.cantidad;
-    const fecha = pago.fecha.toDate();
-    this.fechaEnEdicion = fecha.toISOString().substring(0, 10);
-  }
-  
-
-  async guardarEdicion() {
-    if (this.pagoEnEdicion && this.nuevoMonto != null && this.nuevoMonto >= 0) {
-      const { id, campo } = this.pagoEnEdicion;
-      const pago = this.campos
-        .flatMap(c => this.pagosTotales[c])
-        .find(p => p.id === id);
-
-      if (!pago) return;
-
-      const ref = doc(this.firestore, `usuarios/${this.uidUsuario}/reportesDiarios/${pago.reporteId}/pagosTotales/${pago.id}`);
-      
-      const updateData: any = {
-        [`detalles.${campo}`]: this.nuevoMonto
-      };
-
-      if (this.fechaEnEdicion) {
-        const [year, month, day] = this.fechaEnEdicion.split('-').map(Number);
-        const nuevaFecha = new Date(year, month - 1, day);
-        updateData.fecha = Timestamp.fromDate(nuevaFecha);
-      }
-      
-      await updateDoc(ref, updateData);
-
-      alert('✅ Pago actualizado');
-      await this.cargarPagosTotales();
-
-      // Limpieza
-      this.pagoEnEdicion = null;
-      this.nuevoMonto = null;
-      this.fechaEnEdicion = null;
-    }
-  }
-  esPagoEnEdicion(pago: PagoPorModulo, campo: CampoClave): boolean {
-    return this.pagoEnEdicion?.id === pago.id && this.pagoEnEdicion?.campo === campo;
-  }
-  cancelarEdicion() {
-    this.pagoEnEdicion = null;
-    this.nuevoMonto = null;
-  }
   volver() {
     this.router.navigate(['/reportes/lista-reportes']);
   }

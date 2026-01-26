@@ -28,9 +28,9 @@
           <td>{{ item.unidad }}</td>
           <td>{{ item.nombre }}</td>
         </tr>
-      </tbody>      
+      </tbody>
     </table>
-    
+
   </ng-container>
   <ng-template #cargandoSpinner>
     <div class="spinner-contenedor">
@@ -78,7 +78,7 @@
         <p class="total">TOTAL ADEUDADO: <strong>{{ total | currency:'USD' }}</strong></p>
       </div>
 
-      <button class="btn-pago" (click)="generarPago()" [disabled]="esSocio">GENERAR PAGO</button>
+      <button type="button" class="btn-pago" (click)="generarPago()" [disabled]="esSocio">PAGAR</button>
     </div>
   </ng-container>
   <ng-template #cargandoSpinner>

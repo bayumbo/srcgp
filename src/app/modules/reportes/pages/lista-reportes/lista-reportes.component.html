@@ -1,4 +1,20 @@
 <!-- lista-reportes.component.html -->
+<div class="modulos-barra">
+  <button
+    class="modulo-btn"
+    [class.activo]="moduloActivo === 'cobros'"
+    (click)="irACuentasPorCobrar()">
+    Cuentas por cobrar
+  </button>
+
+  <button
+    class="modulo-btn"
+    [class.activo]="moduloActivo === 'cierre'"
+    (click)="irACierreCaja()">
+    Cierre de caja
+  </button>
+</div>
+
 
 <div class="contenedor-reportes">
 
@@ -137,7 +153,7 @@
                 type="button"
                 class="btn-icono editar"
                 title="Editar"
-                (click)="irAEditar(r.uid, r.id); $event.stopPropagation()"
+              (click)="irAEditar(r); $event.stopPropagation()"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.83H5v-.92l9.06-9.06.92.92L5.92 20.08zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -149,7 +165,7 @@
                 type="button"
                 class="btn-icono pagar"
                 title="Pagar"
-                (click)="irAPagar(r.uid, r.id); $event.stopPropagation()"
+                (click)="irAPagar(r); $event.stopPropagation()"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4H4V6h16v2zm-8 8H6v-2h6v2z"/>
@@ -187,3 +203,4 @@
   </div>
 
 </div>
+
