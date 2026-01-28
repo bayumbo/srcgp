@@ -11,6 +11,42 @@
   /* CLAVE: evita que el layout empuje el body */
   overflow-x: hidden;
 }
+.modulos-barra {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin-bottom: 16px;
+  background-color: #e9ecef;
+  border-radius: 10px solid ;
+  overflow: hidden;
+}
+.excel-progreso{
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(16, 24, 40, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e9eef6;
+}
+.modulo-btn {
+  padding: 14px 0;
+  border: 1px #8da19c solid;
+  background-color: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.modulo-btn:hover {
+  background-color: #9ab4b4dd;
+}
+
+.modulo-btn.activo {
+  background-color: #2f7d6d; // verde institucional
+  color: #ffffff;
+}
 
 /* =========================
    CONTENEDOR GENERAL

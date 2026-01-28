@@ -46,7 +46,17 @@ export interface Usuario {
 export interface Unidad {
   nombre: string;
 }
-
+export interface UnidadGlobal {
+  id: string;
+  codigo: string;
+  empresa: string;
+  estado: boolean;
+  numeroOrden: number;
+  propietarioNombre?: string;
+  uidPropietario: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
 @Injectable({ providedIn: 'root' })
 export class AuthService {
 
@@ -181,6 +191,27 @@ export class AuthService {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Unidad);
   }
+  async obtenerUnidadesGlobalesDeUsuario(userId: string): Promise<UnidadGlobal[]> {
+  const unidadesRef = collection(this.firestore, 'unidades');
+  const q = query(unidadesRef, where('uidPropietario', '==', userId));
+  const snap = await getDocs(q);
+
+  return snap.docs.map(d => {
+    const data = d.data() as any;
+    return {
+      id: d.id,
+      codigo: data.codigo || '',
+      empresa: data.empresa || '',
+      estado: data.estado ?? true,
+      numeroOrden: data.numeroOrden ?? 0,
+      propietarioNombre: data.propietarioNombre || '',
+      uidPropietario: data.uidPropietario || userId,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
+    } as UnidadGlobal;
+  });
+}
+
 
   async correoExiste(email: string): Promise<boolean> {
     const usuariosRef = collection(this.firestore, 'usuariosPublicos');

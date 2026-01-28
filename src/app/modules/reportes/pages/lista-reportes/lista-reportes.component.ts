@@ -10,6 +10,8 @@ import {
   query,
   orderBy,
   limit,
+  serverTimestamp,
+  writeBatch,
 } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -19,7 +21,7 @@ import autoTable from 'jspdf-autotable';
 import { AuthService } from 'src/app/core/auth/services/auth.service';
 import { ReportesDiaService } from '../../services/reportes-dia.service';
 import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
-
+import * as XLSX from 'xlsx';
 type EmpresaNombre = 'General Pintag' | 'Expreso Antisana';
 
 type ReporteListaRow = ReporteConPagos & {
@@ -40,7 +42,11 @@ type ReporteListaRow = ReporteConPagos & {
   uidPropietario: string;
   propietarioNombre: string;
 };
-
+type FilaExcelMinutos = {
+  unidad: string;   // E01 / P01
+  fecha: string;    // YYYY-MM-DD
+  valor: number;    // número
+};
 @Component({
   selector: 'app-reporte-lista',
   standalone: true,
@@ -78,10 +84,17 @@ export class ReporteListaComponent implements OnInit {
   // Selección múltiple
   seleccion = new Set<string>();
   seleccionarTodo = false;
+  subiendoExcel: boolean = false;
 
+  progresoExcel: { total: number; ok: number; fail: number } = {
+  total: 0,
+  ok: 0,
+  fail: 0
+};
   private firestore = inject(Firestore);
   private router = inject(Router);
-
+  private nombrePorUnidad = new Map<string, string>();
+  private nombresCargados = false;
   constructor(
     private authService: AuthService,
     private reportesDiaService: ReportesDiaService
@@ -151,6 +164,88 @@ export class ReporteListaComponent implements OnInit {
   private keyDeFila(r: Pick<ReporteListaRow, 'empresaKey' | 'fechaISO' | 'unidadDocId'>): string {
     return `${r.empresaKey}|${r.fechaISO}|${r.unidadDocId}`;
   }
+  private normUnidad(u: any): string {
+  return (u ?? '').toString().trim().toUpperCase();
+}
+
+private async cargarMaestroNombresUnidades(): Promise<void> {
+  if (this.nombresCargados) return;
+
+  this.nombrePorUnidad.clear();
+
+  const ref = collection(this.firestore, 'unidades');
+  const snap = await getDocs(ref);
+
+  snap.forEach(docSnap => {
+    const data: any = docSnap.data();
+
+    // Prioridad: campo 'codigo' (E01 / P01)
+    const codigo = this.normUnidad(data.codigo || '');
+
+    // Nombre REAL del propietario
+    const nombre = (data.propietarioNombre ?? '').toString().trim();
+
+    if (codigo && nombre) {
+      this.nombrePorUnidad.set(codigo, nombre);
+    }
+  });
+
+  this.nombresCargados = true;
+}
+
+
+private aplicarNombreSoloSiFalta(): void {
+  if (!this.reportes?.length) return;
+
+  // Creamos nuevo array para forzar refresco visual
+  this.reportes = this.reportes.map((r: any) => {
+    const nombreActual = (r?.nombre ?? '').toString().trim();
+    if (nombreActual) return r; // ❌ no tocar si ya tiene nombre
+
+    const unidad = this.normUnidad(r?.unidad);
+    const nombreResuelto = this.nombrePorUnidad.get(unidad) || '';
+
+    return { ...r, nombre: nombreResuelto };
+  });
+}
+
+
+private esFechaISO(val: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(val);
+}
+
+private async leerExcelMinutos(file: File): Promise<FilaExcelMinutos[]> {
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data, { type: 'array' });
+
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+
+  const raw: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  if (!raw.length) throw new Error('El Excel está vacío.');
+
+  // Columnas exactas del formato que me pasaste
+  const requiredKeys = ['Unidad *', 'Fecha *', 'Valor *'];
+  const keys = Object.keys(raw[0] || {});
+  for (const rk of requiredKeys) {
+    if (!keys.includes(rk)) {
+      throw new Error(`Falta la columna obligatoria: "${rk}"`);
+    }
+  }
+
+  return raw.map((r, idx) => {
+    const unidad = String(r['Unidad *'] || '').trim().toUpperCase();
+    const fecha = String(r['Fecha *'] || '').trim();
+    const valor = Number(r['Valor *']);
+
+    if (!unidad) throw new Error(`Fila ${idx + 2}: "Unidad" vacía.`);
+    if (!this.esFechaISO(fecha)) throw new Error(`Fila ${idx + 2}: "Fecha" inválida (${fecha}). Use YYYY-MM-DD.`);
+    if (!Number.isFinite(valor)) throw new Error(`Fila ${idx + 2}: "Valor" inválido (${r['Valor *']}).`);
+
+    return { unidad, fecha, valor };
+  });
+}
 
   trackByReporte = (_: number, r: ReporteListaRow) => this.keyDeFila(r);
 
@@ -189,6 +284,100 @@ export class ReporteListaComponent implements OnInit {
     if (fa !== fb) return fa - fb;
     return this.ordenarPorEmpresaUnidad(a, b);
   }
+  private resolverEmpresaPorUnidad(codigoUnidad: string): {
+    empresa: string;
+    empresaKey: string;
+    unidad: string;
+  } {
+    const unidad = (codigoUnidad || '').trim().toUpperCase();
+
+    if (/^E\d+/.test(unidad)) {
+      return { empresa: 'Expreso Antisana', empresaKey: 'ExpresoAntisana', unidad };
+    }
+
+    if (/^P\d+/.test(unidad)) {
+      return { empresa: 'General Pintag', empresaKey: 'GeneralPintag', unidad };
+    }
+
+    throw new Error(`Unidad "${codigoUnidad}" no válida. Use E01 o P01.`);
+  }
+  private async guardarMinutosDesdeExcel(filas: FilaExcelMinutos[]): Promise<void> {
+  const CHUNK = 450;
+
+  for (let i = 0; i < filas.length; i += CHUNK) {
+    const chunk = filas.slice(i, i + CHUNK);
+    const batch = writeBatch(this.firestore);
+
+    for (const f of chunk) {
+      try {
+        const r = this.resolverEmpresaPorUnidad(f.unidad);
+
+        const diaId = `${r.empresaKey}_${f.fecha}`;
+        const unidadDocId = `${r.empresaKey}_${r.unidad}`;
+
+        const diaRef = doc(this.firestore, `reportes_dia/${diaId}`);
+        batch.set(diaRef, {
+          empresa: r.empresa,
+          fecha: f.fecha,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        const unidadRef = doc(this.firestore, `reportes_dia/${diaId}/unidades/${unidadDocId}`);
+        batch.set(unidadRef, {
+          codigo: r.unidad,
+          empresa: r.empresa,
+          fecha: f.fecha,
+          minutosAtraso: f.valor,
+          fechaModificacion: serverTimestamp()
+        }, { merge: true });
+
+        this.progresoExcel.ok++;
+      } catch (err) {
+        this.progresoExcel.fail++;
+        console.error('Fila fallida:', f, err);
+      }
+    }
+
+    await batch.commit();
+  }
+}
+async onExcelMinutosSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  this.subiendoExcel = true;
+  this.progresoExcel = { total: 0, ok: 0, fail: 0 };
+
+  try {
+    const filas = await this.leerExcelMinutos(file);
+    this.progresoExcel.total = filas.length;
+
+    await this.guardarMinutosDesdeExcel(filas);
+
+    // 🔁 Siempre recargar el día (vista principal)
+    const fechaISO = (this.fechaPersonalizada && this.fechaPersonalizada.trim())
+      ? this.fechaPersonalizada.trim()
+      : filas[0]?.fecha;
+
+    if (fechaISO) {
+      await this.cargarDiaEnListaReportes(fechaISO);
+    }
+
+    // 🧠 Resolver nombres SOLO para filas sin nombre (Excel)
+    await this.cargarMaestroNombresUnidades();
+    this.aplicarNombreSoloSiFalta();
+
+    alert(`Carga completa. OK: ${this.progresoExcel.ok}, Fallas: ${this.progresoExcel.fail}`);
+  } catch (e: any) {
+    console.error(e);
+    alert(e?.message || 'Error al procesar el Excel.');
+  } finally {
+    this.subiendoExcel = false;
+    input.value = '';
+  }
+}
+
 
   // ==========================
   // Selección múltiple
@@ -604,14 +793,46 @@ export class ReporteListaComponent implements OnInit {
     this.router.navigate(['/reportes/nuevo-registro']);
   }
 
-  irAEditar(uid: string, id: string): void {
-    // id debe ser el docId real del registro (ej: ExpresoAntisana_E13)
-    this.router.navigate([`/reportes/actualizar`, uid, id]);
+irAEditar(r: any): void {
+  const uid = r?.uid;
+  const refPath = r?.refPath;
+
+  if (!uid || !refPath) {
+    alert('❌ No se puede editar: faltan uid o refPath.');
+    return;
   }
 
-  irAPagar(uid: string, id: string): void {
-    this.router.navigate([`/reportes/realizar-pago`, uid, id]);
+  const safe = encodeURIComponent(refPath);
+
+  this.router.navigate(['/reportes/actualizar', uid, safe], {
+    queryParams: {
+      nombre: r?.propietarioNombre ?? r?.nombre ?? '',
+      apellido: r?.apellido ?? '',
+      unidad: r?.codigo ?? r?.unidad ?? ''
+    }
+  });
+}
+
+irAPagar(r: any): void {
+  const uid = (r?.uid ?? '').toString().trim();
+  const refPath = (r?.refPath ?? '').toString().trim(); // debe ser: reportes_dia/.../unidades/...
+
+  if (!uid || !refPath) {
+    alert('❌ No se puede pagar: faltan uid o refPath.');
+    return;
   }
+
+  const safeId = encodeURIComponent(refPath);
+
+  this.router.navigate(['/reportes/realizar-pago', uid, safeId], {
+    queryParams: {
+      nombre: (r?.propietarioNombre ?? r?.nombre ?? '').toString(),
+      apellido: (r?.apellido ?? '').toString(),
+      unidad: (r?.codigo ?? r?.unidad ?? '').toString()
+    }
+  });
+}
+moduloActivo: 'cobros' | 'cierre' | null = null;
 
   irACuentasPorCobrar() {
     this.router.navigate(['/reportes/cuentas-por-cobrar']);
@@ -651,106 +872,201 @@ export class ReporteListaComponent implements OnInit {
   }
 
   generarPDFMinutos(data: any[], fecha: Date) {
-    const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
-    if (filtrado.length === 0) {
-      alert('No hay valores de minutos para imprimir en esta vista.');
-      return;
-    }
-
-    const docPdf = new jsPDF();
-    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    const logo1 = new Image();
-    logo1.src = '/assets/img/LogoPintag.png';
-    const logo2 = new Image();
-    logo2.src = '/assets/img/LogoAntisana.png';
-
-    docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
-    docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
-
-    docPdf.setFontSize(16);
-    docPdf.text('Minutos', 105, 45, { align: 'center' });
-
-    docPdf.setFontSize(11);
-    docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
-
-    docPdf.setFontSize(10);
-    docPdf.text('Consorcio Píntag Expresso', 135, 55);
-    docPdf.text('Píntag, Antisana S2-138', 135, 60);
-    docPdf.text('consorciopinexpres@hotmail.com', 135, 65);
-
-    const cuerpo = filtrado.map(item => [
-      item.codigo || item.unidad || '',
-      item.propietarioNombre || item.nombre || '',
-      `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
-      ''
-    ]);
-
-    const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
-
-    autoTable(docPdf, {
-      head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
-      body: cuerpo,
-      startY: 75,
-      styles: { fontSize: 10 }
-    });
-
-    const finalY = (docPdf as any).lastAutoTable.finalY + 10;
-    docPdf.setFontSize(11);
-    docPdf.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, 15, finalY);
-
-    docPdf.save(`Minutos_${this.fechaPersonalizada || 'vista'}.pdf`);
+  const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
+  if (filtrado.length === 0) {
+    alert('No hay valores de minutos para imprimir en esta vista.');
+    return;
   }
+
+  const docPdf = new jsPDF();
+  const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const W = docPdf.internal.pageSize.getWidth();
+  const H = docPdf.internal.pageSize.getHeight();
+  const margin = 15;
+
+  const totalPagesExp = '{total_pages_count_string}';
+
+  const logo1 = new Image();
+  logo1.src = '/assets/img/LogoPintag.png';
+  const logo2 = new Image();
+  logo2.src = '/assets/img/LogoAntisana.png';
+
+  docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
+  docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+  docPdf.setFontSize(16);
+  docPdf.text('Minutos', W / 2, 45, { align: 'center' });
+
+  docPdf.setFontSize(11);
+  docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+  const cuerpo = filtrado.map(item => [
+    item.codigo || item.unidad || '',
+    item.propietarioNombre || item.nombre || '',
+    `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
+    ''
+  ]);
+
+  const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
+
+  autoTable(docPdf, {
+    head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
+    body: cuerpo,
+    startY: 75,
+    styles: { fontSize: 10 },
+    margin: { left: margin, right: margin, bottom: 18 }, // ✅ espacio para footer
+
+    didDrawPage: () => {
+  const W = docPdf.internal.pageSize.getWidth();
+  const H = docPdf.internal.pageSize.getHeight();
+  const margin = 15;
+
+  const pageNumber = (((docPdf as any).internal?.pages?.length) || 1) - 1;
+
+  // --- Footer (igual al recibo) ---
+  docPdf.setDrawColor(180);
+  docPdf.line(margin, H - 12, W - margin, H - 12);
+
+  docPdf.setFontSize(6);
+  docPdf.setTextColor(150);
+  docPdf.text(
+    'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+    margin,
+    H - 8,
+    { maxWidth: W - (margin * 2) }
+  );
+
+  // --- Paginación ---
+  docPdf.setFontSize(7);
+  docPdf.setTextColor(120);
+  docPdf.text(
+    `Página ${pageNumber} de ${totalPagesExp}`,
+    W - margin,
+    H - 8,
+    { align: 'right' }
+  );
+}
+
+  });
+
+  // Total (si cae muy abajo, lo subimos para evitar choque con footer)
+  const lastY = (docPdf as any).lastAutoTable.finalY ?? 75;
+  let yTotal = lastY + 10;
+  if (yTotal > H - 22) yTotal = H - 22;
+
+  docPdf.setFontSize(11);
+  docPdf.setTextColor(20);
+  docPdf.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, margin, yTotal);
+
+  // Reemplaza {total_pages_count_string} por el total real (si está disponible)
+  // @ts-ignore
+  if ((docPdf as any).putTotalPages) {
+    // @ts-ignore
+    (docPdf as any).putTotalPages(totalPagesExp);
+  }
+
+  docPdf.save(`Minutos_${this.fechaPersonalizada || 'vista'}.pdf`);
+}
+
 
   generarPDFAdministracion(data: any[], fecha: Date) {
-    const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
-    if (filtrado.length === 0) {
-      alert('No hay valores de administración para imprimir en esta vista.');
-      return;
-    }
-
-    const docPdf = new jsPDF();
-    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    const logo1 = new Image();
-    logo1.src = '/assets/img/LogoPintag.png';
-    const logo2 = new Image();
-    logo2.src = '/assets/img/LogoAntisana.png';
-
-    docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
-    docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
-
-    docPdf.setFontSize(16);
-    docPdf.text('Administración', 105, 45, { align: 'center' });
-
-    docPdf.setFontSize(11);
-    docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
-
-    docPdf.setFontSize(10);
-    docPdf.text('Consorcio Píntag Expresso', 135, 55);
-    docPdf.text('Píntag, Antisana S2-138', 135, 60);
-    docPdf.text('consorciopinexpres@hotmail.com', 135, 65);
-
-    const cuerpo = filtrado.map(item => [
-      item.codigo || item.unidad || '',
-      item.propietarioNombre || item.nombre || '',
-      `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
-      ''
-    ]);
-
-    const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
-
-    autoTable(docPdf, {
-      head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
-      body: cuerpo,
-      startY: 75,
-      styles: { fontSize: 10 }
-    });
-
-    const finalY = (docPdf as any).lastAutoTable.finalY + 10;
-    docPdf.setFontSize(11);
-    docPdf.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, 15, finalY);
-
-    docPdf.save(`Administracion_${this.fechaPersonalizada || 'vista'}.pdf`);
+  const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
+  if (filtrado.length === 0) {
+    alert('No hay valores de administración para imprimir en esta vista.');
+    return;
   }
+
+  const docPdf = new jsPDF();
+  const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const W = docPdf.internal.pageSize.getWidth();
+  const H = docPdf.internal.pageSize.getHeight();
+  const margin = 15;
+
+  const totalPagesExp = '{total_pages_count_string}';
+
+  const logo1 = new Image();
+  logo1.src = '/assets/img/LogoPintag.png';
+  const logo2 = new Image();
+  logo2.src = '/assets/img/LogoAntisana.png';
+
+  docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
+  docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+  docPdf.setFontSize(16);
+  docPdf.text('Administración', W / 2, 45, { align: 'center' });
+
+  docPdf.setFontSize(11);
+  docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+  const cuerpo = filtrado.map(item => [
+    item.codigo || item.unidad || '',
+    item.propietarioNombre || item.nombre || '',
+    `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
+    ''
+  ]);
+
+  const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
+
+  autoTable(docPdf, {
+    head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
+    body: cuerpo,
+    startY: 75,
+    styles: { fontSize: 10 },
+    margin: { left: margin, right: margin, bottom: 18 }, // ✅ espacio para footer
+
+    didDrawPage: () => {
+  const W = docPdf.internal.pageSize.getWidth();
+  const H = docPdf.internal.pageSize.getHeight();
+  const margin = 15;
+
+  const pageNumber = (((docPdf as any).internal?.pages?.length) || 1) - 1;
+
+  // --- Footer (igual al recibo) ---
+  docPdf.setDrawColor(180);
+  docPdf.line(margin, H - 12, W - margin, H - 12);
+
+  docPdf.setFontSize(6);
+  docPdf.setTextColor(150);
+  docPdf.text(
+    'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+    margin,
+    H - 8,
+    { maxWidth: W - (margin * 2) }
+  );
+
+  // --- Paginación ---
+  docPdf.setFontSize(7);
+  docPdf.setTextColor(120);
+  docPdf.text(
+    `Página ${pageNumber} de ${totalPagesExp}`,
+    W - margin,
+    H - 8,
+    { align: 'right' }
+  );
+  if ((docPdf as any).putTotalPages) {
+  // @ts-ignore
+  (docPdf as any).putTotalPages(totalPagesExp);
 }
+}
+
+
+  });
+
+  const lastY = (docPdf as any).lastAutoTable.finalY ?? 75;
+  let yTotal = lastY + 10;
+  if (yTotal > H - 22) yTotal = H - 22;
+
+  docPdf.setFontSize(11);
+  docPdf.setTextColor(20);
+  docPdf.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, margin, yTotal);
+
+  // @ts-ignore
+  if ((docPdf as any).putTotalPages) {
+    // @ts-ignore
+    (docPdf as any).putTotalPages(totalPagesExp);
+  }
+
+  docPdf.save(`Administracion_${this.fechaPersonalizada || 'vista'}.pdf`);
+}}

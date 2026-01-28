@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+
 import {
   getAuth,
   updatePassword,
@@ -8,9 +9,9 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from '@angular/fire/auth';
+
 import {
   collection,
-  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -18,14 +19,43 @@ import {
   orderBy,
   query,
   setDoc,
-  Firestore, 
-  deleteDoc,
-  Timestamp
+  Timestamp,
+  where,
+  limit
 } from '@angular/fire/firestore';
+
 import { Router, ActivatedRoute } from '@angular/router';
-import { AuthService, Usuario, Unidad } from 'src/app/core/auth/services/auth.service'; // Importar 'Unidad'
-import { NuevoRegistro, ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
+import { AuthService, Usuario } from 'src/app/core/auth/services/auth.service';
+import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+
+/**
+ * PerfilComponent (users.component.ts)
+ *
+ * Compatibilidad:
+ * - Unidades legacy: usuarios/{uid}/unidades -> { nombre: "E01" }
+ * - Unidades globales (modelo actual): unidades/{empresaSlug}_{codigo} con uidPropietario
+ *
+ * Este componente:
+ *  1) Carga datos de usuario desde usuarios/{uid}
+ *  2) Carga unidades desde colección global "unidades" (uidPropietario)
+ *     y si no existen, hace fallback a legacy usuarios/{uid}/unidades
+ *  3) Carga reportes del usuario desde "reportes_dia" (modelo oficial)
+ *  4) Carga pagos (agregados) desde "reportes_dia" (si existen campos pagados)
+ */
+type UnidadGlobalUI = {
+  id: string;            // docId global o generado
+  codigo: string;        // E01
+  nombre: string;        // alias para tu HTML (nombre = codigo)
+  empresa: string;       // Expreso Antisana
+  estado: boolean;
+  numeroOrden: number;
+  propietarioNombre?: string;
+  uidPropietario: string;
+  createdAt?: any;
+  updatedAt?: any;
+};
+
 @Component({
   standalone: true,
   selector: 'app-perfil',
@@ -35,29 +65,36 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 })
 export class PerfilComponent implements OnInit {
   cargando: boolean = false;
+
   nombres: string = '';
-  apellidos: string = ''; 
+  apellidos: string = '';
   correo: string = '';
   nuevaContrasena: string = '';
   contrasenaActual: string = '';
-  unidades: Unidad[] = []; // CAMBIO CLAVE: Ahora es un array de objetos Unidad
+
+  unidades: UnidadGlobalUI[] = [];
+
   cedula: string = '';
   empresa: string = '';
+
   uidActual: string = '';
   uid: string | undefined;
+
   showCurrentPassword: boolean = false;
   showNewPassword: boolean = false;
+
   esAdmin: boolean = false;
   soloLectura: boolean = false;
+
   mostrarConfirmacion = false;
   eliminando = false;
-  // Para comparar cambios
-  // Nota: Considera si necesitas comparar cambios en las unidades aquí o en otra parte
-  datosOriginales: Partial<Usuario> = {}; // CAMBIO: Usar Partial<Usuario> para tipado
+
+  datosOriginales: Partial<Usuario> = {};
   hayCambios: boolean = false;
+
   reportesUsuario: ReporteConPagos[] = [];
 
-  //Datos para lista de pagos
+  // Pagos
   pagos: any[] = [];
   pagosPaginados: any[] = [];
   paginaActualPagos: number = 1;
@@ -71,40 +108,33 @@ export class PerfilComponent implements OnInit {
     private functions: Functions
   ) {}
 
-async ngOnInit(): Promise<void> {
-  const uidParam = this.route.snapshot.paramMap.get('uid');
+  async ngOnInit(): Promise<void> {
+    const uidParam = this.route.snapshot.paramMap.get('uid');
 
-  // Obtener el usuario actual
-  const user = await this.authService.getCurrentUser();
-  if (!user) {
-    // Manejar caso de no autenticado, redirigir o mostrar mensaje
-    return;
-  }
+    const user = await this.authService.getCurrentUser();
+    if (!user) return;
 
-  this.correo = user.email || '';
+    this.uidActual = user.uid;
+    this.correo = user.email || '';
 
-  if (uidParam) { 
-    this.uid = uidParam;
-    if (uidParam !== user.uid) {
-      this.soloLectura = true;
+    if (uidParam) {
+      this.uid = uidParam;
+      this.soloLectura = uidParam !== user.uid;
+    } else {
+      this.uid = user.uid;
+      this.soloLectura = false;
     }
-  } else {
-    this.uid = user.uid;
+
+    // Rol
+    const rol = await this.authService.cargarRolActual();
+    this.esAdmin = rol === 'admin';
+
+    await this.cargarDatosUsuario();      // usuario + unidades
+    await this.obtenerReportesUsuario();  // reportes_dia
+    await this.cargarPagosUsuario();      // agregados desde reportes_dia
   }
 
-  // 🔄 FORZAR RECARGA DEL TOKEN ANTES DE CONSULTAS
-  await user.getIdToken(true); // <- clave
-  const rol = await this.authService.cargarRolActual();
-  this.esAdmin = rol === 'admin';
-
-  // Ahora sí hacemos las consultas a Firestore
-  await this.cargarDatosUsuario();
-  await this.obtenerReportesUsuario();
-  await this.cargarPagosUsuario();
-}
-
-
-  async cargarDatosUsuario() {
+  async cargarDatosUsuario(): Promise<void> {
     try {
       const firestore = getFirestore();
       if (!this.uid) return;
@@ -120,87 +150,280 @@ async ngOnInit(): Promise<void> {
         this.empresa = data['empresa'] || '';
         this.correo = data['email'] || this.correo;
 
-        // **CAMBIO CLAVE AQUÍ: Cargar unidades de la subcolección**
-        this.unidades = await this.authService.obtenerUnidadesDeUsuario(this.uid);
-
-
-        // Guardar estado original para detección de cambios
         this.datosOriginales = {
           nombres: this.nombres,
           apellidos: this.apellidos,
           cedula: this.cedula,
-          // Las unidades no se comparan directamente aquí si son una subcolección,
-          // ya que no son parte del documento principal del usuario para esta comparación simple.
-          // Si necesitas comparar cambios en unidades, sería una lógica más compleja.
           empresa: this.empresa,
-          email: this.correo, // Usa 'email' para que coincida con la interfaz Usuario
+          email: this.correo
         };
       }
+
+      await this.cargarUnidadesDelUsuario();
+
     } catch (error) {
-      console.error('Error al cargar usuario o sus unidades:', error);
+      console.error('Error al cargar usuario o unidades:', error);
     }
   }
 
-  async obtenerReportesUsuario() {
+  /**
+   * Unidades:
+   * - Primero desde colección global "unidades" where uidPropietario == uid
+   * - Si no hay resultados, fallback a legacy usuarios/{uid}/unidades (campo nombre)
+   */
+  private async cargarUnidadesDelUsuario(): Promise<void> {
+    if (!this.uid) return;
+
+    const firestore = getFirestore();
+
+    // 1) Global
+    const globalRef = collection(firestore, 'unidades');
+    const qGlobal = query(globalRef, where('uidPropietario', '==', this.uid));
+    const snapGlobal = await getDocs(qGlobal);
+
+    if (!snapGlobal.empty) {
+      const unidades = snapGlobal.docs.map(d => {
+        const data = d.data() as any;
+        const codigo = String(data.codigo ?? '').trim();
+
+        return {
+          id: d.id,
+          codigo,
+          nombre: codigo, // alias para template
+          empresa: String(data.empresa ?? this.empresa ?? '').trim(),
+          estado: data.estado ?? true,
+          numeroOrden: data.numeroOrden ?? 0,
+          propietarioNombre: data.propietarioNombre || `${this.nombres} ${this.apellidos}`.trim(),
+          uidPropietario: data.uidPropietario || this.uid!,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt
+        } as UnidadGlobalUI;
+      });
+
+      // Orden local por numeroOrden
+      this.unidades = unidades.sort((a, b) => (a.numeroOrden ?? 0) - (b.numeroOrden ?? 0));
+      return;
+    }
+
+    // 2) Legacy fallback
+    const legacyRef = collection(firestore, `usuarios/${this.uid}/unidades`);
+    const snapLegacy = await getDocs(query(legacyRef));
+
+    if (snapLegacy.empty) {
+      this.unidades = [];
+      return;
+    }
+
+    const propietarioNombre = `${this.nombres} ${this.apellidos}`.trim();
+    const empresaSlug = (this.empresa || '').replace(/\s+/g, '');
+
+    this.unidades = snapLegacy.docs.map((d, idx) => {
+      const data = d.data() as any;
+      const codigo = String(data?.nombre ?? '').trim() || d.id;
+
+      return {
+        id: `${empresaSlug || 'EMP'}_${codigo}`,
+        codigo,
+        nombre: codigo, // alias para template
+        empresa: this.empresa || '',
+        estado: true,
+        numeroOrden: idx + 1,
+        propietarioNombre,
+        uidPropietario: this.uid!
+      } as UnidadGlobalUI;
+    });
+  }
+
+  /**
+   * Reportes desde el modelo oficial: reportes_dia/{diaId}/unidades/{uid}
+   */
+  async obtenerReportesUsuario(): Promise<void> {
   if (!this.uid) return;
 
-  this.cargando = true; // ⬅️ Inicia el spinner
+  this.cargando = true;
 
   try {
     const firestore = getFirestore();
-    const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
-    const q = query(reportesRef, orderBy('fechaModificacion', 'desc'));
 
-    const snapshot = await getDocs(q);
-    const tempReportes: ReporteConPagos[] = [];
-
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data() as NuevoRegistro;
-      const id = docSnap.id;
-
-      const pagosRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios/${id}/pagosTotales`);
-      const pagosSnap = await getDocs(pagosRef);
-
-      let minutosPagados = 0;
-      let adminPagada = 0;
-      let minBasePagados = 0;
-      let multasPagadas = 0;
-
-      pagosSnap.forEach((pagoDoc) => {
-        const pago = pagoDoc.data();
-        const detalles = pago['detalles'] ?? {};
-
-        minutosPagados += detalles.minutosAtraso || 0;
-        adminPagada += detalles.administracion || 0;
-        minBasePagados += detalles.minutosBase || 0;
-        multasPagadas += detalles.multas || 0;
-      });
-
-      const fechaModificacion =
-        (data.fechaModificacion as unknown as Timestamp)?.toDate() ?? new Date();
-
-      tempReportes.push({
-        ...data,
-        id,
-        uid: this.uid,
-        minutosPagados,
-        adminPagada,
-        minBasePagados,
-        multasPagadas,
-        fechaModificacion,
-      });
+    // Asegura empresa/unidades cargadas
+    if (!this.empresa) {
+      await this.cargarDatosUsuario();
+      if (!this.empresa) return;
     }
 
-    this.reportesUsuario = tempReportes;
+    // Si unidades aún no están cargadas, cárgalas
+    if (!this.unidades || this.unidades.length === 0) {
+      await this.cargarDatosUsuario(); // esto llama cargarUnidadesDelUsuario()
+    }
+
+    // Set de códigos de unidades del usuario (E01, E02, ...)
+    const unidadesUsuarioSet = new Set(
+      (this.unidades || [])
+        .map(u => (u.codigo || u.nombre || '').trim())
+        .filter(Boolean)
+    );
+
+    // 1) Traer últimos días de esa empresa
+    const diasRef = collection(firestore, 'reportes_dia');
+    const qDias = query(
+      diasRef,
+      where('empresa', '==', this.empresa),
+      orderBy('fecha', 'desc'),
+      limit(90)
+    );
+
+    const diasSnap = await getDocs(qDias);
+
+    const temp: ReporteConPagos[] = [];
+
+    // 2) Para cada día, leer todas las unidades del día y filtrar por las del usuario
+    for (const diaDoc of diasSnap.docs) {
+      const diaId = diaDoc.id;
+      const diaData = diaDoc.data() as any;
+
+      const unidadesDiaRef = collection(firestore, `reportes_dia/${diaId}/unidades`);
+      const unidadesDiaSnap = await getDocs(unidadesDiaRef);
+
+      if (unidadesDiaSnap.empty) continue;
+
+      const fechaDia: string =
+        diaData.fecha || (diaId.includes('_') ? diaId.split('_').pop() : diaId) || '';
+
+      for (const uDoc of unidadesDiaSnap.docs) {
+        const u = uDoc.data() as any;
+
+        // El campo unidad/código debe existir en el doc (ajusta si tu campo real es otro)
+        const codigoUnidad = String(u.unidad ?? u.codigoUnidad ?? u.unidadCodigo ?? '').trim();
+
+        // Filtra: solo las unidades que pertenecen a este usuario
+        if (!codigoUnidad || !unidadesUsuarioSet.has(codigoUnidad)) continue;
+
+        // Omite si todo está en 0 (asignado y pagado)
+        const asignado =
+          (u.minutosAtraso || 0) +
+          (u.administracion || 0) +
+          (u.minutosBase || 0) +
+          (u.multas || 0);
+
+        const pagado =
+          (u.minutosPagados || 0) +
+          (u.adminPagada || 0) +
+          (u.minBasePagados || 0) +
+          (u.multasPagadas || 0);
+
+        if (asignado === 0 && pagado === 0) continue;
+
+        temp.push({
+          id: `${diaId}_${codigoUnidad}`, // id único por día+unidad
+          uid: this.uid,                  // propietario (para navegación)
+          nombre: u.nombre || `${this.nombres} ${this.apellidos}`.trim(),
+          unidad: codigoUnidad,
+
+          minutosAtraso: u.minutosAtraso || 0,
+          administracion: u.administracion || 0,
+          minutosBase: u.minutosBase || 0,
+          multas: u.multas || 0,
+
+          minutosPagados: u.minutosPagados || 0,
+          adminPagada: u.adminPagada || 0,
+          minBasePagados: u.minBasePagados || 0,
+          multasPagadas: u.multasPagadas || 0,
+
+          fechaModificacion: (diaData.updatedAt?.toDate?.() ?? new Date(fechaDia))
+        } as any);
+      }
+    }
+
+    // Orden final: fecha desc (si fechaModificacion es Date)
+    this.reportesUsuario = temp.sort((a: any, b: any) => {
+      const ta = a.fechaModificacion ? new Date(a.fechaModificacion).getTime() : 0;
+      const tb = b.fechaModificacion ? new Date(b.fechaModificacion).getTime() : 0;
+      return tb - ta;
+    });
+
   } catch (error) {
-    console.error('Error al obtener reportes del usuario:', error);
+    console.error('Error al obtener reportes por unidades del usuario:', error);
   } finally {
-    this.cargando = false; // ⬅️ Detiene el spinner siempre, haya éxito o error
+    this.cargando = false;
   }
 }
 
+  /**
+   * Pagos (agregados por día) desde reportes_dia
+   */
+  async cargarPagosUsuario(): Promise<void> {
+    if (!this.uid) return;
 
+    try {
+      const firestore = getFirestore();
 
+      if (!this.empresa) {
+        await this.cargarDatosUsuario();
+        if (!this.empresa) return;
+      }
+
+      const diasRef = collection(firestore, 'reportes_dia');
+      const qDias = query(
+        diasRef,
+        where('empresa', '==', this.empresa),
+        orderBy('fecha', 'desc'),
+        limit(180)
+      );
+
+      const diasSnap = await getDocs(qDias);
+      const pagosTemp: any[] = [];
+
+      for (const diaDoc of diasSnap.docs) {
+        const diaId = diaDoc.id;
+        const diaData = diaDoc.data() as any;
+
+        const uRef = doc(firestore, `reportes_dia/${diaId}/unidades/${this.uid}`);
+        const uSnap = await getDoc(uRef);
+        if (!uSnap.exists()) continue;
+
+        const u = uSnap.data() as any;
+
+        const totalPagado =
+          (u.minutosPagados || 0) +
+          (u.adminPagada || 0) +
+          (u.minBasePagados || 0) +
+          (u.multasPagadas || 0);
+
+        if (totalPagado === 0) continue;
+
+        pagosTemp.push({
+          fecha: diaData.fecha || (diaId.includes('_') ? diaId.split('_').pop() : null),
+          empresa: diaData.empresa || this.empresa,
+          unidad: u.unidad || u.unidadCodigo || u.codigoUnidad || '',
+          detalles: {
+            minutosAtraso: u.minutosPagados || 0,
+            administracion: u.adminPagada || 0,
+            minutosBase: u.minBasePagados || 0,
+            multas: u.multasPagadas || 0
+          },
+          totalPagado,
+          urlPDF: u.urlPDF || null
+        });
+      }
+
+      this.pagos = pagosTemp.sort((a, b) => {
+        const fa = a.fecha ? new Date(a.fecha).getTime() : 0;
+        const fb = b.fecha ? new Date(b.fecha).getTime() : 0;
+        return fb - fa;
+      });
+
+      this.totalPaginasPagos = Math.max(1, Math.ceil(this.pagos.length / this.pagosPorPagina));
+      this.paginaActualPagos = 1;
+      this.actualizarPagosPaginados();
+
+    } catch (e) {
+      console.error('Error al cargar pagos (agregados) del usuario:', e);
+      this.pagos = [];
+      this.pagosPaginados = [];
+      this.totalPaginasPagos = 1;
+      this.paginaActualPagos = 1;
+    }
+  }
 
   get passwordStrength(): string {
     const pass = this.nuevaContrasena;
@@ -210,20 +433,17 @@ async ngOnInit(): Promise<void> {
     return 'Media';
   }
 
-  // Modificar verificarCambios para que no intente comparar `unidad`
   verificarCambios(): void {
-    // Si 'datosOriginales' fue tipado como Partial<Usuario>, 'unidad' ya no es una propiedad directa.
-    // Si necesitas comparar las unidades, sería una lógica más compleja (ej. serializar los arrays, etc.)
     this.hayCambios =
       this.nombres !== this.datosOriginales.nombres ||
       this.apellidos !== this.datosOriginales.apellidos ||
       this.cedula !== this.datosOriginales.cedula ||
-      this.empresa !== this.datosOriginales.empresa || // 'empresa' es correcto
-      this.correo !== this.datosOriginales.email || // 'email' es correcto
+      this.empresa !== this.datosOriginales.empresa ||
+      this.correo !== this.datosOriginales.email ||
       !!this.nuevaContrasena;
   }
 
-  async guardarCambios() {
+  async guardarCambios(): Promise<void> {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) return;
@@ -232,45 +452,56 @@ async ngOnInit(): Promise<void> {
       const email = user.email;
       if (!email) return alert('❌ Email no disponible');
 
-      // Actualizar email en Auth si ha cambiado
-      if (this.correo !== email) {
-        await updateEmail(user, this.correo);
-        // Si el email cambia en Auth, también actualiza en Firestore para consistencia
-        const firestore = getFirestore();
-        const userDocRef = doc(firestore, 'usuarios', user.uid);
-        await setDoc(userDocRef, { email: this.correo }, { merge: true });
-      }
-
-      // Actualizar contraseña si se ha proporcionado una nueva
-      if (this.nuevaContrasena) {
-        if (this.nuevaContrasena.length < 6) {
-          return alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres');
+      // Evitar cambiar credenciales de otro usuario desde el cliente
+      if (this.uid !== user.uid) {
+        if (this.correo !== this.datosOriginales.email || this.nuevaContrasena) {
+          return alert('⚠️ Para cambiar correo/clave de otro usuario, debe hacerse vía Cloud Function (Admin).');
         }
-        if (!this.contrasenaActual) {
-          return alert('⚠️ Ingresa tu contraseña actual');
+      } else {
+        // Cambiar email propio
+        if (this.correo !== email) {
+          await updateEmail(user, this.correo);
+          const firestore = getFirestore();
+          const userDocRef = doc(firestore, 'usuarios', user.uid);
+          await setDoc(userDocRef, { email: this.correo }, { merge: true });
         }
 
-        const credential = EmailAuthProvider.credential(email, this.contrasenaActual);
-        await reauthenticateWithCredential(user, credential);
-        await updatePassword(user, this.nuevaContrasena);
+        // Cambiar contraseña propia
+        if (this.nuevaContrasena) {
+          if (this.nuevaContrasena.length < 6) {
+            return alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres');
+          }
+          if (!this.contrasenaActual) {
+            return alert('⚠️ Ingresa tu contraseña actual');
+          }
+          const credential = EmailAuthProvider.credential(email, this.contrasenaActual);
+          await reauthenticateWithCredential(user, credential);
+          await updatePassword(user, this.nuevaContrasena);
+        }
       }
 
-      // **Actualizar los otros datos del perfil en Firestore (nombres, apellidos, cedula, empresa)**
+      // Firestore: propio o ajeno si admin
+      if (this.uid !== user.uid && !this.esAdmin) {
+        return alert('❌ No autorizado para editar este perfil');
+      }
+
       const firestore = getFirestore();
-      const userDocRef = doc(firestore, 'usuarios', user.uid);
-      await setDoc(userDocRef, {
-        nombres: this.nombres,
-        apellidos: this.apellidos,
-        cedula: this.cedula,
-        // No se actualizan las unidades directamente aquí, ya que están en una subcolección
-        empresa: this.empresa
-      }, { merge: true }); // Usar merge: true para no sobrescribir todo el documento
+      const userDocRef = doc(firestore, 'usuarios', this.uid || user.uid);
+
+      await setDoc(
+        userDocRef,
+        {
+          nombres: this.nombres,
+          apellidos: this.apellidos,
+          cedula: this.cedula,
+          empresa: this.empresa
+        },
+        { merge: true }
+      );
 
       alert('✅ Cambios guardados correctamente');
       this.cancelarCambioContrasena();
-
-      // Recargar datos originales después de guardar cambios exitosamente
-      await this.cargarDatosUsuario(); // Esto actualizará datosOriginales y las unidades
+      await this.cargarDatosUsuario();
       this.hayCambios = false;
 
     } catch (error: any) {
@@ -292,81 +523,47 @@ async ngOnInit(): Promise<void> {
   }
 
   togglePasswordVisibility(type: 'current' | 'new'): void {
-    if (type === 'current') {
-      this.showCurrentPassword = !this.showCurrentPassword;
-    } else {
-      this.showNewPassword = !this.showNewPassword;
+    if (type === 'current') this.showCurrentPassword = !this.showCurrentPassword;
+    else this.showNewPassword = !this.showNewPassword;
+  }
+
+  eliminarUsuario(): void {
+    this.mostrarConfirmacion = true;
+  }
+
+  async confirmarEliminacion(): Promise<void> {
+    this.mostrarConfirmacion = false;
+    this.eliminando = true;
+
+    try {
+      if (!this.uid) throw new Error('UID destino no definido');
+      if (!this.esAdmin) throw new Error('No autorizado');
+      if (this.uid === this.uidActual) throw new Error('No puedes eliminar tu propio usuario desde aquí');
+
+      const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');
+      await eliminarFn({ uid: this.uid });
+
+      alert('✅ Usuario eliminado correctamente.');
+      this.router.navigate(['/admin/gestionroles']);
+    } catch (error: any) {
+      console.error('❌ Error al eliminar usuario:', error);
+      alert('❌ No se pudo eliminar completamente el usuario.');
+    } finally {
+      this.eliminando = false;
     }
   }
 
-  async cargarPagosUsuario() {
-    if (!this.uid) return;
-
-    const firestore = getFirestore();
-    const reportesRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios`);
-    const reportesSnap = await getDocs(reportesRef);
-
-    const pagosTotales: any[] = [];
-
-    for (const reporte of reportesSnap.docs) {
-      const pagosRef = collection(firestore, `usuarios/${this.uid}/reportesDiarios/${reporte.id}/pagosTotales`);
-      const pagosSnap = await getDocs(pagosRef);
-
-      pagosSnap.forEach(pagoDoc => {
-        const pagoData = pagoDoc.data();
-        pagosTotales.push({
-          ...pagoData,
-          fecha: pagoData['fecha']?.toDate?.() || null,
-          urlPDF: pagoData['urlPDF'] || null
-        });
-      });
-    }
-
-    this.pagos = pagosTotales.sort((a, b) => (b.fecha as any) - (a.fecha as any));
-    this.totalPaginasPagos = Math.ceil(this.pagos.length / this.pagosPorPagina);
-    this.actualizarPagosPaginados();
+  cancelarEliminacion(): void {
+    this.mostrarConfirmacion = false;
   }
 
-eliminarUsuario(): void {
-  this.mostrarConfirmacion = true;
-}
-
-async confirmarEliminacion(): Promise<void> {
-  this.mostrarConfirmacion = false;
-  this.eliminando = true;
-
-  try {
-    const user = getAuth().currentUser;
-    if (user) {
-      await user.getIdToken(true);
-      await user.getIdTokenResult();
-    }
-
-    const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');
-    await eliminarFn({ uid: this.uid });
-
-    alert('✅ Usuario eliminado correctamente.');
-    this.router.navigate(['/admin/gestionroles']);
-  } catch (error) {
-    console.error('❌ Error al eliminar usuario:', error);
-    alert('❌ No se pudo eliminar completamente el usuario.');
-  } finally {
-    this.eliminando = false;
-  }
-}
-
-cancelarEliminacion(): void {
-  this.mostrarConfirmacion = false;
-}
-
-
-  actualizarPagosPaginados() {
+  actualizarPagosPaginados(): void {
     const inicio = (this.paginaActualPagos - 1) * this.pagosPorPagina;
     const fin = inicio + this.pagosPorPagina;
     this.pagosPaginados = this.pagos.slice(inicio, fin);
   }
 
-  cambiarPaginaPagos(valor: number) {
+  cambiarPaginaPagos(valor: number): void {
     const nuevaPagina = this.paginaActualPagos + valor;
     if (nuevaPagina >= 1 && nuevaPagina <= this.totalPaginasPagos) {
       this.paginaActualPagos = nuevaPagina;
@@ -374,12 +571,11 @@ cancelarEliminacion(): void {
     }
   }
 
-  descargarPDF(url: string) {
+  descargarPDF(url: string): void {
     window.open(url, '_blank');
   }
 
   volverAlMenu(): void {
     this.router.navigate(['/menu']);
   }
-  
 }
