@@ -26,17 +26,38 @@
       <button class="btn-primario" type="button" (click)="agregarDia()" [disabled]="creandoDia">
         {{ creandoDia ? 'Creando día...' : 'Agregar día' }}
       </button>
+<!-- Subir Excel (Minutos) -->
+      <button
+        class="btn-primario"
+        type="button"
+        (click)="fileExcelMinutos.click()"
+        [disabled]="subiendoExcel"
+      >
+        {{ subiendoExcel ? 'Subiendo Excel...' : 'Subir Excel (Min. Atraso)' }}
+      </button>
 
+      <input
+        #fileExcelMinutos
+        type="file"
+        accept=".xlsx,.xls"
+        style="display:none"
+        (change)="onExcelMinutosSelected($event)"
+      />
       <button class="btn-secundario" type="button" (click)="mostrarFiltros = !mostrarFiltros">
         Filtros
       </button>
-
       <button class="btn-primario" type="button" (click)="irANuevoRegistro()">
         + Nuevo Registro
       </button>
     </div>
   </div>
-
+<div class="excel-progreso" *ngIf="subiendoExcel">
+  <p style="margin: 6px 0;">
+    Procesando Excel... Total: {{ progresoExcel.total }} |
+    OK: {{ progresoExcel.ok }} |
+    Fallas: {{ progresoExcel.fail }}
+  </p>
+</div>
   <!-- Panel Filtros -->
   <div class="panel-filtros" *ngIf="mostrarFiltros">
     <div class="filtros-rapidos">

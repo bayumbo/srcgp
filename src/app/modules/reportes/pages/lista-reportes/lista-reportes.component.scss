@@ -15,7 +15,14 @@
   border-radius: 10px solid ;
   overflow: hidden;
 }
-
+.excel-progreso{
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(16, 24, 40, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e9eef6;
+}
 .modulo-btn {
   padding: 14px 0;
   border: 1px #8da19c solid;
