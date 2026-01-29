@@ -56,12 +56,12 @@
  </small>
  </div>
 
- <div class="form-group half">
+<div class="form-group half" *ngIf="form.get('rol')?.value !== 'recaudador'">
  <label for="unidadInput">Unidad(es)</label>
  <input type="text" id="unidadInput" formControlName="unidadInput" placeholder="Unidad1, Unidad2, Unidad3">
  <small class="error" *ngIf="form.get('unidadInput')?.touched && form.get('unidadInput')?.invalid">
- Este campo es obligatorio
- </small>
+  Formato inválido
+</small>
  </div>
  </div>
 

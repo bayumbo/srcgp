@@ -37,7 +37,7 @@ export class RegisterComponent {
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
     rol: ['usuario', Validators.required],
-    unidadInput: ['', Validators.required], // Campo para la entrada de texto de las unidades
+    unidadInput: [''], // Campo para la entrada de texto de las unidades
     empresa: ['General Pintag', Validators.required]
   });
   volverAlMenu: any;
@@ -82,8 +82,16 @@ async signUp(): Promise<void> {
     await this.authService.guardarUsuarioEnFirestore(uid, usuarioData);
     console.log('📝 Documento de usuario guardado en Firestore.');
 
-    // 🔄 Guardar unidades (subcolección)
-    const unidadesArray = unidadInput.split(',')
+
+    // 🔄 Guardar unidades (subcolección) SOLO si corresponde
+  const unidadTexto = String(unidadInput ?? '').trim();
+
+  // Regla: recaudador NO requiere unidades. Para otros roles, se guardan si el usuario las ingresó.
+  const debeGuardarUnidades = rol !== 'recaudador' && unidadTexto.length > 0;
+
+  if (debeGuardarUnidades) {
+    const unidadesArray = unidadTexto
+      .split(',')
       .map((u: string) => u.trim())
       .filter((u: string) => u !== '');
 
@@ -92,6 +100,10 @@ async signUp(): Promise<void> {
       await this.authService.guardarUnidadEnSubcoleccion(uid, unidad);
       console.log(`🚍 Unidad "${unidadNombre}" guardada en subcolección`);
     }
+  } else {
+    console.log('ℹ️ No se registran unidades (rol recaudador o input vacío).');
+  }
+
 
     // 3️⃣ Llamar función para asignar rol y esperar propagation
     try {
@@ -115,7 +127,7 @@ async signUp(): Promise<void> {
       const rolString = typeof claimRol === 'string' ? claimRol : '';
       this.authService['_currentUserRole'].next(rolString || null);
       localStorage.setItem('userRole', rolString);
- 
+
     } catch (error) {
       console.warn('⚠️ No se pudo asignar el claim de rol automáticamente.', error);
     }

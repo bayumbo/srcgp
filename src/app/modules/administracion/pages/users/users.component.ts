@@ -499,10 +499,10 @@ export class PerfilComponent implements OnInit {
         { merge: true }
       );
 
-      alert('✅ Cambios guardados correctamente');
       this.cancelarCambioContrasena();
       await this.cargarDatosUsuario();
       this.hayCambios = false;
+
 
     } catch (error: any) {
       const errorCode = error?.code || error?.error?.code;
@@ -543,8 +543,9 @@ export class PerfilComponent implements OnInit {
       const eliminarFn = httpsCallable(this.functions, 'eliminarUsuarioAuth');
       await eliminarFn({ uid: this.uid });
 
-      alert('✅ Usuario eliminado correctamente.');
       this.router.navigate(['/admin/gestionroles']);
+      alert('✅ Usuario eliminado correctamente.');
+
     } catch (error: any) {
       console.error('❌ Error al eliminar usuario:', error);
       alert('❌ No se pudo eliminar completamente el usuario.');

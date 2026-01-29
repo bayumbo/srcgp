@@ -18,7 +18,9 @@ import {
   where,
   getDocs,
   getDoc,
-  addDoc
+  addDoc,
+  serverTimestamp,
+  limit
 } from '@angular/fire/firestore';
 
 import { BehaviorSubject } from 'rxjs';
@@ -40,12 +42,14 @@ export interface Usuario {
   rol: 'usuario' | 'admin' | 'socio' | 'recaudador';
   empresa: string;
   estado: boolean;
-  creadoEn: Date;
+  creadoEn: any;   // Timestamp (serverTimestamp)
+  updatedAt?: any; // Timestamp
 }
 
 export interface Unidad {
   nombre: string;
 }
+
 export interface UnidadGlobal {
   id: string;
   codigo: string;
@@ -57,9 +61,9 @@ export interface UnidadGlobal {
   createdAt?: any;
   updatedAt?: any;
 }
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
 
@@ -91,6 +95,9 @@ export class AuthService {
     });
   }
 
+  /**
+   * Registro de usuarios desde un "SecondaryApp" para no cambiar sesión del admin.
+   */
   async signUpWithEmailAndPassword(credential: Credential): Promise<UserCredential> {
     const secondaryApp = initializeApp(environment.firebase, 'SecondaryApp');
     const secondaryAuth = getAuthStandalone(secondaryApp);
@@ -108,28 +115,33 @@ export class AuthService {
     }
   }
 
+  /**
+   * Login normal: primero claims (role), luego fallback a Firestore usuarios/{uid}.
+   * Ya NO usa usuariosPublicos.
+   */
   async logIn(email: string, password: string): Promise<UserCredential> {
     const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
     const user = userCredential.user;
 
-    // Forzar recarga del token
+    // Forzar recarga del token (claims)
     await user.getIdToken(true);
     const token = await user.getIdTokenResult();
-    const role = token.claims['role'] as string | null;
-    this._currentUserRole.next(role);
-    localStorage.setItem('userRole', role ?? '');
+    const roleClaim = (token.claims['role'] as string | null) ?? null;
 
-    // Leer datos públicos
+    this._currentUserRole.next(roleClaim);
+    localStorage.setItem('userRole', roleClaim ?? '');
+
+    // Fallback: leer rol desde usuarios/{uid} (por si claim aún no propaga)
     const uid = user.uid;
-    const docRef = doc(this.firestore, `usuariosPublicos/${uid}`);
+    const docRef = doc(this.firestore, `usuarios/${uid}`);
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
-      const data = snap.data();
-      const rol = data['rol'];
-      if (rol) {
-        this._currentUserRole.next(rol);
-        localStorage.setItem('userRole', rol);
+      const data = snap.data() as any;
+      const rolFs = (data?.rol as string | undefined) ?? null;
+      if (rolFs) {
+        this._currentUserRole.next(rolFs);
+        localStorage.setItem('userRole', rolFs);
       }
     }
 
@@ -146,18 +158,20 @@ export class AuthService {
     return this._currentUserRole.getValue() || localStorage.getItem('userRole');
   }
 
+  /**
+   * Datos del usuario actual desde usuarios/{uid}.
+   * Ya NO usa usuariosPublicos.
+   */
   async obtenerDatosUsuarioActual(): Promise<Usuario | null> {
     const user = this.auth.currentUser;
     if (!user) return null;
 
-    const docRef = doc(this.firestore, `usuariosPublicos/${user.uid}`);
+    const docRef = doc(this.firestore, `usuarios/${user.uid}`);
     const snap = await getDoc(docRef);
 
-    if (snap.exists()) {
-      return snap.data() as Usuario;
-    }
+    if (!snap.exists()) return null;
 
-    return null;
+    return ({ uid: user.uid, ...(snap.data() as any) }) as Usuario;
   }
 
   enviarCorreoRecuperacion(email: string): Promise<void> {
@@ -165,19 +179,35 @@ export class AuthService {
     return sendPasswordResetEmail(this.auth, email);
   }
 
+  /**
+   * Guarda usuario COMPLETO en usuarios/{uid}.
+   * - merge:true evita pisar campos si alguien escribe parcial después
+   * - serverTimestamp para creadoEn/updatedAt consistente
+   * Ya NO escribe usuariosPublicos.
+   */
   async guardarUsuarioEnFirestore(uid: string, usuario: Omit<Usuario, 'uid'>): Promise<void> {
-    // Guardar en la colección privada
-    const userRef = doc(this.firestore, 'usuarios', uid);
-    await setDoc(userRef, usuario);
+    if (!uid) throw new Error('UID requerido para guardar usuario');
 
-    // Guardar en la colección pública
-    const userPublicoRef = doc(this.firestore, 'usuariosPublicos', uid);
-    await setDoc(userPublicoRef, {
-      nombres: usuario.nombres,
-      apellidos: usuario.apellidos,
-      cedula: usuario.cedula,
-      email: usuario.email
-    });
+    const userRef = doc(this.firestore, 'usuarios', uid);
+
+    const data = {
+      cedula: String(usuario.cedula ?? '').trim(),
+      nombres: String(usuario.nombres ?? '').trim(),
+      apellidos: String(usuario.apellidos ?? '').trim(),
+      email: String(usuario.email ?? '').trim().toLowerCase(),
+      rol: (usuario.rol ?? 'usuario') as Usuario['rol'],
+      empresa: String(usuario.empresa ?? 'General Pintag').trim(),
+      estado: typeof usuario.estado === 'boolean' ? usuario.estado : true,
+      creadoEn: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    if (!data.cedula) throw new Error('Cédula requerida');
+    if (!data.nombres) throw new Error('Nombres requeridos');
+    if (!data.apellidos) throw new Error('Apellidos requeridos');
+    if (!data.email) throw new Error('Email requerido');
+
+    await setDoc(userRef, data, { merge: true });
   }
 
   async guardarUnidadEnSubcoleccion(userId: string, unidad: Unidad): Promise<void> {
@@ -189,40 +219,46 @@ export class AuthService {
     const unidadesRef = collection(this.firestore, `usuarios/${userId}/unidades`);
     const q = query(unidadesRef);
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data() as Unidad);
+    return querySnapshot.docs.map(d => d.data() as Unidad);
   }
+
   async obtenerUnidadesGlobalesDeUsuario(userId: string): Promise<UnidadGlobal[]> {
-  const unidadesRef = collection(this.firestore, 'unidades');
-  const q = query(unidadesRef, where('uidPropietario', '==', userId));
-  const snap = await getDocs(q);
+    const unidadesRef = collection(this.firestore, 'unidades');
+    const q = query(unidadesRef, where('uidPropietario', '==', userId));
+    const snap = await getDocs(q);
 
-  return snap.docs.map(d => {
-    const data = d.data() as any;
-    return {
-      id: d.id,
-      codigo: data.codigo || '',
-      empresa: data.empresa || '',
-      estado: data.estado ?? true,
-      numeroOrden: data.numeroOrden ?? 0,
-      propietarioNombre: data.propietarioNombre || '',
-      uidPropietario: data.uidPropietario || userId,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt
-    } as UnidadGlobal;
-  });
-}
+    return snap.docs.map(d => {
+      const data = d.data() as any;
+      return {
+        id: d.id,
+        codigo: data.codigo || '',
+        empresa: data.empresa || '',
+        estado: data.estado ?? true,
+        numeroOrden: data.numeroOrden ?? 0,
+        propietarioNombre: data.propietarioNombre || '',
+        uidPropietario: data.uidPropietario || userId,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      } as UnidadGlobal;
+    });
+  }
 
-
+  /**
+   * Validación de correo: ahora consulta usuarios (no usuariosPublicos).
+   */
   async correoExiste(email: string): Promise<boolean> {
-    const usuariosRef = collection(this.firestore, 'usuariosPublicos');
-    const q = query(usuariosRef, where('email', '==', email));
+    const usuariosRef = collection(this.firestore, 'usuarios');
+    const q = query(usuariosRef, where('email', '==', String(email).trim().toLowerCase()), limit(1));
     const resultado = await getDocs(q);
     return !resultado.empty;
   }
 
+  /**
+   * Validación de cédula: ahora consulta usuarios (no usuariosPublicos).
+   */
   async existeCedula(cedula: string): Promise<boolean> {
-    const usuariosRef = collection(this.firestore, 'usuariosPublicos');
-    const q = query(usuariosRef, where('cedula', '==', cedula));
+    const usuariosRef = collection(this.firestore, 'usuarios');
+    const q = query(usuariosRef, where('cedula', '==', String(cedula).trim()), limit(1));
     const querySnapshot = await getDocs(q);
     return !querySnapshot.empty;
   }
@@ -235,6 +271,9 @@ export class AuthService {
     return this.auth.currentUser;
   }
 
+  /**
+   * Rol actual desde usuarios/{uid}.
+   */
   async cargarRolActual(): Promise<string | null> {
     const user = this.auth.currentUser;
     if (!user) {
@@ -246,23 +285,26 @@ export class AuthService {
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
-      const rol = snap.data()['rol'];
-      this._currentUserRole.next(rol);
-      return rol;
+      const rol = (snap.data() as any)['rol'] as string | undefined;
+      this._currentUserRole.next(rol ?? null);
+      return rol ?? null;
     }
 
     this._currentUserRole.next(null);
     return null;
   }
 
+  /**
+   * Obtener correo por cédula desde usuarios (no usuariosPublicos).
+   */
   async obtenerCorreoPorCedula(cedula: string): Promise<string | null> {
-    const usuariosRef = collection(this.firestore, 'usuariosPublicos');
-    const q = query(usuariosRef, where('cedula', '==', cedula));
+    const usuariosRef = collection(this.firestore, 'usuarios');
+    const q = query(usuariosRef, where('cedula', '==', String(cedula).trim()), limit(1));
     const snapshot = await getDocs(q);
 
     if (!snapshot.empty) {
-      const data = snapshot.docs[0].data();
-      return data['email'] || null;
+      const data = snapshot.docs[0].data() as any;
+      return data?.email || null;
     }
 
     return null;
