@@ -37,6 +37,24 @@ exports.asignarRolDesdeFirestore = functions.https.onCall(async (data, context) 
     throw new functions.https.HttpsError('unknown', 'Error al asignar rol desde Firestore.', error);
   }
 });
+exports.obtenerEmailPorCedula = functions.https.onCall(async (data, context) => {
+  const cedula = String(data?.cedula || '').trim();
+  if (!cedula) {
+    throw new functions.https.HttpsError('invalid-argument', 'cedula requerida');
+  }
+
+  const db = admin.firestore();
+
+  const snap = await db.collection('usuarios')
+    .where('cedula', '==', cedula)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return { email: null };
+
+  const u = snap.docs[0].data();
+  return { email: u.email || null };
+});
 
 exports.eliminarUsuarioAuth = functions.https.onCall(async (data, context) => {
   try {
