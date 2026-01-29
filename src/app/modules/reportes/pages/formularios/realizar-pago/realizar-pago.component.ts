@@ -89,6 +89,7 @@ export class RealizarPagoComponent implements OnInit {
     multas: []
   };
 
+
   pagosPorDeuda: Record<string, Partial<Record<CampoClave, number>>> = {};
   pagoEnEdicion: { id: string; campo: CampoClave } | null = null;
   nuevoMonto: number = 0;               // input monto
@@ -112,26 +113,6 @@ export class RealizarPagoComponent implements OnInit {
   });
 }
 
-  private async assetB64(path: string): Promise<string> {
-    if (path.includes('LogoPintag') && this.logoPintagB64) return this.logoPintagB64;
-    if (path.includes('LogoAntisana') && this.logoAntisanaB64) return this.logoAntisanaB64;
-    if (path.includes('Bus.png') && this.busB64) return this.busB64;
-
-    const b64 = await this.cargarImagenBase64(path);
-    if (path.includes('LogoPintag')) this.logoPintagB64 = b64;
-    if (path.includes('LogoAntisana')) this.logoAntisanaB64 = b64;
-    if (path.includes('Bus.png')) this.busB64 = b64;
-    return b64;
-  }
-
-  private descargarPDFInstantaneo(blob: Blob, fileName: string) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  }
 
   // =========================
   // INIT
@@ -166,10 +147,31 @@ export class RealizarPagoComponent implements OnInit {
       id: snap.id
     };
 
-    const qp = this.route.snapshot.queryParamMap;
-    this.registros.nombre = (data.nombre ?? qp.get('nombre') ?? '').toString().trim();
-    (this.registros as any).apellido = (data.apellido ?? qp.get('apellido') ?? '').toString().trim();
-    this.registros.unidad = (data.codigo ?? data.unidad ?? qp.get('unidad') ?? '').toString().trim();
+const qp = this.route.snapshot.queryParamMap;
+
+// ✅ UNIDAD
+this.registros.unidad = (data.codigo ?? data.unidad ?? qp.get('unidad') ?? '').toString().trim();
+
+// ✅ NOMBRE (nuevo modelo primero)
+this.registros.nombre = (
+  data.propietarioNombre ??            // ✅ nuevo
+  data.nombre ??                       // legacy
+  data.propietario ??                  // por si existe
+  data.legacy?.propietarioNombre ??    // si lo guardaste en legacy map
+  qp.get('nombre') ??
+  ''
+).toString().trim();
+
+// ✅ APELLIDO (si no lo tienes en la unidad, se puede completar con usuarios/{uid})
+(this.registros as any).apellido = (
+  data.apellidos ??
+  data.apellido ??
+  data.legacy?.apellidos ??
+  data.legacy?.apellido ??
+  qp.get('apellido') ??
+  ''
+).toString().trim();
+
 
     await this.cargarPagosTotales();
     await this.cargarDeudaHistoricaAcumulada();
@@ -824,7 +826,7 @@ async generarReciboYSubirPDF(
     body: tablaPagoActual,
     theme: 'plain',
     styles: {
-      fontSize: 7,
+      fontSize: 10,
       cellPadding: { top: 0.8, right: 0.8, bottom: 0.8, left: 0.8 },
       overflow: 'linebreak'
     },
@@ -864,25 +866,42 @@ async generarReciboYSubirPDF(
   // =========================
   // TABLA SALDOS (SALDO / TOTAL)
   // =========================
+
   autoTable(pdfDoc, {
-    startY: yDespuesSellos,
-    head: [['SALDO', 'TOTAL']],
-    body: [
-      ['ADMINISTRACIÓN', `$ ${Number(datos.pendientesDespues.administracion ?? 0).toFixed(2)}`],
-      ['MINUTOS',        `$ ${Number(datos.pendientesDespues.minutosAtraso ?? 0).toFixed(2)}`],
-      ['MINUTOS BASE',   `$ ${Number(datos.pendientesDespues.minutosBase ?? 0).toFixed(2)}`],
-      ['MULTAS',         `$ ${Number(datos.pendientesDespues.multas ?? 0).toFixed(2)}`]
-    ],
-    theme: 'plain',
-    styles: { fontSize: 7, cellPadding: 1.0 },
-    headStyles: { fontStyle: 'bold', textColor: 120 },
-    tableWidth: W - (margin * 2),
-    columnStyles: {
-      0: { halign: 'left',  cellWidth: 46 },
-      1: { halign: 'right', cellWidth: 26 }
-    },
-    margin: { left: margin, right: margin }
-  });
+  startY: yDespuesSellos,
+  head: [['SALDO', 'TOTAL']],
+  body: [
+    ['ADMINISTRACIÓN', `$ ${Number(datos.pendientesDespues.administracion ?? 0).toFixed(2)}`],
+    ['MINUTOS',        `$ ${Number(datos.pendientesDespues.minutosAtraso ?? 0).toFixed(2)}`],
+    ['MINUTOS BASE',   `$ ${Number(datos.pendientesDespues.minutosBase ?? 0).toFixed(2)}`],
+    ['MULTAS',         `$ ${Number(datos.pendientesDespues.multas ?? 0).toFixed(2)}`]
+  ],
+  theme: 'plain',
+  styles: { fontSize: 9, cellPadding: 1.0 },
+  headStyles: { fontStyle: 'bold', textColor: 120 },
+
+  tableWidth: W - (margin * 2),
+  columnStyles: {
+    0: { halign: 'left',  cellWidth: 46 },
+    1: { halign: 'right', cellWidth: 26 }
+  },
+  margin: { left: margin, right: margin },
+
+  didDrawCell: (data) => {
+  if (data.section !== 'head') return;
+  if (data.row.index !== 0) return;
+  if (data.column.index !== 1) return;
+
+  const xStart = margin;
+  const xEnd   = W - margin;
+  const yLine  = data.cell.y + data.cell.height + 0.6;
+
+  pdfDoc.setDrawColor(180);
+  pdfDoc.setLineWidth(0.4);
+  pdfDoc.line(xStart, yLine, xEnd, yLine);
+}
+
+});
 
   const yFinal2 = (pdfDoc as any).lastAutoTable?.finalY || (yDespuesSellos + 40);
 

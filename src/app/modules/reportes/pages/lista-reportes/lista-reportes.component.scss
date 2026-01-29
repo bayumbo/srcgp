@@ -172,6 +172,147 @@ button:disabled {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  .btn-limpiar-multi{
+    background-color: #007d55;
+  }
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 12px;
+}
+
+.modal-card {
+  position: relative;
+  width: min(520px, 100%);
+  background: rgba(16, 24, 40, 0.92);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  color: #e9eef6;
+
+  h3 { margin: 0 0 12px 0; font-weight: 800; }
+
+  label { display:block; margin-top: 10px; font-size: 12px; opacity: .9; }
+
+  input, select {
+    width: 100%;
+    margin-top: 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(2, 6, 23, 0.45);
+    color: #e9eef6;
+    outline: none;
+  }
+
+  .acciones {
+    display:flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 14px;
+  }
+
+  .error {
+    margin: 10px 0 0;
+    color: #ffb4b4;
+    font-size: 12px;
+  }
+}
+
+.btn-cerrar {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: rgba(255, 0, 0, .15);
+  border: 1px solid rgba(255, 0, 0, .25);
+  color: #ffd6d6;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* =========================
+   PANEL REPORTE EMPRESAS
+========================= */
+.panel-reporte-empresas {
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  background-color: #eef4f3; /* leve contraste */
+  border-radius: 8px;
+  border: 1px solid #cde3df;
+}
+.empresas-fijas {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-empresa {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(2, 6, 23, 0.45);
+}
+
+/* Botones Pintag / Antisana */
+.empresa-botones {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.empresa-botones .btn-primario {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.empresa-botones .btn-primario.activo {
+  background-color: #2f8071;
+  color: #ffffff;
+}
+
+/* Rango de fechas */
+.rango-fechas {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.campo-fecha {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.campo-fecha label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.error-fecha {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: #c0392b;
+  font-weight: 600;
+}
+
+/* Acción generar PDF empresa */
+.acciones-empresa {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* =========================
@@ -370,6 +511,231 @@ button:disabled {
   margin-top: 0.6rem;
   font-size: 0.75rem;
   color: #666;
+}
+/* =========================
+   BOTONES – JERARQUÍA VISUAL (override)
+========================= */
+
+/* Base: mejor legibilidad y "click feel" */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  min-height: 38px;
+  padding: 0.5rem 0.95rem;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  border: 1px solid transparent;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  transform: translateY(0);
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.10);
+}
+
+button:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+/* --- Variantes principales --- */
+
+/* Primary “institucional” (por defecto para acciones importantes) */
+.btn-primario {
+  background: linear-gradient(180deg, #2f8071 0%, #25685c 100%);
+  color: #fff;
+  border-color: rgba(47, 128, 113, 0.35);
+}
+
+/* Secondary (neutro) */
+.btn-secundario {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #e5e7eb;
+  box-shadow: none; /* que se vea más ligero */
+}
+
+.btn-secundario:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+/* Chips (Hoy/Semana/Mes/Reporte Empresas) */
+.btn-chip {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: .35rem .85rem;
+  min-height: 34px;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.btn-chip:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+/* Estado “activo” para chip (si quieres, opcional: agrega class.activo en HTML cuando aplique) */
+.btn-chip.activo {
+  background: #2f8071;
+  border-color: rgba(47, 128, 113, .35);
+  color: #fff;
+}
+
+/* =========================
+   DIFERENCIACIÓN POR ACCIÓN (sin cambiar HTML)
+   Usamos selectores por posición/orden dentro de .grupo-botones
+========================= */
+
+.grupo-botones > button.btn-primario:nth-child(1) {
+  /* Agregar día = Success */
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.grupo-botones > button.btn-secundario:nth-child(2) {
+  /* Eliminar día = Danger (si es btn-secundario en tu HTML actual, lo estilizamos como peligro) */
+  background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  border-color: rgba(239, 68, 68, .35);
+  box-shadow: 0 6px 14px rgba(185, 28, 28, 0.18);
+}
+
+.grupo-botones > button.btn-primario:nth-child(3) {
+  /* Subir Excel = Info */
+  background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+.grupo-botones > button.btn-secundario:nth-child(5) {
+  /* Filtros = Neutral outline */
+  background: #ffffff;
+  border-color: #d1d5db;
+  color: #111827;
+  box-shadow: none;
+}
+
+.grupo-botones > button.btn-primario:nth-child(6) {
+  /* + Nuevo Registro = Primary fuerte */
+  background: linear-gradient(180deg, #2f8071 0%, #1f5a50 100%);
+  border-color: rgba(47, 128, 113, 0.45);
+}
+/* =========================
+   FILTROS (chips) – diferenciación
+========================= */
+
+.filtros-rapidos {
+  gap: 10px;
+}
+
+.filtros-rapidos .btn-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+/* HOVER más notorio */
+.filtros-rapidos .btn-chip:hover:not(:disabled) {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+/* ✅ Resaltar “Reporte Empresas” como chip especial (último chip del grupo) */
+.filtros-rapidos .btn-chip:last-child {
+  background: #fff7ed;              /* tono cálido */
+  border-color: #fdba74;
+  color: #7c2d12;
+}
+
+.filtros-rapidos .btn-chip:last-child:hover:not(:disabled) {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
+
+/* Si luego quieres "activo", puedes añadir class activo en HTML */
+.filtros-rapidos .btn-chip.activo {
+  background: #2f8071;
+  border-color: rgba(47, 128, 113, 0.35);
+  color: #fff;
+}
+
+/* =========================
+   FILTRO FECHA (Buscar) – botón más claro
+========================= */
+.filtro-fecha .btn-secundario {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+}
+
+.filtro-fecha .btn-secundario:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+/* =========================
+   ACCIONES PDF – diferenciación
+========================= */
+
+.acciones-pdf {
+  gap: 12px;
+}
+
+/* Estilo base de esos botones */
+.acciones-pdf .btn-secundario {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+/* Hover */
+.acciones-pdf .btn-secundario:hover:not(:disabled) {
+  background: #eef2f7;
+  border-color: #cbd5e1;
+}
+
+/* ✅ Botones PDF como “info” (los dos primeros) */
+.acciones-pdf .btn-secundario:nth-child(1),
+.acciones-pdf .btn-secundario:nth-child(2) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.acciones-pdf .btn-secundario:nth-child(1):hover:not(:disabled),
+.acciones-pdf .btn-secundario:nth-child(2):hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #60a5fa;
+}
+
+/* ✅ Limpiar filtros como “danger-light” (último botón) */
+.acciones-pdf .btn-secundario:last-child {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.acciones-pdf .btn-secundario:last-child:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
+/* En pantallas pequeñas: botones full width por filas si hace falta */
+@media (max-width: 768px) {
+  .grupo-botones button {
+    flex: 1 1 auto;
+  }
 }
 
 /* =========================

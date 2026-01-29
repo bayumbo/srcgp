@@ -1,3 +1,4 @@
+
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -12,6 +13,7 @@ import {
   limit,
   serverTimestamp,
   writeBatch,
+  where,
 } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -22,6 +24,7 @@ import { AuthService } from 'src/app/core/auth/services/auth.service';
 import { ReportesDiaService } from '../../services/reportes-dia.service';
 import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import * as XLSX from 'xlsx';
+
 type EmpresaNombre = 'General Pintag' | 'Expreso Antisana';
 
 type ReporteListaRow = ReporteConPagos & {
@@ -29,7 +32,6 @@ type ReporteListaRow = ReporteConPagos & {
   empresaKey: string;
 
   // DocId real del doc dentro de subcolección "unidades"
-  // Ej: "ExpresoAntisana_E13"
   unidadDocId: string;
 
   // Código visual: "E13"
@@ -42,11 +44,13 @@ type ReporteListaRow = ReporteConPagos & {
   uidPropietario: string;
   propietarioNombre: string;
 };
+
 type FilaExcelMinutos = {
   unidad: string;   // E01 / P01
   fecha: string;    // YYYY-MM-DD
   valor: number;    // número
 };
+
 @Component({
   selector: 'app-reporte-lista',
   standalone: true,
@@ -55,10 +59,13 @@ type FilaExcelMinutos = {
   styleUrls: ['./lista-reportes.component.scss'],
 })
 export class ReporteListaComponent implements OnInit {
+  // =========================
   // UI state
+  // =========================
   creandoDia = false;
   cargando = true;
   cargandoEliminacion = false;
+  eliminandoDia: boolean = false;
 
   esSocio = false;
 
@@ -70,7 +77,7 @@ export class ReporteListaComponent implements OnInit {
   mostrarFiltros = false;
   fechaPersonalizada = ''; // yyyy-mm-dd
 
-  // Reporte empresas (mantengo tus variables aunque aquí no las toco)
+  // Reporte empresas (restaurado)
   mostrarOpcionesEmpresa = false;
   empresaSeleccionada: EmpresaNombre | null = null;
   fechaInicio = '';
@@ -84,17 +91,33 @@ export class ReporteListaComponent implements OnInit {
   // Selección múltiple
   seleccion = new Set<string>();
   seleccionarTodo = false;
-  subiendoExcel: boolean = false;
 
-  progresoExcel: { total: number; ok: number; fail: number } = {
-  total: 0,
-  ok: 0,
-  fail: 0
-};
+  // Excel
+  subiendoExcel: boolean = false;
+  progresoExcel: { total: number; ok: number; fail: number } = { total: 0, ok: 0, fail: 0 };
+
+  // =========================
+  // MODALES: Agregar/Eliminar día (fecha puntual)
+  // =========================
+  mostrarModalAgregarDia: boolean = false;
+  fechaNuevaDia: string = ''; // YYYY-MM-DD
+  errorCrearDia: string = '';
+
+  mostrarModalEliminarDia: boolean = false;
+  fechaEliminarDia: string = ''; // YYYY-MM-DD
+  errorEliminarDia: string = '';
+
+  // =========================
+  // Injections
+  // =========================
   private firestore = inject(Firestore);
   private router = inject(Router);
+
   private nombrePorUnidad = new Map<string, string>();
   private nombresCargados = false;
+
+  moduloActivo: 'cobros' | 'cierre' | null = null;
+
   constructor(
     private authService: AuthService,
     private reportesDiaService: ReportesDiaService
@@ -116,6 +139,14 @@ export class ReporteListaComponent implements OnInit {
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private hoyISO(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   private startOfWeekISO(date: Date): string {
@@ -146,8 +177,6 @@ export class ReporteListaComponent implements OnInit {
   }
 
   private empresaToKey(empresa: string): string {
-    // "Expreso Antisana" -> "ExpresoAntisana"
-    // "General Pintag" -> "GeneralPintag"
     return (empresa || '').replace(/\s+/g, '').trim();
   }
 
@@ -156,98 +185,18 @@ export class ReporteListaComponent implements OnInit {
   }
 
   private unidadDocIdFromCodigo(empresaKey: string, codigo: string): string {
-    // Ej: empresaKey=ExpresoAntisana, codigo=E13 -> ExpresoAntisana_E13
     return `${empresaKey}_${(codigo || '').toString().trim()}`;
   }
 
-  // Key canónica de UI: empresaKey|fechaISO|unidadDocId
   private keyDeFila(r: Pick<ReporteListaRow, 'empresaKey' | 'fechaISO' | 'unidadDocId'>): string {
     return `${r.empresaKey}|${r.fechaISO}|${r.unidadDocId}`;
   }
-  private normUnidad(u: any): string {
-  return (u ?? '').toString().trim().toUpperCase();
-}
-
-private async cargarMaestroNombresUnidades(): Promise<void> {
-  if (this.nombresCargados) return;
-
-  this.nombrePorUnidad.clear();
-
-  const ref = collection(this.firestore, 'unidades');
-  const snap = await getDocs(ref);
-
-  snap.forEach(docSnap => {
-    const data: any = docSnap.data();
-
-    // Prioridad: campo 'codigo' (E01 / P01)
-    const codigo = this.normUnidad(data.codigo || '');
-
-    // Nombre REAL del propietario
-    const nombre = (data.propietarioNombre ?? '').toString().trim();
-
-    if (codigo && nombre) {
-      this.nombrePorUnidad.set(codigo, nombre);
-    }
-  });
-
-  this.nombresCargados = true;
-}
-
-
-private aplicarNombreSoloSiFalta(): void {
-  if (!this.reportes?.length) return;
-
-  // Creamos nuevo array para forzar refresco visual
-  this.reportes = this.reportes.map((r: any) => {
-    const nombreActual = (r?.nombre ?? '').toString().trim();
-    if (nombreActual) return r; // ❌ no tocar si ya tiene nombre
-
-    const unidad = this.normUnidad(r?.unidad);
-    const nombreResuelto = this.nombrePorUnidad.get(unidad) || '';
-
-    return { ...r, nombre: nombreResuelto };
-  });
-}
-
-
-private esFechaISO(val: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(val);
-}
-
-private async leerExcelMinutos(file: File): Promise<FilaExcelMinutos[]> {
-  const data = await file.arrayBuffer();
-  const wb = XLSX.read(data, { type: 'array' });
-
-  const sheetName = wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-
-  const raw: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-  if (!raw.length) throw new Error('El Excel está vacío.');
-
-  // Columnas exactas del formato que me pasaste
-  const requiredKeys = ['Unidad *', 'Fecha *', 'Valor *'];
-  const keys = Object.keys(raw[0] || {});
-  for (const rk of requiredKeys) {
-    if (!keys.includes(rk)) {
-      throw new Error(`Falta la columna obligatoria: "${rk}"`);
-    }
-  }
-
-  return raw.map((r, idx) => {
-    const unidad = String(r['Unidad *'] || '').trim().toUpperCase();
-    const fecha = String(r['Fecha *'] || '').trim();
-    const valor = Number(r['Valor *']);
-
-    if (!unidad) throw new Error(`Fila ${idx + 2}: "Unidad" vacía.`);
-    if (!this.esFechaISO(fecha)) throw new Error(`Fila ${idx + 2}: "Fecha" inválida (${fecha}). Use YYYY-MM-DD.`);
-    if (!Number.isFinite(valor)) throw new Error(`Fila ${idx + 2}: "Valor" inválido (${r['Valor *']}).`);
-
-    return { unidad, fecha, valor };
-  });
-}
 
   trackByReporte = (_: number, r: ReporteListaRow) => this.keyDeFila(r);
+
+  private normUnidad(u: any): string {
+    return (u ?? '').toString().trim().toUpperCase();
+  }
 
   private esRegistroVisible(r: any): boolean {
     const asignados =
@@ -270,7 +219,6 @@ private async leerExcelMinutos(file: File): Promise<FilaExcelMinutos[]> {
     const eb = (b.empresa ?? '').toString();
     if (ea !== eb) return ea.localeCompare(eb);
 
-    // Ordena por número dentro del código (E13 -> 13)
     const ca = (a.codigo ?? a.unidad ?? '').toString();
     const cb = (b.codigo ?? b.unidad ?? '').toString();
     const numA = parseInt(ca.replace(/\D/g, ''), 10) || 0;
@@ -284,6 +232,77 @@ private async leerExcelMinutos(file: File): Promise<FilaExcelMinutos[]> {
     if (fa !== fb) return fa - fb;
     return this.ordenarPorEmpresaUnidad(a, b);
   }
+
+  // ==========================
+  // Maestro nombres (para Excel)
+  // ==========================
+  private async cargarMaestroNombresUnidades(): Promise<void> {
+    if (this.nombresCargados) return;
+
+    this.nombrePorUnidad.clear();
+
+    const ref = collection(this.firestore, 'unidades');
+    const snap = await getDocs(ref);
+
+    snap.forEach(docSnap => {
+      const data: any = docSnap.data();
+      const codigo = this.normUnidad(data.codigo || '');
+      const nombre = (data.propietarioNombre ?? '').toString().trim();
+      if (codigo && nombre) this.nombrePorUnidad.set(codigo, nombre);
+    });
+
+    this.nombresCargados = true;
+  }
+
+  private aplicarNombreSoloSiFalta(): void {
+    if (!this.reportes?.length) return;
+
+    this.reportes = this.reportes.map((r: any) => {
+      const nombreActual = (r?.nombre ?? '').toString().trim();
+      if (nombreActual) return r;
+
+      const unidad = this.normUnidad(r?.unidad);
+      const nombreResuelto = this.nombrePorUnidad.get(unidad) || '';
+      return { ...r, nombre: nombreResuelto };
+    });
+  }
+
+  // ==========================
+  // Excel Minutos
+  // ==========================
+  private esFechaISO(val: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(val);
+  }
+
+  private async leerExcelMinutos(file: File): Promise<FilaExcelMinutos[]> {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: 'array' });
+
+    const sheetName = wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+
+    const raw: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!raw.length) throw new Error('El Excel está vacío.');
+
+    const requiredKeys = ['Unidad *', 'Fecha *', 'Valor *'];
+    const keys = Object.keys(raw[0] || {});
+    for (const rk of requiredKeys) {
+      if (!keys.includes(rk)) throw new Error(`Falta la columna obligatoria: "${rk}"`);
+    }
+
+    return raw.map((r, idx) => {
+      const unidad = String(r['Unidad *'] || '').trim().toUpperCase();
+      const fecha = String(r['Fecha *'] || '').trim();
+      const valor = Number(r['Valor *']);
+
+      if (!unidad) throw new Error(`Fila ${idx + 2}: "Unidad" vacía.`);
+      if (!this.esFechaISO(fecha)) throw new Error(`Fila ${idx + 2}: "Fecha" inválida (${fecha}). Use YYYY-MM-DD.`);
+      if (!Number.isFinite(valor)) throw new Error(`Fila ${idx + 2}: "Valor" inválido (${r['Valor *']}).`);
+
+      return { unidad, fecha, valor };
+    });
+  }
+
   private resolverEmpresaPorUnidad(codigoUnidad: string): {
     empresa: string;
     empresaKey: string;
@@ -291,93 +310,85 @@ private async leerExcelMinutos(file: File): Promise<FilaExcelMinutos[]> {
   } {
     const unidad = (codigoUnidad || '').trim().toUpperCase();
 
-    if (/^E\d+/.test(unidad)) {
-      return { empresa: 'Expreso Antisana', empresaKey: 'ExpresoAntisana', unidad };
-    }
-
-    if (/^P\d+/.test(unidad)) {
-      return { empresa: 'General Pintag', empresaKey: 'GeneralPintag', unidad };
-    }
+    if (/^E\d+/.test(unidad)) return { empresa: 'Expreso Antisana', empresaKey: 'ExpresoAntisana', unidad };
+    if (/^P\d+/.test(unidad)) return { empresa: 'General Pintag', empresaKey: 'GeneralPintag', unidad };
 
     throw new Error(`Unidad "${codigoUnidad}" no válida. Use E01 o P01.`);
   }
+
   private async guardarMinutosDesdeExcel(filas: FilaExcelMinutos[]): Promise<void> {
-  const CHUNK = 450;
+    const CHUNK = 450;
 
-  for (let i = 0; i < filas.length; i += CHUNK) {
-    const chunk = filas.slice(i, i + CHUNK);
-    const batch = writeBatch(this.firestore);
+    for (let i = 0; i < filas.length; i += CHUNK) {
+      const chunk = filas.slice(i, i + CHUNK);
+      const batch = writeBatch(this.firestore);
 
-    for (const f of chunk) {
-      try {
-        const r = this.resolverEmpresaPorUnidad(f.unidad);
+      for (const f of chunk) {
+        try {
+          const r = this.resolverEmpresaPorUnidad(f.unidad);
 
-        const diaId = `${r.empresaKey}_${f.fecha}`;
-        const unidadDocId = `${r.empresaKey}_${r.unidad}`;
+          const diaId = `${r.empresaKey}_${f.fecha}`;
+          const unidadDocId = `${r.empresaKey}_${r.unidad}`;
 
-        const diaRef = doc(this.firestore, `reportes_dia/${diaId}`);
-        batch.set(diaRef, {
-          empresa: r.empresa,
-          fecha: f.fecha,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
+          const diaRef = doc(this.firestore, `reportes_dia/${diaId}`);
+          batch.set(diaRef, {
+            empresa: r.empresa,
+            fecha: f.fecha,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
 
-        const unidadRef = doc(this.firestore, `reportes_dia/${diaId}/unidades/${unidadDocId}`);
-        batch.set(unidadRef, {
-          codigo: r.unidad,
-          empresa: r.empresa,
-          fecha: f.fecha,
-          minutosAtraso: f.valor,
-          fechaModificacion: serverTimestamp()
-        }, { merge: true });
+          const unidadRef = doc(this.firestore, `reportes_dia/${diaId}/unidades/${unidadDocId}`);
+          batch.set(unidadRef, {
+            codigo: r.unidad,
+            empresa: r.empresa,
+            fecha: f.fecha,
+            minutosAtraso: f.valor,
+            fechaModificacion: serverTimestamp()
+          }, { merge: true });
 
-        this.progresoExcel.ok++;
-      } catch (err) {
-        this.progresoExcel.fail++;
-        console.error('Fila fallida:', f, err);
+          this.progresoExcel.ok++;
+        } catch (err) {
+          this.progresoExcel.fail++;
+          console.error('Fila fallida:', f, err);
+        }
       }
+
+      await batch.commit();
     }
-
-    await batch.commit();
   }
-}
-async onExcelMinutosSelected(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
 
-  this.subiendoExcel = true;
-  this.progresoExcel = { total: 0, ok: 0, fail: 0 };
+  async onExcelMinutosSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
 
-  try {
-    const filas = await this.leerExcelMinutos(file);
-    this.progresoExcel.total = filas.length;
+    this.subiendoExcel = true;
+    this.progresoExcel = { total: 0, ok: 0, fail: 0 };
 
-    await this.guardarMinutosDesdeExcel(filas);
+    try {
+      const filas = await this.leerExcelMinutos(file);
+      this.progresoExcel.total = filas.length;
 
-    // 🔁 Siempre recargar el día (vista principal)
-    const fechaISO = (this.fechaPersonalizada && this.fechaPersonalizada.trim())
-      ? this.fechaPersonalizada.trim()
-      : filas[0]?.fecha;
+      await this.guardarMinutosDesdeExcel(filas);
 
-    if (fechaISO) {
-      await this.cargarDiaEnListaReportes(fechaISO);
+      const fechaISO = (this.fechaPersonalizada && this.fechaPersonalizada.trim())
+        ? this.fechaPersonalizada.trim()
+        : filas[0]?.fecha;
+
+      if (fechaISO) await this.cargarDiaEnListaReportes(fechaISO);
+
+      await this.cargarMaestroNombresUnidades();
+      this.aplicarNombreSoloSiFalta();
+
+      alert(`Carga completa. OK: ${this.progresoExcel.ok}, Fallas: ${this.progresoExcel.fail}`);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || 'Error al procesar el Excel.');
+    } finally {
+      this.subiendoExcel = false;
+      input.value = '';
     }
-
-    // 🧠 Resolver nombres SOLO para filas sin nombre (Excel)
-    await this.cargarMaestroNombresUnidades();
-    this.aplicarNombreSoloSiFalta();
-
-    alert(`Carga completa. OK: ${this.progresoExcel.ok}, Fallas: ${this.progresoExcel.fail}`);
-  } catch (e: any) {
-    console.error(e);
-    alert(e?.message || 'Error al procesar el Excel.');
-  } finally {
-    this.subiendoExcel = false;
-    input.value = '';
   }
-}
-
 
   // ==========================
   // Selección múltiple
@@ -405,6 +416,15 @@ async onExcelMinutosSelected(event: Event) {
 
   get seleccionCount(): number {
     return this.seleccion.size;
+  }
+
+  abrirCalendario(input: HTMLInputElement): void {
+    if (input && typeof (input as any).showPicker === 'function') {
+      (input as any).showPicker();
+    } else {
+      input.focus();
+      input.click();
+    }
   }
 
   // ==========================
@@ -467,7 +487,6 @@ async onExcelMinutosSelected(event: Event) {
         return;
       }
 
-      // Registros por empresa (idealmente esta función ya lee de reportes_dia/{dia}/unidades)
       const regsPorEmpresa = await Promise.all(
         empresas.map((emp, i) =>
           existe[i] ? this.reportesDiaService.getRegistrosDia(emp as any, fechaISO) : Promise.resolve([])
@@ -483,9 +502,6 @@ async onExcelMinutosSelected(event: Event) {
         const diaId = this.diaDocId(empKey, fechaISO);
 
         for (const r of regs as any[]) {
-          // Compatibilidad:
-          // - r.id / r.unidadId puede venir como "ExpresoAntisana_E13"
-          // - r.codigo suele ser "E13"
           const codigo = (r.codigo ?? '').toString().trim();
           const unidadDocId = (r.unidadId ?? r.id ?? '').toString().trim()
             || (codigo ? this.unidadDocIdFromCodigo(empKey, codigo) : '');
@@ -494,16 +510,14 @@ async onExcelMinutosSelected(event: Event) {
 
           const refPath = `reportes_dia/${diaId}/unidades/${unidadDocId}`;
 
-          // Campos canónicos (preferidos)
           const propietarioNombre = (r.propietarioNombre ?? r.nombre ?? '').toString().trim();
           const uidPropietario = (r.uidPropietario ?? r.uid ?? '').toString().trim();
 
-          const row: ReporteListaRow = {
-            // ReporteConPagos base
+          temp.push({
             id: unidadDocId,
-            uid: uidPropietario, // compatibilidad con tu navegación actual
-            unidad: codigo || unidadDocId, // en tabla se muestra E13
-            nombre: propietarioNombre,     // importante: pintar desde propietarioNombre
+            uid: uidPropietario,
+            unidad: codigo || unidadDocId,
+            nombre: propietarioNombre,
             apellido: (r.apellido ?? '').toString().trim(),
 
             minutosAtraso: r.minutosAtraso ?? 0,
@@ -528,9 +542,7 @@ async onExcelMinutosSelected(event: Event) {
 
             uidPropietario,
             propietarioNombre,
-          } as any;
-
-          temp.push(row);
+          } as any);
         }
       }
 
@@ -584,7 +596,7 @@ async onExcelMinutosSelected(event: Event) {
       const temp: ReporteListaRow[] = [];
 
       for (let i = 0; i < dias.length; i++) {
-        const dia = dias[i]; // { empresa, fecha }
+        const dia = dias[i];
         const regs = registrosPorDia[i] || [];
         const emp = dia.empresa as EmpresaNombre;
         const empKey = this.empresaToKey(emp);
@@ -660,27 +672,166 @@ async onExcelMinutosSelected(event: Event) {
   }
 
   // ==========================
-  // Botón: Agregar día (crea día completo)
+  // MODAL: Agregar día (fecha puntual) -> usa ReportesDiaService (CREA UNIDADES BIEN)
   // ==========================
-  async agregarDia() {
-    try {
-      this.creandoDia = true;
+  abrirModalAgregarDia(): void {
+    this.errorCrearDia = '';
+    this.mostrarModalAgregarDia = true;
+    this.fechaNuevaDia = this.hoyISO();
+  }
 
-      const res = await this.reportesDiaService.agregarDiaCompleto();
+  cerrarModalAgregarDia(): void {
+    this.mostrarModalAgregarDia = false;
+  }
+
+  async confirmarAgregarDia(): Promise<void> {
+    if (this.creandoDia) return;
+
+    this.creandoDia = true;
+    this.errorCrearDia = '';
+
+    const fecha = (this.fechaNuevaDia || '').trim();
+    if (!fecha) {
+      this.errorCrearDia = 'Selecciona una fecha.';
+      this.creandoDia = false;
+      return;
+    }
+
+    try {
+      // ✅ CLAVE: usa el service que ya crea doc día + subcolección unidades.
+      // ✅ Debes tener agregarDiaCompleto(fechaISO?: string) en ReportesDiaService.
+      const res = await this.reportesDiaService.agregarDiaCompleto(fecha);
+
       alert(`Día ${res.fecha} creado/actualizado. Nuevos: ${res.creados}. Ya existentes: ${res.omitidos}.`);
 
       this.fechaPersonalizada = res.fecha;
       await this.cargarDiaEnListaReportes(res.fecha);
+
+      this.cerrarModalAgregarDia();
+      this.mostrarFiltros = false;
     } catch (e) {
       console.error(e);
-      alert('Error al agregar día. Revise consola.');
+      this.errorCrearDia = 'Error al crear el día. Revise consola.';
     } finally {
       this.creandoDia = false;
     }
   }
 
   // ==========================
-  // Filtros
+  // MODAL: Eliminar día (fecha puntual) - ambas empresas
+  // ==========================
+  abrirModalEliminarDia(): void {
+    this.errorEliminarDia = '';
+    this.mostrarModalEliminarDia = true;
+    this.fechaEliminarDia = this.hoyISO();
+  }
+
+  cerrarModalEliminarDia(): void {
+    this.mostrarModalEliminarDia = false;
+  }
+
+  private async borrarSubcoleccionEnChunks(path: string, chunkSize = 400): Promise<void> {
+    while (true) {
+      const colRef = collection(this.firestore, path);
+      const snap = await getDocs(colRef);
+
+      if (snap.empty) break;
+
+      const docs = snap.docs.slice(0, chunkSize);
+      const batch = writeBatch(this.firestore);
+      docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+
+      if (docs.length < chunkSize) break;
+    }
+  }
+
+  private async borrarUnidadesYSubcolecciones(diaPath: string, chunkSize = 200): Promise<void> {
+    const unidadesPath = `${diaPath}/unidades`;
+
+    while (true) {
+      const colUnidades = collection(this.firestore, unidadesPath);
+      const snapUnidades = await getDocs(colUnidades);
+      if (snapUnidades.empty) break;
+
+      const lote = snapUnidades.docs.slice(0, chunkSize);
+
+      // 1) borrar pagosTotales dentro de cada unidad
+      for (const u of lote) {
+        await this.borrarSubcoleccionEnChunks(`${u.ref.path}/pagosTotales`, 400);
+      }
+
+      // 2) borrar unidades (batch)
+      const batch = writeBatch(this.firestore);
+      lote.forEach(u => batch.delete(u.ref));
+      await batch.commit();
+
+      if (lote.length < chunkSize) break;
+    }
+  }
+
+  async confirmarEliminarDia(): Promise<void> {
+    if (this.eliminandoDia) return;
+    this.eliminandoDia = true;
+    this.errorEliminarDia = '';
+
+    const fecha = (this.fechaEliminarDia || '').trim();
+
+    const EMPRESAS = [
+      { nombre: 'General Pintag', id: 'GeneralPintag' },
+      { nombre: 'Expreso Antisana', id: 'ExpresoAntisana' }
+    ];
+
+    try {
+      if (!fecha) {
+        this.errorEliminarDia = 'Selecciona una fecha.';
+        return;
+      }
+
+      const ok = confirm(
+        `¿Seguro que deseas eliminar el día ${fecha} para ambas empresas?\n` +
+        `Esto eliminará unidades y pagos de ese día.`
+      );
+      if (!ok) return;
+
+      const resultados: string[] = [];
+
+      for (const emp of EMPRESAS) {
+        const diaId = `${emp.id}_${fecha}`;
+        const diaPath = `reportes_dia/${diaId}`;
+        const diaRef = doc(this.firestore, diaPath);
+
+        const snapDia = await getDoc(diaRef);
+        if (!snapDia.exists()) {
+          resultados.push(`⚠️ ${emp.nombre}: no existe`);
+          continue;
+        }
+
+        // 1) borrar subcolección unidades + pagosTotales
+        await this.borrarUnidadesYSubcolecciones(diaPath, 200);
+
+        // 2) borrar doc día
+        await deleteDoc(diaRef);
+
+        resultados.push(`✅ ${emp.nombre}: eliminado`);
+      }
+
+      this.cerrarModalEliminarDia();
+      alert(`Resultado:\n${resultados.join('\n')}`);
+
+      // ✅ Refrescar vista: cargar el último día existente
+      await this.cargarUltimoDiaGenerado();
+
+    } catch (e) {
+      console.error(e);
+      this.errorEliminarDia = 'Error al eliminar el día.';
+    } finally {
+      this.eliminandoDia = false;
+    }
+  }
+
+  // ==========================
+  // Filtros restaurados (sin filtro unidad)
   // ==========================
   async filtrarPor(tipo: 'hoy' | 'semana' | 'mes') {
     const hoy = new Date();
@@ -710,6 +861,169 @@ async onExcelMinutosSelected(event: Event) {
   }
 
   // ==========================
+  // Empresa + rango + validación 31 días (restaurado)
+  // ==========================
+  seleccionarEmpresa(nombreBoton: 'Pintag' | 'Antisana') {
+    this.empresaSeleccionada = (nombreBoton === 'Pintag')
+      ? 'General Pintag'
+      : 'Expreso Antisana';
+
+    this.fechaInicio = '';
+    this.fechaFin = '';
+    this.errorFecha = '';
+  }
+
+  validarRangoFechas() {
+    if (this.fechaInicio && this.fechaFin) {
+      const inicio = new Date(`${this.fechaInicio}T12:00:00`);
+      const fin = new Date(`${this.fechaFin}T12:00:00`);
+      const diferenciaDias = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (diferenciaDias < 0) {
+        this.errorFecha = 'La fecha de inicio no puede ser mayor que la de fin.';
+        this.reportes = [];
+      } else if (diferenciaDias > 31) {
+        this.errorFecha = 'El rango no debe superar los 31 días.';
+        this.reportes = [];
+      } else {
+        this.errorFecha = '';
+        this.actualizarVistaPorRango();
+      }
+    }
+  }
+
+  async actualizarVistaPorRango() {
+    if (!this.fechaInicio || !this.fechaFin || this.errorFecha) {
+      this.reportes = [];
+      return;
+    }
+
+    const inicioISO = this.fechaInicio;
+    const finISO = this.fechaFin;
+
+    await this.cargarRangoDetalladoEnListaReportesPorEmpresa(inicioISO, finISO, this.empresaSeleccionada);
+  }
+
+  async cargarRangoDetalladoEnListaReportesPorEmpresa(
+    inicioISO: string,
+    finISO: string,
+    empresa: EmpresaNombre | null
+  ) {
+    this.cargando = true;
+    this.mostrarMensajeDia = false;
+    this.mensajeEstadoDia = '';
+    this.limpiarSeleccion();
+
+    try {
+      const dias = await this.reportesDiaService.getDiasEnRango(inicioISO, finISO);
+
+      const diasFiltrados = (empresa)
+        ? (dias || []).filter(d => (d.empresa ?? '') === empresa)
+        : (dias || []);
+
+      if (!diasFiltrados || diasFiltrados.length === 0) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No existen reportes generados para ${empresa ?? 'las empresas'} entre ${inicioISO} y ${finISO}.`;
+        return;
+      }
+
+      const registrosPorDia = await Promise.all(
+        diasFiltrados.map(d => this.reportesDiaService.getRegistrosDia(d.empresa as any, d.fecha))
+      );
+
+      const temp: ReporteListaRow[] = [];
+
+      for (let i = 0; i < diasFiltrados.length; i++) {
+        const dia = diasFiltrados[i];
+        const regs = registrosPorDia[i] || [];
+        const emp = dia.empresa as EmpresaNombre;
+        const empKey = this.empresaToKey(emp);
+        const diaId = this.diaDocId(empKey, dia.fecha);
+
+        for (const r of regs as any[]) {
+          const codigo = (r.codigo ?? '').toString().trim();
+          const unidadDocId = (r.unidadId ?? r.id ?? '').toString().trim()
+            || (codigo ? this.unidadDocIdFromCodigo(empKey, codigo) : '');
+
+          if (!unidadDocId) continue;
+
+          const refPath = `reportes_dia/${diaId}/unidades/${unidadDocId}`;
+
+          const propietarioNombre = (r.propietarioNombre ?? r.nombre ?? '').toString().trim();
+          const uidPropietario = (r.uidPropietario ?? r.uid ?? '').toString().trim();
+
+          temp.push({
+            id: unidadDocId,
+            uid: uidPropietario,
+            unidad: codigo || unidadDocId,
+            nombre: propietarioNombre,
+            apellido: (r.apellido ?? '').toString().trim(),
+
+            minutosAtraso: r.minutosAtraso ?? 0,
+            administracion: r.administracion ?? 0,
+            minutosBase: r.minutosBase ?? 0,
+            multas: r.multas ?? 0,
+
+            minutosPagados: r.minutosPagados ?? 0,
+            adminPagada: r.adminPagada ?? 0,
+            minBasePagados: r.minBasePagados ?? 0,
+            multasPagadas: r.multasPagadas ?? 0,
+
+            fechaModificacion: new Date(`${dia.fecha}T12:00:00`),
+            empresa: r.empresa ?? emp,
+
+            fechaISO: dia.fecha,
+            empresaKey: empKey,
+
+            unidadDocId,
+            codigo: codigo || (unidadDocId.split('_').pop() ?? unidadDocId),
+            refPath,
+
+            uidPropietario,
+            propietarioNombre,
+          } as any);
+        }
+      }
+
+      const visibles = temp.filter(r => this.esRegistroVisible(r));
+
+      if (visibles.length === 0) {
+        this.reportes = [];
+        this.mostrarMensajeDia = true;
+        this.mensajeEstadoDia = `No existen reportes con valores en el rango ${inicioISO} a ${finISO}.`;
+        return;
+      }
+
+      visibles.sort((a, b) => this.ordenarPorFechaEmpresaUnidad(a, b));
+      this.reportes = visibles;
+
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = `Mostrando reportes del ${inicioISO} al ${finISO} (${empresa ?? 'todas'}).`;
+    } catch (e) {
+      console.error('❌ Error cargando rango (empresa):', e);
+      this.reportes = [];
+      this.mostrarMensajeDia = true;
+      this.mensajeEstadoDia = 'Error al cargar rango por empresa. Revisa consola.';
+    } finally {
+      this.cargando = false;
+    }
+  }
+
+  // ==========================
+  // Limpiar filtros (restaurado)
+  // ==========================
+  async limpiarFiltros() {
+    this.fechaPersonalizada = '';
+    this.fechaInicio = '';
+    this.fechaFin = '';
+    this.empresaSeleccionada = null;
+    this.errorFecha = '';
+
+    await this.cargarUltimoDiaGenerado();
+  }
+
+  // ==========================
   // ELIMINAR (individual) - REAL (por refPath)
   // ==========================
   async eliminarReporte(reporte: ReporteListaRow) {
@@ -728,7 +1042,6 @@ async onExcelMinutosSelected(event: Event) {
       const ref = doc(this.firestore, refPath);
       await deleteDoc(ref);
 
-      // Verificación dura (evita "ficticio")
       const check = await getDoc(ref);
       if (check.exists()) {
         console.error('El documento sigue existiendo tras deleteDoc:', refPath);
@@ -793,46 +1106,45 @@ async onExcelMinutosSelected(event: Event) {
     this.router.navigate(['/reportes/nuevo-registro']);
   }
 
-irAEditar(r: any): void {
-  const uid = r?.uid;
-  const refPath = r?.refPath;
+  irAEditar(r: any): void {
+    const uid = r?.uid;
+    const refPath = r?.refPath;
 
-  if (!uid || !refPath) {
-    alert('❌ No se puede editar: faltan uid o refPath.');
-    return;
+    if (!uid || !refPath) {
+      alert('❌ No se puede editar: faltan uid o refPath.');
+      return;
+    }
+
+    const safe = encodeURIComponent(refPath);
+
+    this.router.navigate(['/reportes/actualizar', uid, safe], {
+      queryParams: {
+        nombre: r?.propietarioNombre ?? r?.nombre ?? '',
+        apellido: r?.apellido ?? '',
+        unidad: r?.codigo ?? r?.unidad ?? ''
+      }
+    });
   }
 
-  const safe = encodeURIComponent(refPath);
+  irAPagar(r: any): void {
+    const uid = (r?.uid ?? '').toString().trim();
+    const refPath = (r?.refPath ?? '').toString().trim();
 
-  this.router.navigate(['/reportes/actualizar', uid, safe], {
-    queryParams: {
-      nombre: r?.propietarioNombre ?? r?.nombre ?? '',
-      apellido: r?.apellido ?? '',
-      unidad: r?.codigo ?? r?.unidad ?? ''
+    if (!uid || !refPath) {
+      alert('❌ No se puede pagar: faltan uid o refPath.');
+      return;
     }
-  });
-}
 
-irAPagar(r: any): void {
-  const uid = (r?.uid ?? '').toString().trim();
-  const refPath = (r?.refPath ?? '').toString().trim(); // debe ser: reportes_dia/.../unidades/...
+    const safeId = encodeURIComponent(refPath);
 
-  if (!uid || !refPath) {
-    alert('❌ No se puede pagar: faltan uid o refPath.');
-    return;
+    this.router.navigate(['/reportes/realizar-pago', uid, safeId], {
+      queryParams: {
+        nombre: (r?.propietarioNombre ?? r?.nombre ?? '').toString(),
+        apellido: (r?.apellido ?? '').toString(),
+        unidad: (r?.codigo ?? r?.unidad ?? '').toString()
+      }
+    });
   }
-
-  const safeId = encodeURIComponent(refPath);
-
-  this.router.navigate(['/reportes/realizar-pago', uid, safeId], {
-    queryParams: {
-      nombre: (r?.propietarioNombre ?? r?.nombre ?? '').toString(),
-      apellido: (r?.apellido ?? '').toString(),
-      unidad: (r?.codigo ?? r?.unidad ?? '').toString()
-    }
-  });
-}
-moduloActivo: 'cobros' | 'cierre' | null = null;
 
   irACuentasPorCobrar() {
     this.router.navigate(['/reportes/cuentas-por-cobrar']);
@@ -847,7 +1159,7 @@ moduloActivo: 'cobros' | 'cierre' | null = null;
   }
 
   // ==========================
-  // PDFs Minutos / Administración (desde la vista actual)
+  // PDFs Minutos / Administración (desde la vista actual) - SIN CAMBIOS
   // ==========================
   imprimirPDFMinutosDesdeVista() {
     if (this.reportes.length === 0) {
@@ -872,201 +1184,430 @@ moduloActivo: 'cobros' | 'cierre' | null = null;
   }
 
   generarPDFMinutos(data: any[], fecha: Date) {
-  const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
-  if (filtrado.length === 0) {
-    alert('No hay valores de minutos para imprimir en esta vista.');
-    return;
+    const filtrado = data.filter(r => (r.minutosAtraso ?? 0) > 0);
+    if (filtrado.length === 0) {
+      alert('No hay valores de minutos para imprimir en esta vista.');
+      return;
+    }
+
+    const docPdf = new jsPDF();
+    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const W = docPdf.internal.pageSize.getWidth();
+    const H = docPdf.internal.pageSize.getHeight();
+    const margin = 15;
+
+    const totalPagesExp = '{total_pages_count_string}';
+
+    const logo1 = new Image();
+    logo1.src = '/assets/img/LogoPintag.png';
+    const logo2 = new Image();
+    logo2.src = '/assets/img/LogoAntisana.png';
+
+    docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
+    docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+    docPdf.setFontSize(16);
+    docPdf.text('Minutos', W / 2, 45, { align: 'center' });
+
+    docPdf.setFontSize(11);
+    docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+    const cuerpo = filtrado.map(item => [
+      item.codigo || item.unidad || '',
+      item.propietarioNombre || item.nombre || '',
+      `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
+      ''
+    ]);
+
+    const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
+
+    autoTable(docPdf, {
+      head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
+      body: cuerpo,
+      startY: 75,
+      styles: { fontSize: 10 },
+      margin: { left: margin, right: margin, bottom: 18 },
+
+      didDrawPage: () => {
+        const W = docPdf.internal.pageSize.getWidth();
+        const H = docPdf.internal.pageSize.getHeight();
+        const margin = 15;
+
+        const pageNumber = (((docPdf as any).internal?.pages?.length) || 1) - 1;
+
+        docPdf.setDrawColor(180);
+        docPdf.line(margin, H - 12, W - margin, H - 12);
+
+        docPdf.setFontSize(6);
+        docPdf.setTextColor(150);
+        docPdf.text(
+          'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+          margin,
+          H - 8,
+          { maxWidth: W - (margin * 2) }
+        );
+
+        docPdf.setFontSize(7);
+        docPdf.setTextColor(120);
+        docPdf.text(
+          `Página ${pageNumber} de ${totalPagesExp}`,
+          W - margin,
+          H - 8,
+          { align: 'right' }
+        );
+      }
+    });
+
+    const lastY = (docPdf as any).lastAutoTable.finalY ?? 75;
+    let yTotal = lastY + 10;
+    if (yTotal > H - 22) yTotal = H - 22;
+
+    docPdf.setFontSize(11);
+    docPdf.setTextColor(20);
+    docPdf.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, margin, yTotal);
+
+    if ((docPdf as any).putTotalPages) (docPdf as any).putTotalPages(totalPagesExp);
+
+    docPdf.save(`Minutos_${this.fechaPersonalizada || 'vista'}.pdf`);
   }
-
-  const docPdf = new jsPDF();
-  const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const W = docPdf.internal.pageSize.getWidth();
-  const H = docPdf.internal.pageSize.getHeight();
-  const margin = 15;
-
-  const totalPagesExp = '{total_pages_count_string}';
-
-  const logo1 = new Image();
-  logo1.src = '/assets/img/LogoPintag.png';
-  const logo2 = new Image();
-  logo2.src = '/assets/img/LogoAntisana.png';
-
-  docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
-  docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
-
-  docPdf.setFontSize(16);
-  docPdf.text('Minutos', W / 2, 45, { align: 'center' });
-
-  docPdf.setFontSize(11);
-  docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
-
-  const cuerpo = filtrado.map(item => [
-    item.codigo || item.unidad || '',
-    item.propietarioNombre || item.nombre || '',
-    `$ ${Number(item.minutosAtraso ?? 0).toFixed(2)}`,
-    ''
-  ]);
-
-  const totalMinutos = filtrado.reduce((sum, item) => sum + (item.minutosAtraso || 0), 0);
-
-  autoTable(docPdf, {
-    head: [['UNIDAD', 'NOMBRE', 'COSTO DE MINUTOS', 'FIRMA']],
-    body: cuerpo,
-    startY: 75,
-    styles: { fontSize: 10 },
-    margin: { left: margin, right: margin, bottom: 18 }, // ✅ espacio para footer
-
-    didDrawPage: () => {
-  const W = docPdf.internal.pageSize.getWidth();
-  const H = docPdf.internal.pageSize.getHeight();
-  const margin = 15;
-
-  const pageNumber = (((docPdf as any).internal?.pages?.length) || 1) - 1;
-
-  // --- Footer (igual al recibo) ---
-  docPdf.setDrawColor(180);
-  docPdf.line(margin, H - 12, W - margin, H - 12);
-
-  docPdf.setFontSize(6);
-  docPdf.setTextColor(150);
-  docPdf.text(
-    'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
-    margin,
-    H - 8,
-    { maxWidth: W - (margin * 2) }
-  );
-
-  // --- Paginación ---
-  docPdf.setFontSize(7);
-  docPdf.setTextColor(120);
-  docPdf.text(
-    `Página ${pageNumber} de ${totalPagesExp}`,
-    W - margin,
-    H - 8,
-    { align: 'right' }
-  );
-}
-
-  });
-
-  // Total (si cae muy abajo, lo subimos para evitar choque con footer)
-  const lastY = (docPdf as any).lastAutoTable.finalY ?? 75;
-  let yTotal = lastY + 10;
-  if (yTotal > H - 22) yTotal = H - 22;
-
-  docPdf.setFontSize(11);
-  docPdf.setTextColor(20);
-  docPdf.text(`TOTAL MINUTOS: $ ${totalMinutos.toFixed(2)}`, margin, yTotal);
-
-  // Reemplaza {total_pages_count_string} por el total real (si está disponible)
-  // @ts-ignore
-  if ((docPdf as any).putTotalPages) {
-    // @ts-ignore
-    (docPdf as any).putTotalPages(totalPagesExp);
-  }
-
-  docPdf.save(`Minutos_${this.fechaPersonalizada || 'vista'}.pdf`);
-}
-
 
   generarPDFAdministracion(data: any[], fecha: Date) {
-  const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
-  if (filtrado.length === 0) {
-    alert('No hay valores de administración para imprimir en esta vista.');
+    const filtrado = data.filter(r => (r.administracion ?? 0) > 0);
+    if (filtrado.length === 0) {
+      alert('No hay valores de administración para imprimir en esta vista.');
+      return;
+    }
+
+    const docPdf = new jsPDF();
+    const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const W = docPdf.internal.pageSize.getWidth();
+    const H = docPdf.internal.pageSize.getHeight();
+    const margin = 15;
+
+    const totalPagesExp = '{total_pages_count_string}';
+
+    const logo1 = new Image();
+    logo1.src = '/assets/img/LogoPintag.png';
+    const logo2 = new Image();
+    logo2.src = '/assets/img/LogoAntisana.png';
+
+    docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
+    docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
+
+    docPdf.setFontSize(16);
+    docPdf.text('Administración', W / 2, 45, { align: 'center' });
+
+    docPdf.setFontSize(11);
+    docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
+
+    const cuerpo = filtrado.map(item => [
+      item.codigo || item.unidad || '',
+      item.propietarioNombre || item.nombre || '',
+      `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
+      ''
+    ]);
+
+    const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
+
+    autoTable(docPdf, {
+      head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
+      body: cuerpo,
+      startY: 75,
+      styles: { fontSize: 10 },
+      margin: { left: margin, right: margin, bottom: 18 },
+
+      didDrawPage: () => {
+        const W = docPdf.internal.pageSize.getWidth();
+        const H = docPdf.internal.pageSize.getHeight();
+        const margin = 15;
+
+        const pageNumber = (((docPdf as any).internal?.pages?.length) || 1) - 1;
+
+        docPdf.setDrawColor(180);
+        docPdf.line(margin, H - 12, W - margin, H - 12);
+
+        docPdf.setFontSize(6);
+        docPdf.setTextColor(150);
+        docPdf.text(
+          'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+          margin,
+          H - 8,
+          { maxWidth: W - (margin * 2) }
+        );
+
+        docPdf.setFontSize(7);
+        docPdf.setTextColor(120);
+        docPdf.text(
+          `Página ${pageNumber} de ${totalPagesExp}`,
+          W - margin,
+          H - 8,
+          { align: 'right' }
+        );
+      }
+    });
+
+    const lastY = (docPdf as any).lastAutoTable.finalY ?? 75;
+    let yTotal = lastY + 10;
+    if (yTotal > H - 22) yTotal = H - 22;
+
+    docPdf.setFontSize(11);
+    docPdf.setTextColor(20);
+    docPdf.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, margin, yTotal);
+
+    if ((docPdf as any).putTotalPages) (docPdf as any).putTotalPages(totalPagesExp);
+
+    docPdf.save(`Administracion_${this.fechaPersonalizada || 'vista'}.pdf`);
+  }
+
+  // ==========================
+  // PDF EMPRESA (restaurado) - usa la vista filtrada por empresa/rango
+  // ==========================
+  private agruparDatosParaPDF(): Map<string, Map<string, any>> {
+    const agrupado = new Map<string, Map<string, any>>();
+
+    for (const reporte of this.reportes) {
+      const unidad = (reporte.codigo || reporte.unidad || 'SIN_UNIDAD').toString().trim();
+
+      const fecha = (reporte.fechaISO || '').toString().trim(); // YYYY-MM-DD
+      const keyFecha = this.esFechaISO(fecha)
+        ? new Date(`${fecha}T12:00:00`).toLocaleDateString('es-EC', { month: '2-digit', day: '2-digit' })
+        : 'Sin Fecha';
+
+      if (!agrupado.has(unidad)) agrupado.set(unidad, new Map());
+      const fechasMap = agrupado.get(unidad)!;
+
+      if (!fechasMap.has(keyFecha)) {
+        fechasMap.set(keyFecha, {
+          minutosAtraso: 0,
+          minutosPagados: 0,
+          administracion: 0,
+          adminPagada: 0,
+          minutosBase: 0,
+          minBasePagados: 0,
+          multas: 0,
+          multasPagadas: 0
+        });
+      }
+
+      const valores = fechasMap.get(keyFecha)!;
+
+      valores.minutosAtraso += reporte.minutosAtraso || 0;
+      valores.minutosPagados += (reporte as any).minutosPagados || 0;
+      valores.administracion += reporte.administracion || 0;
+      valores.adminPagada += (reporte as any).adminPagada || 0;
+      valores.minutosBase += reporte.minutosBase || 0;
+      valores.minBasePagados += (reporte as any).minBasePagados || 0;
+      valores.multas += reporte.multas || 0;
+      valores.multasPagadas += (reporte as any).multasPagadas || 0;
+    }
+
+    return agrupado;
+  }
+
+async generarReporteEmpresasPDF() {
+  this.cargandoPDF = true;
+  if (!this.empresaSeleccionada || this.errorFecha) {
+    this.cargandoPDF = false;
     return;
   }
 
-  const docPdf = new jsPDF();
-  const fechaTexto = fecha.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+  const inicio = new Date(`${this.fechaInicio}T12:00:00`);
+  const fin = new Date(`${this.fechaFin}T12:00:00`);
+  const fechaEmision = new Date();
 
-  const W = docPdf.internal.pageSize.getWidth();
-  const H = docPdf.internal.pageSize.getHeight();
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
   const margin = 15;
-
   const totalPagesExp = '{total_pages_count_string}';
 
-  const logo1 = new Image();
-  logo1.src = '/assets/img/LogoPintag.png';
-  const logo2 = new Image();
-  logo2.src = '/assets/img/LogoAntisana.png';
+  /* =======================
+     ENCABEZADO
+  ======================= */
+  doc.setFontSize(18);
+  doc.text(`Reporte ${this.empresaSeleccionada}`, W / 2, 20, { align: 'center' });
 
-  docPdf.addImage(logo1, 'PNG', 15, 10, 25, 25);
-  docPdf.addImage(logo2, 'PNG', 170, 10, 25, 25);
+  doc.setFontSize(12);
+  doc.text(`Fecha de inicio: ${inicio.toLocaleDateString('es-EC')}`, 15, 30);
+  doc.text(`Fecha de finalización: ${fin.toLocaleDateString('es-EC')}`, 15, 36);
+  doc.text(`Fecha de emisión: ${fechaEmision.toLocaleDateString('es-EC')}`, 15, 42);
 
-  docPdf.setFontSize(16);
-  docPdf.text('Administración', W / 2, 45, { align: 'center' });
-
-  docPdf.setFontSize(11);
-  docPdf.text(`Fecha: ${fechaTexto}`, 15, 55);
-
-  const cuerpo = filtrado.map(item => [
-    item.codigo || item.unidad || '',
-    item.propietarioNombre || item.nombre || '',
-    `$ ${Number(item.administracion ?? 0).toFixed(2)}`,
-    ''
-  ]);
-
-  const totalAdministracion = filtrado.reduce((sum, item) => sum + (item.administracion || 0), 0);
-
-  autoTable(docPdf, {
-    head: [['UNIDAD', 'NOMBRE', 'VALOR ADMINISTRACIÓN', 'FIRMA']],
-    body: cuerpo,
-    startY: 75,
-    styles: { fontSize: 10 },
-    margin: { left: margin, right: margin, bottom: 18 }, // ✅ espacio para footer
-
-    didDrawPage: () => {
-  const W = docPdf.internal.pageSize.getWidth();
-  const H = docPdf.internal.pageSize.getHeight();
-  const margin = 15;
-
-  const pageNumber = (((docPdf as any).internal?.pages?.length) || 1) - 1;
-
-  // --- Footer (igual al recibo) ---
-  docPdf.setDrawColor(180);
-  docPdf.line(margin, H - 12, W - margin, H - 12);
-
-  docPdf.setFontSize(6);
-  docPdf.setTextColor(150);
-  docPdf.text(
-    'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
-    margin,
-    H - 8,
-    { maxWidth: W - (margin * 2) }
-  );
-
-  // --- Paginación ---
-  docPdf.setFontSize(7);
-  docPdf.setTextColor(120);
-  docPdf.text(
-    `Página ${pageNumber} de ${totalPagesExp}`,
-    W - margin,
-    H - 8,
-    { align: 'right' }
-  );
-  if ((docPdf as any).putTotalPages) {
-  // @ts-ignore
-  (docPdf as any).putTotalPages(totalPagesExp);
-}
-}
-
-
-  });
-
-  const lastY = (docPdf as any).lastAutoTable.finalY ?? 75;
-  let yTotal = lastY + 10;
-  if (yTotal > H - 22) yTotal = H - 22;
-
-  docPdf.setFontSize(11);
-  docPdf.setTextColor(20);
-  docPdf.text(`TOTAL ADMINISTRACIÓN: $ ${totalAdministracion.toFixed(2)}`, margin, yTotal);
-
-  // @ts-ignore
-  if ((docPdf as any).putTotalPages) {
-    // @ts-ignore
-    (docPdf as any).putTotalPages(totalPagesExp);
+  /* =======================
+     FECHAS DEL RANGO
+  ======================= */
+  const fechasArray: string[] = [];
+  let actual = new Date(inicio);
+  while (actual <= fin) {
+    fechasArray.push(
+      actual.toLocaleDateString('es-EC', { month: '2-digit', day: '2-digit' })
+    );
+    actual.setDate(actual.getDate() + 1);
   }
 
-  docPdf.save(`Administracion_${this.fechaPersonalizada || 'vista'}.pdf`);
-}}
+  const unidades = [...new Set(this.reportes.map(r => r.unidad))]
+    .filter(Boolean)
+    .sort((a, b) => {
+      const na = parseInt(a.replace(/\D/g, '')) || 0;
+      const nb = parseInt(b.replace(/\D/g, '')) || 0;
+      return na - nb;
+    });
+
+  const agrupado = this.agruparDatosParaPDF();
+
+  const modulos = [
+    { nombre: 'Minutos', campo: 'minutosAtraso', pagado: 'minutosPagados' },
+    { nombre: 'Administración', campo: 'administracion', pagado: 'adminPagada' },
+    { nombre: 'Minutos Base', campo: 'minutosBase', pagado: 'minBasePagados' },
+    { nombre: 'Multas', campo: 'multas', pagado: 'multasPagadas' }
+  ];
+
+  let currentY = 50;
+  const resumenFinal: [string, number, number, number][] = [];
+
+  /* =======================
+     TABLAS POR MÓDULO
+  ======================= */
+  for (const modulo of modulos) {
+    doc.setFontSize(14);
+    doc.text(`${modulo.nombre} Asignados`, 15, currentY);
+    currentY += 6;
+
+    let totalAsignado = 0;
+    let totalSaldo = 0;
+
+    const bodyAsignados: (string | number)[][] = [];
+
+    for (const unidad of unidades) {
+      const row: (string | number)[] = [unidad];
+      let totalUnidad = 0;
+
+      for (const fecha of fechasArray) {
+        const datos = agrupado.get(unidad)?.get(fecha);
+        const valor = datos?.[modulo.campo] || 0;
+        row.push(`$${Math.round(valor)}`);
+        totalUnidad += valor;
+      }
+
+      row.push(`$${Math.round(totalUnidad)}`);
+      totalAsignado += totalUnidad;
+      bodyAsignados.push(row);
+    }
+
+    await new Promise(r => setTimeout(r, 50));
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['UNIDAD', ...fechasArray, 'TOTAL']],
+      body: bodyAsignados,
+      styles: { fontSize: 6.5, cellPadding: 1.5 },
+      headStyles: { fontSize: 7.5, fillColor: [41, 128, 185], halign: 'center' },
+      margin: { left: margin, right: margin, bottom: 18 },
+
+      didDrawPage: () => {
+        doc.setDrawColor(180);
+        doc.line(margin, H - 12, W - margin, H - 12);
+
+        doc.setFontSize(6);
+        doc.setTextColor(150);
+        doc.text(
+          'Consorcio Pintag Expresso | Pintag, Antisana S2-138 | consorciopinxpres@hotmail.com',
+          margin,
+          H - 8,
+          { maxWidth: W - margin * 2 }
+        );
+
+        const pageNumber = (((doc as any).internal?.pages?.length) || 1) - 1;
+        doc.setFontSize(7);
+        doc.setTextColor(120);
+        doc.text(
+          `Página ${pageNumber} de ${totalPagesExp}`,
+          W - margin,
+          H - 8,
+          { align: 'right' }
+        );
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 8;
+
+    doc.setFontSize(12);
+    doc.text(`${modulo.nombre} Adeudados`, 15, currentY);
+    currentY += 6;
+
+    const bodyAdeudados: (string | number)[][] = [];
+
+    for (const unidad of unidades) {
+      const row: (string | number)[] = [unidad];
+      let totalUnidad = 0;
+
+      for (const fecha of fechasArray) {
+        const datos = agrupado.get(unidad)?.get(fecha);
+        const asignado = datos?.[modulo.campo] || 0;
+        const pagado = datos?.[modulo.pagado] || 0;
+        const saldo = asignado - pagado;
+        row.push(`$${Math.round(saldo)}`);
+        totalUnidad += saldo;
+      }
+
+      row.push(`$${Math.round(totalUnidad)}`);
+      totalSaldo += totalUnidad;
+      bodyAdeudados.push(row);
+    }
+
+    await new Promise(r => setTimeout(r, 50));
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['UNIDAD', ...fechasArray, 'TOTAL']],
+      body: bodyAdeudados,
+      styles: { fontSize: 6.5, cellPadding: 1.5 },
+      headStyles: { fontSize: 7.5, fillColor: [41, 128, 185], halign: 'center' },
+      margin: { left: margin, right: margin, bottom: 18 },
+      didDrawPage: (doc as any).lastAutoTable.settings?.didDrawPage
+    });
+
+    resumenFinal.push([
+      modulo.nombre,
+      totalAsignado,
+      totalSaldo,
+      totalAsignado - totalSaldo
+    ]);
+
+    currentY = (doc as any).lastAutoTable.finalY + 12;
+  }
+
+  /* =======================
+     RESUMEN FINAL
+  ======================= */
+  doc.setFontSize(14);
+  doc.text('Resumen Final por Módulo', 15, currentY);
+  currentY += 6;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['MÓDULO', 'ASIGNADO TOTAL', 'SALDO TOTAL', 'PAGADO TOTAL']],
+    body: resumenFinal.map(r => [
+      r[0],
+      `$${r[1].toFixed(2)}`,
+      `$${r[2].toFixed(2)}`,
+      `$${r[3].toFixed(2)}`
+    ]),
+    styles: { fontSize: 10 },
+    margin: { left: margin, right: margin, bottom: 18 },
+    didDrawPage: (doc as any).lastAutoTable.settings?.didDrawPage
+  });
+
+  // Reemplazo total de páginas
+  // @ts-ignore
+  if ((doc as any).putTotalPages) {
+    // @ts-ignore
+    (doc as any).putTotalPages(totalPagesExp);
+  }
+
+  doc.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
+  this.cargandoPDF = false;
+}
+}

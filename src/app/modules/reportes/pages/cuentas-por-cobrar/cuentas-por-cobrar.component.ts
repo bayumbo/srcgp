@@ -21,6 +21,7 @@ import {
 
 type UnidadItem = {
   unidad: string;   // "E01"
+  empresa: string;
   nombre: string;   // "JUAN ..."
   uid: string;      // legacy.uid (para resolver nombre)
 };
@@ -110,62 +111,69 @@ export class CuentasPorCobrarComponent implements OnInit {
    * - Extrae legacy.uid para resolver el nombre desde /usuarios/{uid}
    * - Ordena por codigo (E01, E02...)
    */
-  private async cargarUnidadesOrdenadasConNombre(): Promise<void> {
-    const desdeISO = this.isoHaceNDias(this.diasCatalogo);
+private async cargarUnidadesOrdenadasConNombre(): Promise<void> {
+  const desdeISO = this.isoHaceNDias(this.diasCatalogo);
 
-    const unidadesCG = collectionGroup(this.firestore, 'unidades');
+  const unidadesCG = collectionGroup(this.firestore, 'unidades');
 
-    // Filtramos por fecha >= desdeISO para no leer todo el histórico
-    const q = query(
-      unidadesCG,
-      where('fecha', '>=', desdeISO),
-      orderBy('fecha', 'desc') // primero lo más reciente
-    );
+  const q = query(
+    unidadesCG,
+    where('fecha', '>=', desdeISO),
+    orderBy('fecha', 'desc')
+  );
 
-    const snap = await getDocs(q);
+  const snap = await getDocs(q);
 
-    // Map por codigo (unidad)
-    const map = new Map<string, { uid: string; nombreDirecto?: string }>();
+  // clave: empresa__codigo
+  const map = new Map<string, { uid: string; nombreDirecto?: string; empresa: string; codigo: string }>();
 
-    snap.forEach(d => {
-      const data: any = d.data();
+  snap.forEach(d => {
+    const data: any = d.data();
 
-      const codigo = (data.codigo || '').toString().trim(); // "E01"
-      if (!codigo) return;
-      // ✅ Filtrar códigos inválidos (evita que aparezca "01" sin la E)
-      // Ajusta el regex si tienes otros formatos
-      if (!/^E\d{2,3}$/i.test(codigo)) return;
-      // Tomamos el más reciente para cada codigo (ya viene desc por fecha)
-      if (map.has(codigo)) return;
+    const empresa = (data.empresa || '').toString().trim();
+    const codigoRaw = (data.codigo || '').toString().trim();
+    if (!empresa || !codigoRaw) return;
 
-      const uid = (data?.uidPropietario || data?.legacy?.uid || data?.uid || '').toString().trim();
-      const nombreDirecto = (data?.propietarioNombre || data?.nombre || data?.propietarioNombre || data?.propietario || '').toString().trim();
+    // ✅ evita "01" sin prefijo, pero no bloquea Pintag si usa "P01", "GP01", etc.
+    const codigo = codigoRaw.toUpperCase();
+    if (/^\d+$/.test(codigo)) return;                 // solo números => fuera
+    if (!/^[A-Z]{1,4}\d{1,3}$/.test(codigo)) return;  // patrón flexible
 
+    const key = `${empresa}__${codigo}`;
+    if (map.has(key)) return; // ya tomamos el más reciente para esa empresa+unidad
 
-      map.set(codigo, { uid, nombreDirecto });
-      });
+    const uid = (data?.uidPropietario || data?.legacy?.uid || data?.uid || '').toString().trim();
+    const nombreDirecto = (data?.propietarioNombre || data?.nombre || data?.propietario || '').toString().trim();
 
-    // Resolver nombres por uid (usuarios/{uid})
-    const unidades: UnidadItem[] = [];
+    map.set(key, { uid, nombreDirecto, empresa, codigo });
+  });
 
-  for (const [codigo, info] of map.entries()) {
+  const unidades: UnidadItem[] = [];
+
+  for (const [, info] of map.entries()) {
     const nombre =
       info.nombreDirecto ||
       (await this.obtenerNombreUsuarioFlexible(info.uid)) ||
       '—';
 
     unidades.push({
-      unidad: codigo.toUpperCase(),
+      unidad: info.codigo,
+      empresa: info.empresa,
       nombre,
       uid: info.uid || ''
     });
   }
 
-    // Ordenar por unidad tipo E01, E02...
-    unidades.sort((a, b) => a.unidad.localeCompare(b.unidad, 'es', { numeric: true }));
+  // Ordenar: empresa -> unidad (numérico)
+  unidades.sort((a, b) => {
+    const emp = a.empresa.localeCompare(b.empresa, 'es');
+    if (emp !== 0) return emp;
+    return a.unidad.localeCompare(b.unidad, 'es', { numeric: true });
+  });
 
-    this.listaUnidades = unidades;
-  }
+  this.listaUnidades = unidades;
+}
+
 
   /**
    * Obtiene el nombre del usuario desde /usuarios/{uid}.
@@ -204,75 +212,67 @@ private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
    * - Ordena por fecha ascendente
    * - Construye la tabla derecha
    */
-  async seleccionarUnidad(unidad: string, uid: string) {
-    this.cargandoReportes = true;
-    this.error = '';
-    this.unidadSeleccionada = unidad;
+  async seleccionarUnidad(unidad: string, empresa: string, uid: string) {
+  this.cargandoReportes = true;
+  this.error = '';
+  this.unidadSeleccionada = unidad;
+  this.empresaSeleccionada = empresa;
+  try {
+    const unidadesCG = collectionGroup(this.firestore, 'unidades');
 
-    try {
-      const unidadesCG = collectionGroup(this.firestore, 'unidades');
+    const q = query(
+      unidadesCG,
+      where('codigo', '==', unidad),
+      where('empresa', '==', empresa),
+      orderBy('fecha', 'asc')
+    );
 
-      // Traemos TODOS los documentos de esa unidad.
-      // Si quieres limitar por rango, agregamos where('fecha','>=',...)
-      const q = query(
-        unidadesCG,
-        where('codigo', '==', unidad),
-        orderBy('fecha', 'asc')
-      );
+    const snap = await getDocs(q);
 
-      const snap = await getDocs(q);
+    const rows: ReporteUnidad[] = [];
+    snap.forEach(d => {
+      const x: any = d.data();
+      const fecha = (x.fecha || '').toString();
+      const ts = x.fechaModificacion as Timestamp | undefined;
 
-      const rows: ReporteUnidad[] = [];
+      rows.push({
+        empresa: (x.empresa || '').toString(),
+        fecha,
+        fechaModificacion: ts?.toDate ? ts.toDate() : (fecha ? new Date(`${fecha}T00:00:00`) : undefined),
 
-      snap.forEach(d => {
+        administracion: Number(x.administracion || 0),
+        adminPagada: Number(x.adminPagada || 0),
 
-        const x: any = d.data();
+        minutosBase: Number(x.minutosBase || 0),
+        minBasePagados: Number(x.minBasePagados || 0),
 
-        const fecha = (x.fecha || '').toString(); // "2025-05-02"
-        const ts = x.fechaModificacion as Timestamp | undefined;
+        minutosAtraso: Number(x.minutosAtraso || 0),
+        minutosPagados: Number(x.minutosPagados || 0),
 
-        rows.push({
-          empresa: (x.empresa || '').toString(),
-          fecha,
+        multas: Number(x.multas || 0),
+        multasPagadas: Number(x.multasPagadas || 0),
 
-          fechaModificacion: ts?.toDate ? ts.toDate() : (fecha ? new Date(`${fecha}T00:00:00`) : undefined),
-
-          administracion: Number(x.administracion || 0),
-          adminPagada: Number(x.adminPagada || 0),
-
-          minutosBase: Number(x.minutosBase || 0),
-          minBasePagados: Number(x.minBasePagados || 0),
-
-          minutosAtraso: Number(x.minutosAtraso || 0),
-          minutosPagados: Number(x.minutosPagados || 0),
-
-          multas: Number(x.multas || 0),
-          multasPagadas: Number(x.multasPagadas || 0),
-
-          legacyUid: (x?.legacy?.uid || '').toString(),
-          legacyReporteId: (x?.legacy?.reporteId || '').toString()
-        });
+        legacyUid: (x?.legacy?.uid || '').toString(),
+        legacyReporteId: (x?.legacy?.reporteId || '').toString()
       });
+    });
 
-      // IMPORTANTE: tu HTML usa reporte.fechaModificacion
-      this.reportesSeleccionados = rows;
-      this.reportesConFechaConvertida = rows.map(r => ({
-        ...r,
-        fechaModificacion: r.fechaModificacion ?? new Date(`${r.fecha}T00:00:00`)
-      }));
+    this.reportesSeleccionados = rows;
+    this.reportesConFechaConvertida = rows.map(r => ({
+      ...r,
+      fechaModificacion: r.fechaModificacion ?? new Date(`${r.fecha}T00:00:00`)
+    }));
 
-      if (rows.length === 0) {
-        this.error = 'No se encontraron registros para esta unidad.';
-      }
-    } catch (err) {
-      console.error(err);
-      this.reportesSeleccionados = [];
-      this.reportesConFechaConvertida = [];
-      this.error = 'Ocurrió un error al buscar el detalle de la unidad.';
-    } finally {
-      this.cargandoReportes = false;
-    }
+    if (rows.length === 0) this.error = 'No se encontraron registros para esta unidad.';
+  } catch (err) {
+    console.error(err);
+    this.reportesSeleccionados = [];
+    this.reportesConFechaConvertida = [];
+    this.error = 'Ocurrió un error al buscar el detalle de la unidad.';
+  } finally {
+    this.cargandoReportes = false;
   }
+}
 
   // -------------------------
   // Totales: ADEUDADO (asignado - pagado)
@@ -328,6 +328,8 @@ private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
    * - Te manda al PAGO del ÚLTIMO REPORTE de esa unidad.
    * - Se usa legacy.uid + legacy.reporteId (porque tu módulo de pagos ya compila deuda ahí).
    */
+
+empresaSeleccionada: string | null = null;
 async generarPago(): Promise<void> {
   if (!this.unidadSeleccionada) {
     this.error = 'Seleccione una unidad primero.';
@@ -337,12 +339,13 @@ async generarPago(): Promise<void> {
   try {
     const unidadesCG = collectionGroup(this.firestore, 'unidades');
 
-    const q = query(
-      unidadesCG,
-      where('codigo', '==', this.unidadSeleccionada),
-      orderBy('fecha', 'desc'),
-      limit(1)
-    );
+const q = query(
+  unidadesCG,
+  where('codigo', '==', this.unidadSeleccionada),
+  where('empresa', '==', this.empresaSeleccionada),
+  orderBy('fecha', 'desc'),
+  limit(1)
+);
 
     const snap = await getDocs(q);
 

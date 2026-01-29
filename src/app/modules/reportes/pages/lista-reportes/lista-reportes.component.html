@@ -15,7 +15,6 @@
   </button>
 </div>
 
-
 <div class="contenedor-reportes">
 
   <!-- Barra superior -->
@@ -23,10 +22,13 @@
     <button class="btn-secundario" type="button" (click)="volver()">← Volver</button>
 
     <div class="grupo-botones">
-      <button class="btn-primario" type="button" (click)="agregarDia()" [disabled]="creandoDia">
+      <button class="btn-primario" type="button" (click)="abrirModalAgregarDia()" [disabled]="creandoDia">
         {{ creandoDia ? 'Creando día...' : 'Agregar día' }}
       </button>
-<!-- Subir Excel (Minutos) -->
+    <button class="btn-secundario" type="button" (click)="abrirModalEliminarDia()" [disabled]="eliminandoDia">
+      {{ eliminandoDia ? 'Eliminando...' : 'Eliminar día' }}
+    </button>
+      <!-- Subir Excel (Minutos) -->
       <button
         class="btn-primario"
         type="button"
@@ -43,27 +45,40 @@
         style="display:none"
         (change)="onExcelMinutosSelected($event)"
       />
+
       <button class="btn-secundario" type="button" (click)="mostrarFiltros = !mostrarFiltros">
         Filtros
       </button>
+
       <button class="btn-primario" type="button" (click)="irANuevoRegistro()">
         + Nuevo Registro
       </button>
     </div>
   </div>
-<div class="excel-progreso" *ngIf="subiendoExcel">
-  <p style="margin: 6px 0;">
-    Procesando Excel... Total: {{ progresoExcel.total }} |
-    OK: {{ progresoExcel.ok }} |
-    Fallas: {{ progresoExcel.fail }}
-  </p>
-</div>
+
+  <div class="excel-progreso" *ngIf="subiendoExcel">
+    <p style="margin: 6px 0;">
+      Procesando Excel... Total: {{ progresoExcel.total }} |
+      OK: {{ progresoExcel.ok }} |
+      Fallas: {{ progresoExcel.fail }}
+    </p>
+  </div>
+
   <!-- Panel Filtros -->
   <div class="panel-filtros" *ngIf="mostrarFiltros">
     <div class="filtros-rapidos">
       <button type="button" class="btn-chip" (click)="filtrarPor('hoy')">Hoy</button>
       <button type="button" class="btn-chip" (click)="filtrarPor('semana')">Esta semana</button>
       <button type="button" class="btn-chip" (click)="filtrarPor('mes')">Este mes</button>
+
+      <!-- ✅ Restaurado: toggle reporte empresas -->
+      <button
+        type="button"
+        class="btn-chip"
+        (click)="mostrarOpcionesEmpresa = !mostrarOpcionesEmpresa"
+      >
+        Reporte Empresas
+      </button>
     </div>
 
     <div class="filtro-fecha">
@@ -80,6 +95,72 @@
       </button>
     </div>
 
+    <!-- ✅ Panel Reporte Empresas (restaurado) -->
+    <div class="panel-reporte-empresas" *ngIf="mostrarOpcionesEmpresa">
+      <hr class="separador" />
+
+      <div class="empresa-botones">
+        <button
+          type="button"
+          class="btn-primario"
+          [class.activo]="empresaSeleccionada === 'General Pintag'"
+          (click)="seleccionarEmpresa('Pintag')"
+        >
+          Pintag
+        </button>
+
+        <button
+          type="button"
+          class="btn-primario"
+          [class.activo]="empresaSeleccionada === 'Expreso Antisana'"
+          (click)="seleccionarEmpresa('Antisana')"
+        >
+          Antisana
+        </button>
+      </div>
+
+      <div class="rango-fechas">
+        <div class="campo-fecha">
+          <label for="fechaInicio">Inicio:</label>
+          <input
+            id="fechaInicio"
+            type="date"
+            [(ngModel)]="fechaInicio"
+            name="fechaInicio"
+            class="input-fecha"
+            (change)="validarRangoFechas()"
+          />
+        </div>
+
+        <div class="campo-fecha">
+          <label for="fechaFin">Fin:</label>
+          <input
+            id="fechaFin"
+            type="date"
+            [(ngModel)]="fechaFin"
+            name="fechaFin"
+            class="input-fecha"
+            (change)="validarRangoFechas()"
+          />
+        </div>
+
+        <div class="error-fecha" *ngIf="errorFecha">
+          {{ errorFecha }}
+        </div>
+      </div>
+
+      <div class="acciones-empresa">
+        <button
+          type="button"
+          class="btn-primario"
+          (click)="generarReporteEmpresasPDF()"
+          [disabled]="cargandoPDF || !empresaSeleccionada || !fechaInicio || !fechaFin || !!errorFecha"
+        >
+          {{ cargandoPDF ? 'Generando PDF...' : 'Generar PDF Empresa' }}
+        </button>
+      </div>
+    </div>
+
     <hr class="separador" />
 
     <!-- PDFs del día (usa la vista actual: this.reportes) -->
@@ -90,6 +171,11 @@
 
       <button type="button" class="btn-secundario" (click)="imprimirPDFAdministracionDesdeVista()">
         Imprimir PDF Administración (vista)
+      </button>
+
+      <!-- ✅ Restaurado: limpiar filtros -->
+      <button class="Limpiar" type="button" class="btn info" (click)="limpiarFiltros()">
+        Limpiar filtros
       </button>
     </div>
   </div>
@@ -174,7 +260,7 @@
                 type="button"
                 class="btn-icono editar"
                 title="Editar"
-              (click)="irAEditar(r); $event.stopPropagation()"
+                (click)="irAEditar(r); $event.stopPropagation()"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.83H5v-.92l9.06-9.06.92.92L5.92 20.08zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -223,5 +309,89 @@
     </small>
   </div>
 
-</div>
+  <!-- ===================================== -->
+  <!-- MODAL: AGREGAR DÍA (FECHA PUNTUAL) -->
+  <!-- ===================================== -->
+  <div class="modal-backdrop" *ngIf="mostrarModalAgregarDia">
+    <div class="modal-card" role="dialog" aria-modal="true">
 
+      <button class="btn-cerrar" type="button" (click)="cerrarModalAgregarDia()">×</button>
+
+      <h3>Agregar día</h3>
+
+      <label>Empresas</label>
+      <div class="empresas-fijas">
+        <span class="chip-empresa">General Pintag</span>
+        <span class="chip-empresa">Expreso Antisana</span>
+      </div>
+
+    <label>Fecha</label>
+
+    <div class="date-picker-wrapper" (click)="abrirCalendario(fechaInput)">
+      <input
+        #fechaInput
+        type="date"
+        [(ngModel)]="fechaNuevaDia"
+        name="fechaNuevaDia"
+      />
+      <span class="icono-calendario">📅</span>
+    </div>
+
+
+      <p class="error" *ngIf="errorCrearDia">{{ errorCrearDia }}</p>
+
+      <div class="acciones">
+        <button class="btn-secundario" type="button" (click)="cerrarModalAgregarDia()">
+          Cancelar
+        </button>
+
+        <button class="btn-primario" type="button" (click)="confirmarAgregarDia()" [disabled]="creandoDia">
+          {{ creandoDia ? 'Creando...' : 'Crear día' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<!-- ===================================== -->
+<!-- MODAL: ELIMINAR DÍA (FECHA PUNTUAL) -->
+<!-- ===================================== -->
+<div class="modal-backdrop" *ngIf="mostrarModalEliminarDia">
+  <div class="modal-card" role="dialog" aria-modal="true">
+
+    <button class="btn-cerrar" type="button" (click)="cerrarModalEliminarDia()">×</button>
+
+    <h3>Eliminar día</h3>
+
+    <p class="nota-peligro">
+      Esta acción eliminará el día en <b>ambas empresas</b> (General Pintag y Expreso Antisana),
+      incluyendo sus unidades y pagos asociados.
+    </p>
+
+    <label>Fecha</label>
+
+    <div class="date-picker-wrapper" (click)="abrirCalendario(fechaEliminarInput)">
+      <input
+        #fechaEliminarInput
+        type="date"
+        [(ngModel)]="fechaEliminarDia"
+        name="fechaEliminarDia"
+      />
+      <span class="icono-calendario">📅</span>
+    </div>
+
+    <p class="error" *ngIf="errorEliminarDia">{{ errorEliminarDia }}</p>
+
+    <div class="acciones">
+      <button class="btn-secundario" type="button" (click)="cerrarModalEliminarDia()">
+        Cancelar
+      </button>
+
+      <button class="btn-peligro" type="button" (click)="confirmarEliminarDia()" [disabled]="eliminandoDia">
+        {{ eliminandoDia ? 'Eliminando...' : 'Eliminar día' }}
+      </button>
+    </div>
+
+  </div>
+</div>
