@@ -67,7 +67,7 @@ export class RealizarPagoComponent implements OnInit {
   registros: (NuevoRegistro & { id?: string }) | null = null;
 
   campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
-
+fechaEdicion: string = '';
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
     administracion: [],
@@ -120,6 +120,7 @@ export class RealizarPagoComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const idRaw = this.route.snapshot.paramMap.get('id');
     const uid = this.route.snapshot.paramMap.get('uid');
+    this.fechaEdicion = (this.route.snapshot.queryParamMap.get('fecha') ?? '').toString().trim();
 
     if (!idRaw || !uid) {
       this.router.navigate(['/reportes/lista-reportes']);
@@ -440,7 +441,6 @@ iniciarEdicion(pago: { id: string; cantidad: number; fecha: any }, campo: CampoC
 cancelarEdicion(): void {
   this.pagoEnEdicion = null;
   this.nuevoMonto = 0;
-
 }
 
 async guardarEdicion(): Promise<void> {
@@ -508,7 +508,9 @@ async guardarEdicion(): Promise<void> {
     await this.cargarPagosTotales();
     await this.cargarDeudaHistoricaAcumulada();
 
-this.cancelarEdicion();
+this.pagoEnEdicion = null;
+this.nuevoMonto = 0;
+
 alert('✅ Pago actualizado correctamente.');
 this.recargarVistaActual();
   } catch (err) {
@@ -982,7 +984,11 @@ private dateToISO(d: Date): string {
     });
   }
 
-  volver() {
-    this.router.navigate(['/reportes/lista-reportes']);
-  }
+ volver() {
+  const fecha = (this.fechaEdicion ?? this.fechaSeleccionada ?? '').toString().trim();
+
+  this.router.navigate(['/reportes/lista-reportes'], {
+    queryParams: { fecha }
+  });
+}
 }

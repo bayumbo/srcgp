@@ -15,7 +15,7 @@ import {
   writeBatch,
   where,
 } from '@angular/fire/firestore';
-import { Router } from '@angular/router';
+import { Router,ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,6 +24,7 @@ import { AuthService } from 'src/app/core/auth/services/auth.service';
 import { ReportesDiaService } from '../../services/reportes-dia.service';
 import { ReporteConPagos } from 'src/app/core/interfaces/reportes.interface';
 import * as XLSX from 'xlsx';
+
 
 type EmpresaNombre = 'General Pintag' | 'Expreso Antisana';
 
@@ -106,13 +107,14 @@ export class ReporteListaComponent implements OnInit {
   mostrarModalEliminarDia: boolean = false;
   fechaEliminarDia: string = ''; // YYYY-MM-DD
   errorEliminarDia: string = '';
+fechaSeleccionada: string = '';
 
   // =========================
   // Injections
   // =========================
   private firestore = inject(Firestore);
   private router = inject(Router);
-
+  private route = inject(ActivatedRoute);
   private nombrePorUnidad = new Map<string, string>();
   private nombresCargados = false;
 
@@ -123,13 +125,32 @@ export class ReporteListaComponent implements OnInit {
     private reportesDiaService: ReportesDiaService
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    this.authService.currentUserRole$.subscribe(role => {
-      this.esSocio = role === 'socio';
-    });
+async ngOnInit(): Promise<void> {
+  this.authService.currentUserRole$.subscribe(role => {
+    this.esSocio = role === 'socio';
+  });
 
-    await this.cargarUltimoDiaGenerado();
+  // ✅ 1) Si viene fecha por URL, manda esa fecha (al volver desde editar)
+  const fechaQP = (this.route.snapshot.queryParamMap.get('fecha') ?? '').toString().trim();
+
+  if (fechaQP) {
+    await this.cargarDiaEnListaReportes(fechaQP);
+    return;
   }
+
+  // ✅ 2) Si no viene fecha, comportamiento normal (último día generado)
+  await this.cargarUltimoDiaGenerado();
+
+  // ✅ 3) (RECOMENDADO) fijar el día cargado en la URL (para que F5 no lo pierda)
+  if (this.fechaSeleccionada) {
+    this.router.navigate([], {
+      queryParams: { fecha: this.fechaSeleccionada },
+      replaceUrl: true
+    });
+  }
+}
+
+
 
   // ==========================
   // Helpers
@@ -453,7 +474,7 @@ export class ReporteListaComponent implements OnInit {
       const fechaISO = data.fecha as string;
 
       this.fechaPersonalizada = fechaISO;
-      await this.cargarDiaEnListaReportes(fechaISO);
+      await this.irADia(fechaISO);
     } catch (e) {
       console.error('❌ Error cargando último día:', e);
       this.reportes = [];
@@ -472,7 +493,7 @@ export class ReporteListaComponent implements OnInit {
     this.mostrarMensajeDia = false;
     this.mensajeEstadoDia = '';
     this.limpiarSeleccion();
-
+  this.fechaSeleccionada = fechaISO;
     try {
       const empresas: EmpresaNombre[] = ['General Pintag', 'Expreso Antisana'];
 
@@ -1125,26 +1146,40 @@ export class ReporteListaComponent implements OnInit {
       }
     });
   }
+irADia(fechaISO: string): void {
+  const fecha = (fechaISO ?? '').toString().trim();
+  if (!fecha) return;
 
-  irAPagar(r: any): void {
-    const uid = (r?.uid ?? '').toString().trim();
-    const refPath = (r?.refPath ?? '').toString().trim();
+  this.router.navigate([], {
+    queryParams: { fecha }
+  });
+}
 
-    if (!uid || !refPath) {
-      alert('❌ No se puede pagar: faltan uid o refPath.');
-      return;
-    }
+irAPagar(r: any): void {
+  const uid = (r?.uid ?? '').toString().trim();
+  const refPath = (r?.refPath ?? '').toString().trim();
+  const fecha = (this.fechaSeleccionada ?? '').toString().trim();
 
-    const safeId = encodeURIComponent(refPath);
-
-    this.router.navigate(['/reportes/realizar-pago', uid, safeId], {
-      queryParams: {
-        nombre: (r?.propietarioNombre ?? r?.nombre ?? '').toString(),
-        apellido: (r?.apellido ?? '').toString(),
-        unidad: (r?.codigo ?? r?.unidad ?? '').toString()
-      }
-    });
+  if (!uid || !refPath) {
+    alert('❌ No se puede pagar: faltan uid o refPath.');
+    return;
   }
+
+  const safeId = encodeURIComponent(refPath);
+
+  this.router.navigate(['/reportes/realizar-pago', uid, safeId], {
+    queryParams: {
+      // ✅ CLAVE: para volver al mismo día
+      fecha,
+
+      // tus informativos (déjalos)
+      nombre: (r?.propietarioNombre ?? r?.nombre ?? '').toString(),
+      apellido: (r?.apellido ?? '').toString(),
+      unidad: (r?.codigo ?? r?.unidad ?? '').toString()
+    }
+  });
+}
+
 
   irACuentasPorCobrar() {
     this.router.navigate(['/reportes/cuentas-por-cobrar']);
