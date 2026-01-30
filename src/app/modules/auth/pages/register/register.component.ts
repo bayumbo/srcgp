@@ -66,7 +66,7 @@ async signUp(): Promise<void> {
     // 1️⃣ Registrar en Firebase Auth
     const userCredential = await this.authService.signUpWithEmailAndPassword({ email, password });
     const uid = userCredential.user.uid;
-    console.log('✅ Usuario registrado en Auth:', uid);
+
 
     // 2️⃣ Guardar usuario en Firestore
     const usuarioData: Omit<Usuario, 'uid'> = {

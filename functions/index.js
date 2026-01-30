@@ -37,34 +37,14 @@ exports.asignarRolDesdeFirestore = functions.https.onCall(async (data, context) 
     throw new functions.https.HttpsError('unknown', 'Error al asignar rol desde Firestore.', error);
   }
 });
-exports.obtenerEmailPorCedula = functions.https.onCall(async (data, context) => {
-  const cedula = String(data?.cedula || '').trim();
-  if (!cedula) {
-    throw new functions.https.HttpsError('invalid-argument', 'cedula requerida');
-  }
-
-  const db = admin.firestore();
-
-  const snap = await db.collection('usuarios')
-    .where('cedula', '==', cedula)
-    .limit(1)
-    .get();
-
-  if (snap.empty) return { email: null };
-
-  const u = snap.docs[0].data();
-  return { email: u.email || null };
-});
-
 exports.eliminarUsuarioAuth = functions.https.onCall(async (data, context) => {
   try {
-    // --- Auth & claims
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Debes iniciar sesión");
     }
 
-    const role = context.auth.token?.role || null;
-    if (role !== "admin") {
+    const claims = context.auth.token || {};
+    if (claims.role !== "admin") {
       throw new functions.https.HttpsError("permission-denied", "Solo admin");
     }
 
@@ -74,116 +54,109 @@ exports.eliminarUsuarioAuth = functions.https.onCall(async (data, context) => {
     }
 
     if (context.auth.uid === uid) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "No puedes eliminar tu propio usuario desde aquí"
-      );
+      throw new functions.https.HttpsError("failed-precondition", "No puedes eliminar tu propio usuario desde aquí");
     }
 
     const db = admin.firestore();
 
-    // --- (0) Logs de entorno para confirmar proyecto
-    console.log("[eliminarUsuarioAuth] projectId:", process.env.GCLOUD_PROJECT, "targetUid:", uid);
-
-    // --- (1) Firestore: borrar usuario principal
+    // 0) leer usuario privado para obtener cedula/email (para borrado blindado)
     const userRef = db.doc(`usuarios/${uid}`);
     const userSnap = await userRef.get();
-    console.log("[eliminarUsuarioAuth] usuarios/{uid} existe antes?", userSnap.exists);
 
-    await userRef.delete().catch((e) => {
-      // No tragamos el error silenciosamente si existe y no se puede borrar
-      console.error("[eliminarUsuarioAuth] ERROR borrando usuarios/{uid}:", e);
-      throw e;
-    });
+    const cedula = userSnap.exists ? String(userSnap.data()?.cedula || "").trim() : "";
+    const email  = userSnap.exists ? String(userSnap.data()?.email  || "").trim().toLowerCase() : "";
 
-    const userAfter = await userRef.get();
-    console.log("[eliminarUsuarioAuth] usuarios/{uid} existe después?", userAfter.exists);
+    functions.logger.info("[eliminarUsuarioAuth] uid:", uid, "cedula:", cedula, "email:", email);
 
-    // --- (2) Limpieza histórica opcional: usuariosPublicos/{uid}
-    // Ya no lo usas, pero si quedó basura de versiones anteriores, lo limpia.
-    const pubRef = db.doc(`usuariosPublicos/${uid}`);
-    const pubSnap = await pubRef.get();
-    console.log("[eliminarUsuarioAuth] usuariosPublicos/{uid} existe antes?", pubSnap.exists);
-
-    if (pubSnap.exists) {
-      await pubRef.delete().catch((e) => {
-        console.error("[eliminarUsuarioAuth] ERROR borrando usuariosPublicos/{uid}:", e);
-        // No lo hacemos fatal si ya no usas esta colección,
-        // pero lo dejamos logueado para que lo veas.
-      });
+    // 1) borrar usuarios/{uid}
+    if (userSnap.exists) {
+      await userRef.delete();
+      functions.logger.info("[eliminarUsuarioAuth] usuarios/{uid} borrado:", uid);
+    } else {
+      functions.logger.info("[eliminarUsuarioAuth] usuarios/{uid} NO existía:", uid);
     }
 
-    const pubAfter = await pubRef.get();
-    console.log("[eliminarUsuarioAuth] usuariosPublicos/{uid} existe después?", pubAfter.exists);
+    // 2) borrar usuariosPublicos/{uid}
+    const pubRef = db.doc(`usuariosPublicos/${uid}`);
+    const pubAntes = await pubRef.get();
+    functions.logger.info("[eliminarUsuarioAuth] usuariosPublicos/{uid} antes existe?", pubAntes.exists);
 
-    // --- (3) Desvincular unidades (NO borrar histórico)
-    const desvinculadas = await desvincularUnidadesPorPropietario(db, uid);
-    console.log("[eliminarUsuarioAuth] unidades desvinculadas:", desvinculadas);
+    await pubRef.delete(); // delete() no falla si no existe
+    const pubDespues = await pubRef.get();
+    functions.logger.info("[eliminarUsuarioAuth] usuariosPublicos/{uid} después existe?", pubDespues.exists);
 
-    // --- (4) Auth: borrar usuario
+    // 3) BLINDAJE: borrar cualquier doc adicional en usuariosPublicos por cedula/email
+    let borradosExtra = 0;
+
+    if (cedula) {
+      const qCedula = await db.collection("usuariosPublicos")
+        .where("cedula", "==", cedula)
+        .limit(50)
+        .get();
+
+      if (!qCedula.empty) {
+        const batch = db.batch();
+        qCedula.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        borradosExtra += qCedula.size;
+        functions.logger.info("[eliminarUsuarioAuth] usuariosPublicos borrados por cedula:", qCedula.size);
+      }
+    }
+
+    if (email) {
+      const qEmail = await db.collection("usuariosPublicos")
+        .where("email", "==", email)
+        .limit(50)
+        .get();
+
+      if (!qEmail.empty) {
+        const batch = db.batch();
+        qEmail.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        borradosExtra += qEmail.size;
+        functions.logger.info("[eliminarUsuarioAuth] usuariosPublicos borrados por email:", qEmail.size);
+      }
+    }
+
+    // 4) desvincular unidades (uidPropietario)
+    const unidadesSnap = await db.collection("unidades")
+      .where("uidPropietario", "==", uid)
+      .limit(500)
+      .get();
+
+    if (!unidadesSnap.empty) {
+      const batch = db.batch();
+      unidadesSnap.docs.forEach(d => batch.update(d.ref, {
+        uidPropietario: null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }));
+      await batch.commit();
+      functions.logger.info("[eliminarUsuarioAuth] unidades desvinculadas:", unidadesSnap.size);
+    } else {
+      functions.logger.info("[eliminarUsuarioAuth] unidades desvinculadas: 0");
+    }
+
+    // 5) borrar Auth
     try {
       await admin.auth().deleteUser(uid);
-      console.log("[eliminarUsuarioAuth] Auth delete ok:", uid);
+      functions.logger.info("[eliminarUsuarioAuth] Auth delete ok:", uid);
     } catch (err) {
       const code = String(err?.code || "");
-      if (code.includes("auth/user-not-found")) {
-        console.log("[eliminarUsuarioAuth] Auth user-not-found (ok):", uid);
-      } else {
-        console.error("[eliminarUsuarioAuth] ERROR borrando Auth:", err);
-        throw err;
-      }
+      if (!code.includes("auth/user-not-found")) throw err;
+      functions.logger.info("[eliminarUsuarioAuth] Auth user-not-found (ok):", uid);
     }
 
     return {
       ok: true,
       uid,
-      usuariosDocEliminado: !userAfter.exists,
-      usuariosPublicosEliminado: !pubAfter.exists,
-      unidadesDesvinculadas: desvinculadas
+      usuariosPublicosAntes: pubAntes.exists,
+      usuariosPublicosDespues: pubDespues.exists,
+      borradosExtraUsuariosPublicos: borradosExtra
     };
+
   } catch (e) {
-    console.error("eliminarUsuarioAuth ERROR:", e);
+    functions.logger.error("eliminarUsuarioAuth ERROR:", e);
     if (e instanceof functions.https.HttpsError) throw e;
     throw new functions.https.HttpsError("internal", e?.message || "Error interno");
   }
 });
-
-// =====================
-// Helpers
-// =====================
-
-/**
- * Desvincula unidades donde uidPropietario == uid.
- * No borra docs de unidades, solo quita el propietario para conservar histórico.
- * Maneja lotes grandes con paginación.
- */
-async function desvincularUnidadesPorPropietario(db, uid) {
-  let total = 0;
-  let lastDoc = null;
-
-  while (true) {
-    let q = db.collection("unidades").where("uidPropietario", "==", uid).limit(450);
-    if (lastDoc) q = q.startAfter(lastDoc);
-
-    const snap = await q.get();
-    if (snap.empty) break;
-
-    const batch = db.batch();
-    snap.docs.forEach((d) => {
-      batch.update(d.ref, {
-        uidPropietario: null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    });
-
-    await batch.commit();
-
-    total += snap.size;
-    lastDoc = snap.docs[snap.docs.length - 1];
-
-    // Si vino menos del límite, ya terminó
-    if (snap.size < 450) break;
-  }
-
-  return total;
-}
