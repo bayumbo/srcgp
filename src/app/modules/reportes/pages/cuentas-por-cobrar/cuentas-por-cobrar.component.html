@@ -61,7 +61,7 @@
         </thead>
         <tbody>
          <tr *ngFor="let reporte of reportesConFechaConvertida">
-            <td>{{ reporte.fechaModificacion | date: 'shortDate' }}</td>
+            <td>{{ reporte.fechaDeudaDate | date: 'shortDate' }}</td>
             <td>{{ reporte.administracion - reporte.adminPagada | currency:'USD' }}</td>
             <td>{{ reporte.minutosBase - reporte.minBasePagados | currency:'USD' }}</td>
             <td>{{ reporte.minutosAtraso - reporte.minutosPagados | currency:'USD' }}</td>

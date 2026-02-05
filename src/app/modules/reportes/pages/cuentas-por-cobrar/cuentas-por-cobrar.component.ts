@@ -66,8 +66,16 @@ export class CuentasPorCobrarComponent implements OnInit {
   listaUnidades: UnidadItem[] = [];
 
   unidadSeleccionada: string | null = null;
+  empresaSeleccionada: string | null = null;
 
   reportesSeleccionados: ReporteUnidad[] = [];
+
+  /**
+   * OJO:
+   * Esta lista es la que usas en la tabla derecha.
+   * Para que no se muestre "hoy", aquí agregamos un campo UI `fechaDeudaDate`
+   * calculado desde `fecha` (YYYY-MM-DD).
+   */
   reportesConFechaConvertida: any[] = [];
 
   error: string = '';
@@ -77,7 +85,6 @@ export class CuentasPorCobrarComponent implements OnInit {
   /**
    * Para performance: buscamos unidades desde los últimos N días.
    * Suficiente para obtener el “catálogo” porque siempre hay movimiento.
-   * Si quieres 365 o todo, subimos este valor.
    */
   private diasCatalogo = 180;
 
@@ -100,9 +107,7 @@ export class CuentasPorCobrarComponent implements OnInit {
       this.error = 'Error al cargar unidades.';
     } finally {
       this.cargandoUnidades = false;
-
     }
-
   }
 
   /**
@@ -111,100 +116,98 @@ export class CuentasPorCobrarComponent implements OnInit {
    * - Extrae legacy.uid para resolver el nombre desde /usuarios/{uid}
    * - Ordena por codigo (E01, E02...)
    */
-private async cargarUnidadesOrdenadasConNombre(): Promise<void> {
-  const desdeISO = this.isoHaceNDias(this.diasCatalogo);
+  private async cargarUnidadesOrdenadasConNombre(): Promise<void> {
+    const desdeISO = this.isoHaceNDias(this.diasCatalogo);
 
-  const unidadesCG = collectionGroup(this.firestore, 'unidades');
+    const unidadesCG = collectionGroup(this.firestore, 'unidades');
 
-  const q = query(
-    unidadesCG,
-    where('fecha', '>=', desdeISO),
-    orderBy('fecha', 'desc')
-  );
+    const q = query(
+      unidadesCG,
+      where('fecha', '>=', desdeISO),
+      orderBy('fecha', 'desc')
+    );
 
-  const snap = await getDocs(q);
+    const snap = await getDocs(q);
 
-  // clave: empresa__codigo
-  const map = new Map<string, { uid: string; nombreDirecto?: string; empresa: string; codigo: string }>();
+    // clave: empresa__codigo
+    const map = new Map<string, { uid: string; nombreDirecto?: string; empresa: string; codigo: string }>();
 
-  snap.forEach(d => {
-    const data: any = d.data();
+    snap.forEach(d => {
+      const data: any = d.data();
 
-    const empresa = (data.empresa || '').toString().trim();
-    const codigoRaw = (data.codigo || '').toString().trim();
-    if (!empresa || !codigoRaw) return;
+      const empresa = (data.empresa || '').toString().trim();
+      const codigoRaw = (data.codigo || '').toString().trim();
+      if (!empresa || !codigoRaw) return;
 
-    // ✅ evita "01" sin prefijo, pero no bloquea Pintag si usa "P01", "GP01", etc.
-    const codigo = codigoRaw.toUpperCase();
-    if (/^\d+$/.test(codigo)) return;                 // solo números => fuera
-    if (!/^[A-Z]{1,4}\d{1,3}$/.test(codigo)) return;  // patrón flexible
+      // ✅ evita "01" sin prefijo, pero no bloquea Pintag si usa "P01", "GP01", etc.
+      const codigo = codigoRaw.toUpperCase();
+      if (/^\d+$/.test(codigo)) return;                 // solo números => fuera
+      if (!/^[A-Z]{1,4}\d{1,3}$/.test(codigo)) return;  // patrón flexible
 
-    const key = `${empresa}__${codigo}`;
-    if (map.has(key)) return; // ya tomamos el más reciente para esa empresa+unidad
+      const key = `${empresa}__${codigo}`;
+      if (map.has(key)) return; // ya tomamos el más reciente para esa empresa+unidad
 
-    const uid = (data?.uidPropietario || data?.legacy?.uid || data?.uid || '').toString().trim();
-    const nombreDirecto = (data?.propietarioNombre || data?.nombre || data?.propietario || '').toString().trim();
+      const uid = (data?.uidPropietario || data?.legacy?.uid || data?.uid || '').toString().trim();
+      const nombreDirecto = (data?.propietarioNombre || data?.nombre || data?.propietario || '').toString().trim();
 
-    map.set(key, { uid, nombreDirecto, empresa, codigo });
-  });
-
-  const unidades: UnidadItem[] = [];
-
-  for (const [, info] of map.entries()) {
-    const nombre =
-      info.nombreDirecto ||
-      (await this.obtenerNombreUsuarioFlexible(info.uid)) ||
-      '—';
-
-    unidades.push({
-      unidad: info.codigo,
-      empresa: info.empresa,
-      nombre,
-      uid: info.uid || ''
+      map.set(key, { uid, nombreDirecto, empresa, codigo });
     });
+
+    const unidades: UnidadItem[] = [];
+
+    for (const [, info] of map.entries()) {
+      const nombre =
+        info.nombreDirecto ||
+        (await this.obtenerNombreUsuarioFlexible(info.uid)) ||
+        '—';
+
+      unidades.push({
+        unidad: info.codigo,
+        empresa: info.empresa,
+        nombre,
+        uid: info.uid || ''
+      });
+    }
+
+    // Ordenar: empresa -> unidad (numérico)
+    unidades.sort((a, b) => {
+      const emp = a.empresa.localeCompare(b.empresa, 'es');
+      if (emp !== 0) return emp;
+      return a.unidad.localeCompare(b.unidad, 'es', { numeric: true });
+    });
+
+    this.listaUnidades = unidades;
   }
-
-  // Ordenar: empresa -> unidad (numérico)
-  unidades.sort((a, b) => {
-    const emp = a.empresa.localeCompare(b.empresa, 'es');
-    if (emp !== 0) return emp;
-    return a.unidad.localeCompare(b.unidad, 'es', { numeric: true });
-  });
-
-  this.listaUnidades = unidades;
-}
-
 
   /**
    * Obtiene el nombre del usuario desde /usuarios/{uid}.
    * Ajusta el armado del nombre según tu estructura real (nombres/apellidos).
    */
-private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
-  if (!uid) return '';
+  private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
+    if (!uid) return '';
 
-  try {
-    const ref = doc(this.firestore, `usuarios/${uid}`);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return '';
+    try {
+      const ref = doc(this.firestore, `usuarios/${uid}`);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return '';
 
-    const u: any = snap.data();
+      const u: any = snap.data();
 
-    // Intentos en cascada (según lo que exista en tu DB)
-    const nombres = (u.nombres || '').toString().trim();
-    const apellidos = (u.apellidos || '').toString().trim();
-    const full1 = `${nombres} ${apellidos}`.trim();
-    if (full1) return full1;
+      // Intentos en cascada (según lo que exista en tu DB)
+      const nombres = (u.nombres || '').toString().trim();
+      const apellidos = (u.apellidos || '').toString().trim();
+      const full1 = `${nombres} ${apellidos}`.trim();
+      if (full1) return full1;
 
-    const full2 = (u.nombre || u.displayName || u.razonSocial || '').toString().trim();
-    if (full2) return full2;
+      const full2 = (u.nombre || u.displayName || u.razonSocial || '').toString().trim();
+      if (full2) return full2;
 
-    const email = (u.email || '').toString().trim();
-    return email || '';
-  } catch (e) {
-    return '';
+      const email = (u.email || '').toString().trim();
+      return email || '';
+    } catch (e) {
+      return '';
+    }
   }
-}
-
 
   /**
    * Click en una unidad:
@@ -213,66 +216,77 @@ private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
    * - Construye la tabla derecha
    */
   async seleccionarUnidad(unidad: string, empresa: string, uid: string) {
-  this.cargandoReportes = true;
-  this.error = '';
-  this.unidadSeleccionada = unidad;
-  this.empresaSeleccionada = empresa;
-  try {
-    const unidadesCG = collectionGroup(this.firestore, 'unidades');
+    this.cargandoReportes = true;
+    this.error = '';
+    this.unidadSeleccionada = unidad;
+    this.empresaSeleccionada = empresa;
 
-    const q = query(
-      unidadesCG,
-      where('codigo', '==', unidad),
-      where('empresa', '==', empresa),
-      orderBy('fecha', 'asc')
-    );
+    try {
+      const unidadesCG = collectionGroup(this.firestore, 'unidades');
 
-    const snap = await getDocs(q);
+      const q = query(
+        unidadesCG,
+        where('codigo', '==', unidad),
+        where('empresa', '==', empresa),
+        orderBy('fecha', 'asc')
+      );
 
-    const rows: ReporteUnidad[] = [];
-    snap.forEach(d => {
-      const x: any = d.data();
-      const fecha = (x.fecha || '').toString();
-      const ts = x.fechaModificacion as Timestamp | undefined;
+      const snap = await getDocs(q);
 
-      rows.push({
-        empresa: (x.empresa || '').toString(),
-        fecha,
-        fechaModificacion: ts?.toDate ? ts.toDate() : (fecha ? new Date(`${fecha}T00:00:00`) : undefined),
+      const rows: ReporteUnidad[] = [];
+      snap.forEach(d => {
+        const x: any = d.data();
+        const fecha = (x.fecha || '').toString();
 
-        administracion: Number(x.administracion || 0),
-        adminPagada: Number(x.adminPagada || 0),
+        // ✅ IMPORTANTE:
+        // `fechaModificacion` NO es la fecha de la deuda.
+        // La fecha de deuda es `fecha` (YYYY-MM-DD).
+        const ts = x.fechaModificacion as Timestamp | undefined;
 
-        minutosBase: Number(x.minutosBase || 0),
-        minBasePagados: Number(x.minBasePagados || 0),
+        rows.push({
+          empresa: (x.empresa || '').toString(),
+          fecha,
 
-        minutosAtraso: Number(x.minutosAtraso || 0),
-        minutosPagados: Number(x.minutosPagados || 0),
+          // solo auditoría/edición (NO usar para mostrar la deuda)
+          fechaModificacion: ts?.toDate ? ts.toDate() : undefined,
 
-        multas: Number(x.multas || 0),
-        multasPagadas: Number(x.multasPagadas || 0),
+          administracion: Number(x.administracion || 0),
+          adminPagada: Number(x.adminPagada || 0),
 
-        legacyUid: (x?.legacy?.uid || '').toString(),
-        legacyReporteId: (x?.legacy?.reporteId || '').toString()
+          minutosBase: Number(x.minutosBase || 0),
+          minBasePagados: Number(x.minBasePagados || 0),
+
+          minutosAtraso: Number(x.minutosAtraso || 0),
+          minutosPagados: Number(x.minutosPagados || 0),
+
+          multas: Number(x.multas || 0),
+          multasPagadas: Number(x.multasPagadas || 0),
+
+          legacyUid: (x?.legacy?.uid || '').toString(),
+          legacyReporteId: (x?.legacy?.reporteId || '').toString()
+        });
       });
-    });
 
-    this.reportesSeleccionados = rows;
-    this.reportesConFechaConvertida = rows.map(r => ({
-      ...r,
-      fechaModificacion: r.fechaModificacion ?? new Date(`${r.fecha}T00:00:00`)
-    }));
+      this.reportesSeleccionados = rows;
 
-    if (rows.length === 0) this.error = 'No se encontraron registros para esta unidad.';
-  } catch (err) {
-    console.error(err);
-    this.reportesSeleccionados = [];
-    this.reportesConFechaConvertida = [];
-    this.error = 'Ocurrió un error al buscar el detalle de la unidad.';
-  } finally {
-    this.cargandoReportes = false;
+      // ✅ Esta es la lista para UI:
+      // agregamos `fechaDeudaDate` (Date) derivada de `fecha` para que tu HTML
+      // pueda usar date pipe sin mostrar "hoy".
+      this.reportesConFechaConvertida = rows.map(r => ({
+        ...r,
+        fechaDeudaDate: new Date(`${r.fecha}T00:00:00`)
+      }));
+
+      if (rows.length === 0) this.error = 'No se encontraron registros para esta unidad.';
+    } catch (err) {
+      console.error(err);
+      this.reportesSeleccionados = [];
+      this.reportesConFechaConvertida = [];
+      this.error = 'Ocurrió un error al buscar el detalle de la unidad.';
+    } finally {
+      this.cargandoReportes = false;
+    }
   }
-}
 
   // -------------------------
   // Totales: ADEUDADO (asignado - pagado)
@@ -299,8 +313,7 @@ private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
   }
 
   // -------------------------
-  // Totales: PAGADO (detalle que pediste)
-  // Estos no requieren cambiar HTML, pero ya quedan listos para mostrarlos cuando quieras.
+  // Totales: PAGADO (detalle)
   // -------------------------
 
   get pagadoAdministracion(): number {
@@ -326,70 +339,77 @@ private async obtenerNombreUsuarioFlexible(uid: string): Promise<string> {
   /**
    * Botón PAGAR:
    * - Te manda al PAGO del ÚLTIMO REPORTE de esa unidad.
-   * - Se usa legacy.uid + legacy.reporteId (porque tu módulo de pagos ya compila deuda ahí).
+   * - Envía `uidProp` + `pathReal` (encodeURIComponent) como ya manejas en RealizarPagoComponent.
    */
-
-empresaSeleccionada: string | null = null;
-async generarPago(): Promise<void> {
-  if (!this.unidadSeleccionada) {
-    this.error = 'Seleccione una unidad primero.';
-    return;
-  }
-
-  try {
-    const unidadesCG = collectionGroup(this.firestore, 'unidades');
-
-const q = query(
-  unidadesCG,
-  where('codigo', '==', this.unidadSeleccionada),
-  where('empresa', '==', this.empresaSeleccionada),
-  orderBy('fecha', 'desc'),
-  limit(1)
-);
-
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-      this.error = 'No se encontró el último reporte para esta unidad.';
+  async generarPago(): Promise<void> {
+    if (!this.unidadSeleccionada) {
+      this.error = 'Seleccione una unidad primero.';
       return;
     }
 
-    const docu = snap.docs[0];
-    const data: any = docu.data();
+    try {
+      const unidadesCG = collectionGroup(this.firestore, 'unidades');
 
-    // ✅ UID REAL del propietario según tu DB
-    const uidProp = (data?.uidPropietario || data?.legacy?.uid || data?.uid || '').toString().trim();
-    if (!uidProp) {
-      this.error = 'El último reporte no tiene uidPropietario.';
-      return;
+      const q = query(
+        unidadesCG,
+        where('codigo', '==', this.unidadSeleccionada),
+        where('empresa', '==', this.empresaSeleccionada),
+        orderBy('fecha', 'desc'),
+        limit(1)
+      );
+
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        this.error = 'No se encontró el último reporte para esta unidad.';
+        return;
+      }
+
+      const docu = snap.docs[0];
+      const data: any = docu.data();
+
+      // ✅ UID REAL del propietario según tu DB
+      const uidProp = (data?.uidPropietario || data?.legacy?.uid || data?.uid || '').toString().trim();
+      if (!uidProp) {
+        this.error = 'El último reporte no tiene uidPropietario.';
+        return;
+      }
+
+      // ✅ Path real del documento unidad en reportes_dia/.../unidades/...
+      const pathReal = docu.ref.path;
+      const idParam = encodeURIComponent(pathReal);
+
+      this.router.navigate(['/reportes/realizar-pago', uidProp, idParam]);
+
+    } catch (e) {
+      console.error(e);
+      this.error = 'Error al abrir pagos.';
     }
-
-    // ✅ Path real que tu RealizarPagoComponent ya sabe manejar
-    const pathReal = docu.ref.path;
-    const idParam = encodeURIComponent(pathReal);
-
-
-
-    // ✅ Usamos la ruta que tu RealizarPagoComponent YA exige (uid + id)
-    this.router.navigate(['/reportes/realizar-pago', uidProp, idParam]);
-
-  } catch (e) {
-    console.error(e);
-    this.error = 'Error al abrir pagos.';
   }
-}
 
-get unidadesFiltradas() {
-  const q = (this.filtro || '').toLowerCase();
+  get unidadesFiltradas() {
+    const q = (this.filtro || '').toLowerCase();
 
-  return this.listaUnidades.filter(item =>
-    (item.unidad || '').toLowerCase().includes(q) ||
-    (item.nombre || '').toLowerCase().includes(q)
-  );
-}
+    return this.listaUnidades.filter(item =>
+      (item.unidad || '').toLowerCase().includes(q) ||
+      (item.nombre || '').toLowerCase().includes(q)
+    );
+  }
 
   volver() {
     this.router.navigate(['/reportes/lista-reportes']);
+  }
+
+  // -------------------------
+  // Helpers fecha
+  // -------------------------
+
+  formatearFechaDeudaISO(fechaISO: string): string {
+    if (!fechaISO || typeof fechaISO !== 'string') return '—';
+    const [y, m, d] = fechaISO.split('-').map(Number);
+    if (!y || !m || !d) return '—';
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('es-EC');
   }
 
   private isoHaceNDias(n: number): string {
