@@ -46,15 +46,16 @@
 
     <td class="accion-editar">
       <!-- Si NO está en edición: muestra botones -->
-      <ng-container *ngIf="!esPagoEnEdicion(pago, campo); else bloqueEdicion">
-        <button type="button" (click)="iniciarEdicion(pago, campo)">
-          <span class="material-icons">edit</span>
-        </button>
+<ng-container *ngIf="!esPagoEnEdicion(pago, campo); else bloqueEdicion">
+  <button type="button" (click)="iniciarEdicion(pago, campo)">
+    <span class="material-icons">edit</span>
+  </button>
 
-        <button type="button" class="btn-eliminar" (click)="eliminarPago(pago.id)">
-          <span class="material-icons">delete</span>
-        </button>
-      </ng-container>
+  <button type="button" class="btn-eliminar" (click)="eliminarPago(pago.id, campo)">
+    <span class="material-icons">delete</span>
+  </button>
+</ng-container>
+
 
       <!-- Si SÍ está en edición: muestra inputs + guardar/cancelar -->
       <ng-template #bloqueEdicion>

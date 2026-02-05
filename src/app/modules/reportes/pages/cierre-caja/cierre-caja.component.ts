@@ -79,18 +79,31 @@ export class CierreCajaComponent implements OnInit {
 
   /* ------------------------ CARGA DATOS ------------------------ */
 
-  async cargarCierre() {
-    this.cargando = true;
-    this.actualizarTituloFecha();
+async cargarCierre() {
+  this.cargando = true;
+  this.actualizarTituloFecha();
 
-    try {
-      this.cierreItems = await this.cierreCajaService.obtenerCierrePorFecha(
-        this.fechaSeleccionada
-      );
-    } finally {
-      this.cargando = false;
-    }
+  try {
+    const items = await this.cierreCajaService.obtenerCierrePorFecha(this.fechaSeleccionada);
+
+    this.cierreItems = items.map(item => {
+      const f: any = (item as any).fecha;
+
+      const fechaObj =
+        f?.toDate ? f.toDate() :
+        (f instanceof Date ? f : new Date(f));
+
+      return {
+        ...item,
+        fecha: isNaN(fechaObj.getTime()) ? null : fechaObj
+      } as any;
+    });
+
+  } finally {
+    this.cargando = false;
   }
+}
+
 
   async cargarHistorial() {
     this.cierresGuardados = await this.cierreCajaService.obtenerHistorialCierres();
@@ -139,9 +152,24 @@ export class CierreCajaComponent implements OnInit {
 
   /* ------------------------ CÁLCULOS ------------------------ */
 
-  calcularTotalGeneral(): number {
-    return this.cierreItems.reduce((total, item) => total + item.valor, 0);
+calcularTotalGeneral(): number {
+  const vistos = new Set<string>();
+  let total = 0;
+
+  for (const item of this.cierreItems) {
+    const key = (item as any).pagoKey;
+    const pagoTotal = Number((item as any).pagoTotal ?? 0);
+
+    if (!key) continue; // por seguridad
+    if (vistos.has(key)) continue;
+
+    vistos.add(key);
+    total += pagoTotal;
   }
+
+  return total;
+}
+
 
   calcularTotalEgresos(): number {
     return this.egresos.reduce((total, e) => total + e.valor, 0);
@@ -186,12 +214,24 @@ export class CierreCajaComponent implements OnInit {
 
     const startY = 45;
 
-    const body = this.cierreItems.map(item => [
-      item.modulo,
-      item.unidad,
-      new Date(item.fecha as any).toLocaleDateString('es-EC'),
-      `$${Number(item.valor).toFixed(2)}`
-    ]);
+const body = this.cierreItems.map(item => {
+  const fecha: any = item.fecha;
+
+  const fechaObj =
+    fecha?.toDate ? fecha.toDate() :
+    (fecha instanceof Date ? fecha : new Date(fecha));
+
+  const fechaStr = isNaN(fechaObj.getTime())
+    ? '—'
+    : fechaObj.toLocaleDateString('es-EC');
+
+  return [
+    item.modulo,
+    item.unidad,
+    fechaStr,
+    `$${Number(item.valor).toFixed(2)}`
+  ];
+});
 
     (pdfDoc as any).autoTable({
       head: [['Módulo', 'Unidad', 'Fecha', 'Valor']],
@@ -396,12 +436,25 @@ export class CierreCajaComponent implements OnInit {
     const fechaId = this.fechaSeleccionada.toISOString().split('T')[0];
 
     // Hoja ingresos
-    const ingresosData = this.cierreItems.map(item => ({
-      Módulo: item.modulo,
-      Unidad: item.unidad,
-      Fecha: new Date(item.fecha as any).toLocaleDateString('es-EC'),
-      Valor: Number(item.valor || 0)
-    }));
+const ingresosData = this.cierreItems.map(item => {
+  const fecha: any = item.fecha;
+
+  const fechaObj =
+    fecha?.toDate ? fecha.toDate() :
+    (fecha instanceof Date ? fecha : new Date(fecha));
+
+  const fechaStr = isNaN(fechaObj.getTime())
+    ? '—'
+    : fechaObj.toLocaleDateString('es-EC');
+
+  return {
+    Módulo: item.modulo,
+    Unidad: item.unidad,
+    Fecha: fechaStr,
+    Valor: Number(item.valor || 0)
+  };
+});
+
 
     // Hoja egresos
     const egresosData = this.egresos.map(item => ({

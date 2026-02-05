@@ -13,7 +13,8 @@ import {
   addDoc,
   updateDoc,
   serverTimestamp,
-  increment
+  increment,
+  setDoc
 } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -64,10 +65,13 @@ export class RealizarPagoComponent implements OnInit {
   reporteId: string = '';
   private pathActual: string = '';
 
+  // ✅ unidadId real (ej: ExpresoAntisana_E01) para lectura global de pagos
+  unidadId: string = '';
+
   registros: (NuevoRegistro & { id?: string }) | null = null;
 
   campos: CampoClave[] = ['minutosAtraso', 'administracion', 'minutosBase', 'multas'];
-fechaEdicion: string = '';
+  fechaEdicion: string = '';
   pagosTotales: Record<CampoClave, PagoPorModulo[]> = {
     minutosAtraso: [],
     administracion: [],
@@ -148,6 +152,10 @@ fechaEdicion: string = '';
       id: snap.id
     };
 
+
+    // ✅ unidadId real (si estás en nuevo modelo: reportes_dia/.../unidades/{unidadId})
+    this.unidadId = this.pathActual.split('/').pop() ?? '';
+
 const qp = this.route.snapshot.queryParamMap;
 
 // ✅ UNIDAD
@@ -192,26 +200,53 @@ this.registros.nombre = (
   }
 
   // =========================
-  // HISTORIAL DE PAGOS (doc actual)
+  // HISTORIAL DE PAGOS (global si existe / fallback doc actual)
   // =========================
   async cargarPagosTotales() {
     for (const campo of this.campos) this.pagosTotales[campo] = [];
-    if (!this.registros?.id) return;
 
-    const reporteId = this.registros.id;
-    const refPagos = collection(this.firestore, `${this.pathActual}/pagosTotales`);
-    const snap = await getDocs(refPagos);
+    // 1) Intentar leer desde unidades/{unidadId}/pagos (fuente global para caja)
+    let pagos: DocumentoPago[] = [];
+    if (this.unidadId) {
+      try {
+        const refPagos = collection(this.firestore, `unidades/${this.unidadId}/pagos`);
+        const snap = await getDocs(refPagos);
+        pagos = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      } catch (e) {
+        console.warn('No se pudo leer unidades/{unidadId}/pagos. Se usa fallback a pagosTotales:', e);
+      }
+    }
 
-    const pagos: DocumentoPago[] = snap.docs.map(d => ({
-      id: d.id,
-      ...(d.data() as Omit<DocumentoPago, 'id'>)
-    }));
+    // 2) Fallback: pagos del doc actual (legacy / mientras migras)
+    if (pagos.length === 0) {
+      try {
+        const refPagos = collection(this.firestore, `${this.pathActual}/pagosTotales`);
+        const snap = await getDocs(refPagos);
+        pagos = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      } catch (e) {
+        console.warn('No se pudo leer pagosTotales del doc actual:', e);
+        pagos = [];
+      }
+    }
 
+    // 3) Alimentar UI (una fila por módulo)
+    // Nota: tu UI actual espera "PagoPorModulo" por campo.
     for (const campo of this.campos) {
       const nuevosPagos = pagos.flatMap(p => {
-        const cantidad = p.detalles?.[campo] ?? 0;
+        const cantidad = Number(p.detalles?.[campo] ?? 0);
+
+        // fecha real del pago (preferimos Timestamp)
+        const fechaPago = (p.fecha ?? (p as any).createdAt ?? (p as any).fechaPago) as any;
+
+        // Agrupador (si existe metadata), si no: '---'
+        const reporteId =
+          (p as any).pathDoc ??
+          (p as any).diaId ??
+          (p as any).reporteId ??
+          (this.registros?.id ?? '---');
+
         return cantidad > 0
-          ? [{ id: p.id, cantidad: cantidad, fecha: p.fecha, reporteId }]
+          ? [{ id: p.id, cantidad, fecha: fechaPago, reporteId }]
           : [];
       });
 
@@ -225,32 +260,50 @@ this.registros.nombre = (
   private async cargarDeudaHistoricaAcumulada(): Promise<void> {
     if (!this.registros) return;
 
+    // ✅ Recalcular desde cero SIEMPRE (evita acumulación por múltiples llamadas)
+    const deudaHistoricaTmp: Record<CampoClave, number> = {
+      minutosAtraso: 0,
+      administracion: 0,
+      minutosBase: 0,
+      multas: 0
+    };
+
+    const deudaDetalleTmp: Record<CampoClave, Array<{ fecha: string; monto: number; pathDoc: string }>> = {
+      minutosAtraso: [],
+      administracion: [],
+      minutosBase: [],
+      multas: []
+    };
+
     const codigo = ((this.registros as any)?.codigo ?? this.registros?.unidad ?? '').toString().trim();
     const empresa = ((this.registros as any)?.empresa ?? '').toString().trim();
-    const fechaActual = ((this.registros as any)?.fecha ?? '').toString().trim();
 
-    if (!codigo || !empresa || !fechaActual) return;
-
-    for (const c of this.campos) {
-      this.deudaHistorica[c] = 0;
-      this.deudaDetalle[c] = [];
+    if (!codigo || !empresa) {
+      this.deudaHistorica = deudaHistoricaTmp;
+      this.deudaDetalle = deudaDetalleTmp;
+      return;
     }
 
     const q = query(
       collectionGroup(this.firestore, 'unidades'),
       where('empresa', '==', empresa),
-      where('codigo', '==', codigo),
-      where('fecha', '<', fechaActual)
+      where('codigo', '==', codigo)
     );
 
     const snap = await getDocs(q);
 
     snap.forEach(s => {
+      const pathDoc = s.ref.path;
+
+      // ✅ Solo tomar docs que vienen de reportes_dia (evita colisiones con otras colecciones)
+      if (!pathDoc.startsWith('reportes_dia/')) return;
+
+      // ✅ Solo tomar la unidad exacta (evita colisiones por codigo)
+      if (this.unidadId && !pathDoc.endsWith(`/unidades/${this.unidadId}`)) return;
+
       const d: any = s.data();
       const fecha = (d?.fecha ?? '').toString().trim();
       if (!fecha) return;
-
-      const pathDoc = s.ref.path;
 
       for (const campo of this.campos) {
         const total = Number(d?.[campo] ?? 0);
@@ -259,25 +312,20 @@ this.registros.nombre = (
         const pendiente = Math.max(total - pagado, 0);
 
         if (pendiente > 0) {
-          this.deudaHistorica[campo] += pendiente;
-          this.deudaDetalle[campo].push({ fecha, monto: pendiente, pathDoc });
+          deudaHistoricaTmp[campo] += pendiente;
+          deudaDetalleTmp[campo].push({ fecha, monto: pendiente, pathDoc });
         }
       }
     });
 
+    // Orden por fecha
     for (const campo of this.campos) {
-      this.deudaDetalle[campo].sort((a, b) => a.fecha.localeCompare(b.fecha));
+      deudaDetalleTmp[campo].sort((a, b) => a.fecha.localeCompare(b.fecha));
     }
 
-    const reg: any = this.registros;
-    const fechaHoy = (reg?.fecha ?? fechaActual).toString().trim();
-
-    for (const campo of this.campos) {
-      const pendienteHoy = this.calcularDeudaDelDia(reg, campo);
-      if (pendienteHoy > 0) {
-        this.deudaDetalle[campo].push({ fecha: fechaHoy, monto: pendienteHoy, pathDoc: this.pathActual });
-      }
-    }
+    // ✅ Asignación final (evita renders con parciales 2→4→6)
+    this.deudaHistorica = deudaHistoricaTmp;
+    this.deudaDetalle = deudaDetalleTmp;
   }
 
   getDeudaDetalle(campo: CampoClave): DeudaDetalleItem[] {
@@ -320,18 +368,9 @@ this.registros.nombre = (
     return 'multasPagadas';
   }
 
-  private calcularDeudaDelDia(registro: any, campo: CampoClave): number {
-    const total = Number(registro?.[campo] ?? 0);
-    const pagadoKey = this.campoPagadoKey(campo);
-    const pagado = Number(registro?.[pagadoKey] ?? 0);
-    return Math.max(total - pagado, 0);
-  }
-
-  calcularDeudaAcumulada(campo: CampoClave): number {
-    const historica = Number(this.deudaHistorica?.[campo] ?? 0);
-    const hoy = this.registros ? this.calcularDeudaDelDia(this.registros as any, campo) : 0;
-    return historica + hoy;
-  }
+calcularDeudaAcumulada(campo: CampoClave): number {
+  return Number(this.deudaHistorica?.[campo] ?? 0);
+}
 
   filtrarPagosPorRegistro(campo: CampoClave, registroId: string): PagoPorModulo[] {
     return this.pagosTotales[campo]?.filter(p => p.reporteId === registroId) || [];
@@ -351,18 +390,29 @@ this.registros.nombre = (
     return total;
   }
 
-  async eliminarPago(pagoId: string): Promise<void> {
+  async eliminarPago(pagoId: string, campo?: CampoClave): Promise<void> {
   if (!pagoId) return;
 
-  const ok = confirm('¿Seguro que deseas eliminar este pago? Esta acción no se puede deshacer.');
+  const ok = confirm('¿Seguro que deseas eliminar este pago?');
   if (!ok) return;
 
   try {
-    // ✅ Ruta del doc del pago (si tu historial viene del doc actual, es pathActual)
-    const pagoPath = `${this.pathActual}/pagosTotales/${pagoId}`;
-    const pagoRef = doc(this.firestore, pagoPath);
+    // 1) Resolver doc del pago (dual)
+    const pagoDocPathUnidades = this.unidadId ? `unidades/${this.unidadId}/pagos/${pagoId}` : '';
+    const pagoDocPathFallback = `${this.pathActual}/pagosTotales/${pagoId}`;
 
-    const snap = await getDoc(pagoRef);
+    let pagoRef = pagoDocPathUnidades
+      ? doc(this.firestore, pagoDocPathUnidades)
+      : doc(this.firestore, pagoDocPathFallback);
+
+    let snap = await getDoc(pagoRef);
+
+    if (!snap.exists()) {
+      // fallback
+      pagoRef = doc(this.firestore, pagoDocPathFallback);
+      snap = await getDoc(pagoRef);
+    }
+
     if (!snap.exists()) {
       alert('El pago ya no existe o no se encontró.');
       return;
@@ -371,54 +421,125 @@ this.registros.nombre = (
     const data: any = snap.data();
     const detalles: Partial<Record<CampoClave, number>> = data?.detalles ?? {};
     const urlPDF: string | null = data?.urlPDF ?? null;
+    const storagePath: string | null = data?.storagePath ?? null;
 
-    // ✅ Preparar decrementos en el doc unidad
-    // OJO: el doc unidad es this.pathActual
-    const updates: any = {
-      updatedAt: serverTimestamp(),
-      fechaModificacion: serverTimestamp()
+    // aplicaciones (modelo nuevo)
+    const apps: any[] = Array.isArray(data?.aplicaciones) ? data.aplicaciones : [];
+
+    // fallback doc único (legacy)
+    const pathDocPago = (data?.pathDoc ?? this.pathActual) as string;
+
+    // Helpers
+    const revertirEnDoc = async (pathDoc: string, c: CampoClave, monto: number) => {
+      if (!pathDoc || monto <= 0) return;
+      await updateDoc(doc(this.firestore, pathDoc), {
+        [this.campoPagadoKey(c)]: increment(-monto),
+        updatedAt: serverTimestamp(),
+        fechaModificacion: serverTimestamp()
+      } as any);
     };
 
-    // Restar de los acumulados pagados (adminPagada/minBasePagados/minutosPagados/multasPagadas)
-    (Object.keys(detalles) as CampoClave[]).forEach((campo) => {
-      const monto = Number(detalles[campo] ?? 0);
-      if (monto > 0) {
-        const pagadoKey = this.campoPagadoKey(campo);
-        updates[pagadoKey] = increment(-monto); // ✅ resta
+    // ✅ CASO A: eliminar TODO el pago (campo NO enviado)
+    if (!campo) {
+      if (apps.length > 0) {
+        // ✅ Revertir EXACTAMENTE por aplicaciones (puede afectar varios días)
+        for (const a of apps) {
+          const c = a?.campo as CampoClave;
+          const monto = Number(a?.monto ?? 0);
+          const pathDoc = (a?.pathDoc ?? '').toString().trim();
+          if (!c || monto <= 0 || !pathDoc) continue;
+          await revertirEnDoc(pathDoc, c, monto);
+        }
+      } else {
+        // fallback legacy: revertir por detalles en un solo doc
+        const updates: any = {
+          updatedAt: serverTimestamp(),
+          fechaModificacion: serverTimestamp()
+        };
+
+        (Object.keys(detalles) as CampoClave[]).forEach((c) => {
+          const monto = Number(detalles[c] ?? 0);
+          if (monto > 0) {
+            const pagadoKey = this.campoPagadoKey(c);
+            updates[pagadoKey] = increment(-monto);
+          }
+        });
+
+        await updateDoc(doc(this.firestore, pathDocPago), updates);
       }
-    });
 
-    // 1) actualizar unidad (restar pagos)
-    await updateDoc(doc(this.firestore, this.pathActual), updates);
+      // Borrar doc pago
+      await deleteDoc(pagoRef);
 
-    // 2) eliminar doc pago
-    await deleteDoc(pagoRef);
+    } else {
+      // ✅ CASO B: eliminar SOLO un módulo del pago
+      const montoAnterior = Number(detalles?.[campo] ?? 0);
+      if (montoAnterior <= 0) return;
 
-    // 3) (opcional) eliminar PDF asociado si existe
-    // Solo si quieres que “limpie” storage también.
-    if (urlPDF) {
-      try {
-        // Si urlPDF es una downloadURL, puedes borrarlo si guardas también la ruta.
-        // Si NO guardas ruta, lo más estable es guardar `storagePath` dentro del doc pago.
-        // Aun así, intento borrar desde URL si es compatible en tu caso.
-        const objRef = ref(this.storage, urlPDF);
-        await deleteObject(objRef);
-      } catch (e) {
-        // No bloqueamos por errores de Storage (puede fallar si no hay path)
-        console.warn('No se pudo eliminar el PDF en Storage (revisar storagePath):', e);
+      if (apps.length > 0) {
+        // ✅ Revertir SOLO las aplicaciones del campo en sus docs reales
+        const appsCampo = apps.filter(a => a?.campo === campo && a?.pathDoc);
+        if (appsCampo.length > 0) {
+          for (const a of appsCampo) {
+            const monto = Number(a?.monto ?? 0);
+            const pathDoc = (a?.pathDoc ?? '').toString().trim();
+            if (monto > 0 && pathDoc) {
+              await revertirEnDoc(pathDoc, campo, monto);
+            }
+          }
+        } else {
+          // fallback (por si apps existe pero vino incompleto)
+          await revertirEnDoc(pathDocPago, campo, montoAnterior);
+        }
+      } else {
+        // legacy: revertir por detalles en un doc
+        await revertirEnDoc(pathDocPago, campo, montoAnterior);
+      }
+
+      // Actualizar doc de pago: poner campo en 0 y recalcular total
+      const detallesNuevos: Partial<Record<CampoClave, number>> = { ...detalles, [campo]: 0 };
+
+      const totalNuevo =
+        Number(detallesNuevos.administracion ?? 0) +
+        Number(detallesNuevos.minutosBase ?? 0) +
+        Number(detallesNuevos.minutosAtraso ?? 0) +
+        Number(detallesNuevos.multas ?? 0);
+
+      if (totalNuevo <= 0) {
+        await deleteDoc(pagoRef);
+      } else {
+        // ✅ además, limpiar aplicaciones del campo para que no vuelva a afectar si editas luego
+        const appsNuevas = apps.length > 0 ? apps.filter(a => a?.campo !== campo) : apps;
+
+        await updateDoc(pagoRef, {
+          detalles: detallesNuevos,
+          total: totalNuevo,
+          aplicaciones: appsNuevas,
+          updatedAt: serverTimestamp()
+        } as any);
       }
     }
 
-    alert('✅ Pago eliminado correctamente.');
+    // 2) Storage (solo borrado confiable si guardas storagePath)
+    if (storagePath) {
+      try {
+        await deleteObject(ref(this.storage, storagePath));
+      } catch (e) {
+        console.warn('No se pudo eliminar el PDF en Storage por storagePath:', e);
+      }
+    } else if (urlPDF) {
+      console.warn('urlPDF existe, pero falta storagePath para borrado confiable.');
+    }
 
-    // 4) recargar UI
-  this.recargarVistaActual();
+    alert('✅ Eliminación aplicada.');
+    this.recargarVistaActual();
 
   } catch (error) {
     console.error('❌ Error eliminando pago:', error);
     alert('Ocurrió un error al eliminar el pago.');
   }
 }
+
 
 esPagoEnEdicion(pago: { id: string }, campo: CampoClave): boolean {
   return !!this.pagoEnEdicion && this.pagoEnEdicion.id === pago.id && this.pagoEnEdicion.campo === campo;
@@ -451,13 +572,22 @@ async guardarEdicion(): Promise<void> {
   // Validaciones
   const montoNuevo = Math.max(Number(this.nuevoMonto ?? 0), 0);
 
-
   try {
-    // Doc pago (siempre cuelga del doc actual)
-    const pagoPath = `${this.pathActual}/pagosTotales/${id}`;
-    const pagoRef = doc(this.firestore, pagoPath);
+    // Resolver doc pago (dual)
+    const pagoDocPathUnidades = this.unidadId ? `unidades/${this.unidadId}/pagos/${id}` : '';
+    const pagoDocPathFallback = `${this.pathActual}/pagosTotales/${id}`;
 
-    const snap = await getDoc(pagoRef);
+    let pagoRef = pagoDocPathUnidades
+      ? doc(this.firestore, pagoDocPathUnidades)
+      : doc(this.firestore, pagoDocPathFallback);
+
+    let snap = await getDoc(pagoRef);
+
+    if (!snap.exists()) {
+      pagoRef = doc(this.firestore, pagoDocPathFallback);
+      snap = await getDoc(pagoRef);
+    }
+
     if (!snap.exists()) {
       alert('El pago no existe o ya fue eliminado.');
       this.cancelarEdicion();
@@ -466,23 +596,62 @@ async guardarEdicion(): Promise<void> {
 
     const data: any = snap.data();
     const detalles = (data?.detalles ?? {}) as Partial<Record<CampoClave, number>>;
+    const aplicaciones: any[] = Array.isArray(data?.aplicaciones) ? data.aplicaciones : [];
+    const pathDocPago = (data?.pathDoc ?? this.pathActual) as string;
 
     const montoAnterior = Number(detalles?.[campo] ?? 0);
-
-    // Delta para ajustar acumulado en el doc unidad
     const delta = montoNuevo - montoAnterior;
 
-    // 1) Ajustar acumulado pagado en el doc unidad (adminPagada/minBasePagados/minutosPagados/multasPagadas)
+    // 1) Ajustar acumulados pagados
     if (delta !== 0) {
-      const pagadoKey = this.campoPagadoKey(campo);
-      await updateDoc(doc(this.firestore, this.pathActual), {
-        [pagadoKey]: increment(delta),
-        updatedAt: serverTimestamp(),
-        fechaModificacion: serverTimestamp()
-      } as any);
+      // Si hay aplicaciones del campo, distribuimos el delta proporcionalmente por esas aplicaciones.
+      // Si no hay, aplicamos al doc asociado al pago.
+      const appsCampo = aplicaciones.filter(a => a.campo === campo && a.pathDoc);
+
+      if (appsCampo.length > 0) {
+        // Reparto simple: si hay 1 aplicación, va todo ahí.
+        // Si hay varias, repartimos proporcionalmente al monto original.
+        const totalApps = appsCampo.reduce((acc, a) => acc + Number(a.monto ?? 0), 0) || 0;
+
+        if (totalApps > 0) {
+          let restante = delta;
+
+          for (let i = 0; i < appsCampo.length; i++) {
+            const a = appsCampo[i];
+            const base = Number(a.monto ?? 0);
+
+            // cuota proporcional, el último se lleva el redondeo/restante
+            const cuota = (i === appsCampo.length - 1)
+              ? restante
+              : (delta * (base / totalApps));
+
+            const ajuste = Number(cuota);
+
+            await updateDoc(doc(this.firestore, a.pathDoc), {
+              [this.campoPagadoKey(campo)]: increment(ajuste),
+              updatedAt: serverTimestamp(),
+              fechaModificacion: serverTimestamp()
+            } as any);
+
+            restante -= ajuste;
+          }
+        } else {
+          await updateDoc(doc(this.firestore, pathDocPago), {
+            [this.campoPagadoKey(campo)]: increment(delta),
+            updatedAt: serverTimestamp(),
+            fechaModificacion: serverTimestamp()
+          } as any);
+        }
+      } else {
+        await updateDoc(doc(this.firestore, pathDocPago), {
+          [this.campoPagadoKey(campo)]: increment(delta),
+          updatedAt: serverTimestamp(),
+          fechaModificacion: serverTimestamp()
+        } as any);
+      }
     }
 
-    // 2) Actualizar doc pago (detalles + total + fecha)
+    // 2) Actualizar doc pago (detalles + total)
     const detallesNuevos: Partial<Record<CampoClave, number>> = { ...detalles };
     detallesNuevos[campo] = montoNuevo;
 
@@ -492,12 +661,10 @@ async guardarEdicion(): Promise<void> {
       Number(detallesNuevos.minutosAtraso ?? 0) +
       Number(detallesNuevos.multas ?? 0);
 
-    // Si el total queda en 0, borramos el doc pago (opcional, recomendado)
     if (totalNuevo <= 0) {
       await deleteDoc(pagoRef);
     } else {
       await updateDoc(pagoRef, {
- // si tú manejas ambos campos, mantenlos iguales
         detalles: detallesNuevos,
         total: totalNuevo,
         updatedAt: serverTimestamp()
@@ -508,11 +675,12 @@ async guardarEdicion(): Promise<void> {
     await this.cargarPagosTotales();
     await this.cargarDeudaHistoricaAcumulada();
 
-this.pagoEnEdicion = null;
-this.nuevoMonto = 0;
+    this.pagoEnEdicion = null;
+    this.nuevoMonto = 0;
 
-alert('✅ Pago actualizado correctamente.');
-this.recargarVistaActual();
+    alert('✅ Pago actualizado correctamente.');
+    this.recargarVistaActual();
+
   } catch (err) {
     console.error('❌ Error guardando edición:', err);
     alert('Ocurrió un error al editar el pago.');
@@ -522,168 +690,199 @@ this.recargarVistaActual();
   // =========================
   // GUARDAR PAGOS
   // =========================
-  async guardarPagosGenerales() {
-    if (this.cargandoPago) return;
-    this.cargandoPago = true;
+async guardarPagosGenerales() {
+  if (this.cargandoPago) return;
+  this.cargandoPago = true;
 
-    try {
-      if (!this.registros) {
-        alert('Registro no encontrado');
-        return;
-      }
+  try {
+    if (!this.registros) {
+      alert('Registro no encontrado');
+      return;
+    }
 
-      const aplicaciones: Array<{
-        campo: CampoClave;
-        monto: number;
-        pathDoc: string;
-        fechaDeuda: string;
-      }> = [];
+    const aplicaciones: Array<{
+      campo: CampoClave;
+      monto: number;
+      pathDoc: string;
+      fechaDeuda: string;
+    }> = [];
 
-      for (const campo of this.campos) {
-        const items = this.getDeudaDetalle(campo);
-        for (const item of items) {
-          const monto = this.getPagoFila(campo, item);
-          if (monto > 0) {
-            aplicaciones.push({
-              campo,
-              monto,
-              pathDoc: item.pathDoc,
-              fechaDeuda: item.fecha
-            });
-          }
+    for (const campo of this.campos) {
+      const items = this.getDeudaDetalle(campo);
+      for (const item of items) {
+        const monto = this.getPagoFila(campo, item);
+        if (monto > 0) {
+          aplicaciones.push({
+            campo,
+            monto,
+            pathDoc: item.pathDoc,
+            fechaDeuda: item.fecha
+          });
         }
       }
+    }
 
-      if (aplicaciones.length === 0) {
-        alert('⚠️ Ingresa al menos un pago en alguna fecha.');
-        return;
+    if (aplicaciones.length === 0) {
+      alert('⚠️ Ingresa al menos un pago en alguna fecha.');
+      return;
+    }
+
+    const fechaPagoStr = this.obtenerFechaISODesdeDate(this.fechaSeleccionada);
+    const [y, m, d] = fechaPagoStr.split('-').map(Number);
+    const fechaPago = Timestamp.fromDate(new Date(y, m - 1, d));
+
+    const qrLink = `${window.location.origin}/recibos/pendiente`;
+
+    const porDoc = new Map<string, Array<{ campo: CampoClave; monto: number; fechaDeuda: string }>>();
+    for (const a of aplicaciones) {
+      if (!porDoc.has(a.pathDoc)) porDoc.set(a.pathDoc, []);
+      porDoc.get(a.pathDoc)!.push({ campo: a.campo, monto: a.monto, fechaDeuda: a.fechaDeuda });
+    }
+
+    const detallesTotalesPorCampo: Partial<Record<CampoClave, number>> = {};
+    for (const a of aplicaciones) {
+      detallesTotalesPorCampo[a.campo] = Number(detallesTotalesPorCampo[a.campo] ?? 0) + a.monto;
+    }
+    const totalPago = Object.values(detallesTotalesPorCampo).reduce((acc, v) => acc + Number(v ?? 0), 0);
+
+    const pendientesAntes: Record<CampoClave, number> = {
+      administracion: 0,
+      minutosBase: 0,
+      minutosAtraso: 0,
+      multas: 0
+    };
+
+    for (const campo of this.campos) {
+      pendientesAntes[campo] = this.getDeudaDetalle(campo).reduce((acc, it) => acc + Number(it.monto ?? 0), 0);
+    }
+
+    // ✅ Guardaremos pagos creados como DocumentReference real (no string path)
+    const pagosCreados: Array<ReturnType<typeof doc>> = [];
+
+    // ✅ NUEVA RUTA: unidades/{unidadId}/pagos
+    const pagosUnidadRef = collection(this.firestore, `unidades/${this.unidadId}/pagos`);
+
+    for (const [pathDoc, items] of porDoc.entries()) {
+      const detalles: Partial<Record<CampoClave, number>> = {};
+      let total = 0;
+
+      for (const it of items) {
+        detalles[it.campo] = Number(detalles[it.campo] ?? 0) + it.monto;
+        total += it.monto;
       }
 
-      const fechaPagoStr = this.obtenerFechaISODesdeDate(this.fechaSeleccionada);
-      const [y, m, d] = fechaPagoStr.split('-').map(Number);
-      const fechaPago = Timestamp.fromDate(new Date(y, m - 1, d));
+      // ✅ ID estable (fecha de pago + random corto para evitar colisión si haces 2 pagos el mismo día)
+      const now = Date.now().toString(36).slice(-6);
+      const pagoId = `${fechaPagoStr}_${now}`;
 
-      // ✅ existe en este scope y la firma lo acepta como opcional
-      const qrLink = `${window.location.origin}/recibos/pendiente`;
+      const pagoDocRef = doc(pagosUnidadRef, pagoId);
 
-      const porDoc = new Map<string, Array<{ campo: CampoClave; monto: number; fechaDeuda: string }>>();
-      for (const a of aplicaciones) {
-        if (!porDoc.has(a.pathDoc)) porDoc.set(a.pathDoc, []);
-        porDoc.get(a.pathDoc)!.push({ campo: a.campo, monto: a.monto, fechaDeuda: a.fechaDeuda });
-      }
-
-      const detallesTotalesPorCampo: Partial<Record<CampoClave, number>> = {};
-      for (const a of aplicaciones) {
-        detallesTotalesPorCampo[a.campo] = Number(detallesTotalesPorCampo[a.campo] ?? 0) + a.monto;
-      }
-      const totalPago = Object.values(detallesTotalesPorCampo).reduce((acc, v) => acc + Number(v ?? 0), 0);
-
-      const pendientesAntes: Record<CampoClave, number> = {
-        administracion: 0,
-        minutosBase: 0,
-        minutosAtraso: 0,
-        multas: 0
-      };
-
-      for (const campo of this.campos) {
-        pendientesAntes[campo] = this.getDeudaDetalle(campo).reduce((acc, it) => acc + Number(it.monto ?? 0), 0);
-      }
-
-      const pagosCreados: { pathPagoDoc: string }[] = [];
-
-      for (const [pathDoc, items] of porDoc.entries()) {
-        const detalles: Partial<Record<CampoClave, number>> = {};
-        let total = 0;
-
-        for (const it of items) {
-          detalles[it.campo] = Number(detalles[it.campo] ?? 0) + it.monto;
-          total += it.monto;
-        }
-
-        const refPagos = collection(this.firestore, `${pathDoc}/pagosTotales`);
-        const docRef = await addDoc(refPagos, {
-          fecha: fechaPago,
-          detalles,
-          total,
-          urlPDF: null,
-          fechaPago,
-          aplicaciones: items,
-          createdAt: serverTimestamp(),
-          uidCobrador: this.uidUsuario
-        });
-
-        pagosCreados.push({ pathPagoDoc: `${pathDoc}/pagosTotales/${docRef.id}` });
-
-        const incUpdates: any = {
-          updatedAt: serverTimestamp(),
-          fechaModificacion: serverTimestamp()
-        };
-
-        for (const c of Object.keys(detalles) as CampoClave[]) {
-          const monto = Number(detalles[c] ?? 0);
-          if (monto > 0) {
-            const pagadoKey = this.campoPagadoKey(c);
-            incUpdates[pagadoKey] = increment(monto);
-          }
-        }
-
-        await updateDoc(doc(this.firestore, pathDoc), incUpdates);
-      }
-
-      alert('✅ Pagos aplicados correctamente. Generando recibo...');
-
-      const pagosConFechas: PagoReciboItem[] = aplicaciones.map(a => ({
-        campo: a.campo,
-        monto: a.monto,
+      // ✅ Guardar en unidades/{unidadId}/pagos
+      await setDoc(pagoDocRef, {
+        // fecha real del pago
         fecha: fechaPago,
-        fechaDeuda: a.fechaDeuda
-      }));
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        uidCobrador: this.uidUsuario,
 
-      const pendientesDespues: Record<CampoClave, number> = {
-        administracion: 0,
-        minutosBase: 0,
-        minutosAtraso: 0,
-        multas: 0
+        // metadata
+        unidadId: this.unidadId,
+        codigo: ((this.registros as any)?.codigo ?? this.registros?.unidad ?? '').toString().trim(),
+        empresa: ((this.registros as any)?.empresa ?? '').toString().trim(),
+
+        // totales
+        detalles,
+        total,
+
+        // soporta revertir / editar
+        aplicaciones: items.map(it => ({
+          campo: it.campo,
+          monto: it.monto,
+          fechaDeuda: it.fechaDeuda,
+          pathDoc // doc del día/unidad donde se aplicó el pago
+        })),
+
+        // pdf (se completa luego)
+        urlPDF: null,
+        storagePath: null,
+
+        // opcional
+        qrLink
+      });
+
+      pagosCreados.push(pagoDocRef);
+
+      // ✅ Aplicar increment en el doc del día (reportes_dia/.../unidades/...)
+      const incUpdates: any = {
+        updatedAt: serverTimestamp(),
+        fechaModificacion: serverTimestamp()
       };
 
-      for (const campo of this.campos) {
-        const pagadoCampo = Number(detallesTotalesPorCampo[campo] ?? 0);
-        pendientesDespues[campo] = Math.max(Number(pendientesAntes[campo] ?? 0) - pagadoCampo, 0);
+      for (const c of Object.keys(detalles) as CampoClave[]) {
+        const monto = Number(detalles[c] ?? 0);
+        if (monto > 0) {
+          const pagadoKey = this.campoPagadoKey(c);
+          incUpdates[pagadoKey] = increment(monto);
+        }
       }
 
-      const unidadTicket =
+      await updateDoc(doc(this.firestore, pathDoc), incUpdates);
+    }
+
+    alert('✅ Pagos aplicados correctamente. Generando recibo...');
+
+    const pagosConFechas: PagoReciboItem[] = aplicaciones.map(a => ({
+      campo: a.campo,
+      monto: a.monto,
+      fecha: fechaPago,
+      fechaDeuda: a.fechaDeuda
+    }));
+
+    const pendientesDespues: Record<CampoClave, number> = {
+      administracion: 0,
+      minutosBase: 0,
+      minutosAtraso: 0,
+      multas: 0
+    };
+
+    for (const campo of this.campos) {
+      const pagadoCampo = Number(detallesTotalesPorCampo[campo] ?? 0);
+      pendientesDespues[campo] = Math.max(Number(pendientesAntes[campo] ?? 0) - pagadoCampo, 0);
+    }
+
+    const unidadTicket =
       (this.registros?.unidad ?? '').toString().trim() ||
       ((this.registros as any)?.codigo ?? '').toString().trim() ||
       '---';
 
-
-      // ✅ Genera PDF y luego actualiza urlPDF en los pagos
+    // ✅ Genera PDF y luego actualiza urlPDF en los pagos NUEVOS (unidades/.../pagos)
     this.generarReciboYSubirPDF(this.uidUsuario, this.registros.id ?? 'pago', {
       nombre: (this.registros as any)?.nombre ?? '',
       apellido: (this.registros as any)?.apellido ?? '',
-      unidad: unidadTicket, // ✅ usar la unidad correcta aquí
+      unidad: unidadTicket,
       total: totalPago,
       detalles: detallesTotalesPorCampo,
       pagosConFechas,
       pendientesDespues
     })
       .then(async (urlPDF) => {
-        for (const p of pagosCreados) {
-          await updateDoc(doc(this.firestore, p.pathPagoDoc), { urlPDF });
+        for (const refPago of pagosCreados) {
+          await updateDoc(refPago as any, { urlPDF, updatedAt: serverTimestamp() });
         }
       })
       .catch(err => console.error('❌ Error generando el PDF:', err));
 
-      this.pagosPorDeuda = {};
-this.recargarVistaActual();
+    this.pagosPorDeuda = {};
+    this.recargarVistaActual();
 
-    } catch (error) {
-      console.error('❌ Error al guardar los pagos:', error);
-      alert('Ocurrió un error al guardar los pagos.');
-    } finally {
-      this.cargandoPago = false;
-    }
+  } catch (error) {
+    console.error('❌ Error al guardar los pagos:', error);
+    alert('Ocurrió un error al guardar los pagos.');
+  } finally {
+    this.cargandoPago = false;
   }
+}
+
 
   // =========================
   // PDF

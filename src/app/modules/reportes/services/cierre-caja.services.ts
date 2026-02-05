@@ -5,20 +5,22 @@ import {
   getDocs,
   query,
   where,
-  doc
+  Timestamp,
+  collectionGroup,
+  orderBy
 } from '@angular/fire/firestore';
 import { CierreCajaItem } from '../../../core/interfaces/cierreCajaItem.interface';
 
 @Injectable({ providedIn: 'root' })
 export class CierreCajaService {
-
   constructor(private firestore: Firestore) {}
 
-  private isoDate(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+  private rangoDia(fecha: Date) {
+    const inicio = new Date(fecha);
+    inicio.setHours(0, 0, 0, 0);
+    const fin = new Date(fecha);
+    fin.setHours(23, 59, 59, 999);
+    return { ini: Timestamp.fromDate(inicio), fin: Timestamp.fromDate(fin) };
   }
 
   private normalizarEmpresa(empresaCruda: string): string {
@@ -28,69 +30,110 @@ export class CierreCajaService {
     return empresaCruda || 'Sin empresa';
   }
 
-  private normalizarUnidad(unidadId: string, dataUnidad?: any): string {
-    // Si el doc trae campo "unidad", úsalo.
-    const u = dataUnidad?.unidad;
-    if (u && typeof u === 'string' && u.trim()) return u.trim();
+  private normalizarUnidad(p: any): string {
+    const codigo = (p?.codigo || p?.unidad || p?.codigoUnidad || '').toString().trim();
+    if (codigo) return codigo;
 
-    // Si el ID viene como "ExpresoAntisana_E01", toma lo último
-    if (unidadId.includes('_')) return unidadId.split('_').pop() || unidadId;
+    const unidadId = (p?.unidadId || p?.unidadID || '').toString().trim();
+    if (unidadId) return unidadId.includes('_') ? (unidadId.split('_').pop() || unidadId) : unidadId;
 
-    return unidadId;
+    return '—';
+  }
+
+  private pagoKey(p: any, fallbackPath: string): string {
+    // ✅ Prioridad: legacy.ruta (une pago nuevo con legacy)
+    return (
+      (p?.legacy?.ruta && `ruta:${p.legacy.ruta}`) ||
+      (p?.urlPDF && `pdf:${p.urlPDF}`) ||
+      `path:${fallbackPath}`
+    );
+  }
+
+  private pushLineasPorModulo(
+    out: CierreCajaItem[],
+    p: any,
+    key: string
+  ) {
+    const empresa = this.normalizarEmpresa(p?.empresa || p?.detalles?.empresa || '');
+    const unidad = this.normalizarUnidad(p);
+
+    const det = (p?.detalles || {}) as any;
+
+    const administracion = Number(det?.administracion || 0);
+    const minutosAtraso  = Number(det?.minutosAtraso || 0);
+    const minutosBase    = Number(det?.minutosBase || 0);
+    const multas         = Number(det?.multas || 0);
+
+    const fechaPago = p?.createdAt ?? null;     // Timestamp
+    const totalPago = Number(p?.total ?? 0);    // ✅ total real del pago
+
+    // Solo si el pago tiene algo (por módulos) o total > 0
+    // (si total > 0 pero detalles vacíos, igual lo registramos como "otros")
+    const pushedAny =
+      administracion > 0 || minutosAtraso > 0 || minutosBase > 0 || multas > 0;
+
+    if (administracion > 0) out.push({ modulo: 'administracion', unidad, fecha: fechaPago as any, valor: administracion, empresa, pagoKey: key, pagoTotal: totalPago });
+    if (minutosAtraso  > 0) out.push({ modulo: 'minutosAtraso',  unidad, fecha: fechaPago as any, valor: minutosAtraso,  empresa, pagoKey: key, pagoTotal: totalPago });
+    if (minutosBase    > 0) out.push({ modulo: 'minutosBase',    unidad, fecha: fechaPago as any, valor: minutosBase,    empresa, pagoKey: key, pagoTotal: totalPago });
+    if (multas         > 0) out.push({ modulo: 'multas',         unidad, fecha: fechaPago as any, valor: multas,         empresa, pagoKey: key, pagoTotal: totalPago });
+
+    // Si no hay detalle por módulo pero sí hay total, crea una fila "otros"
+    if (!pushedAny && totalPago > 0) {
+      out.push({ modulo: 'otros', unidad, fecha: fechaPago as any, valor: totalPago, empresa, pagoKey: key, pagoTotal: totalPago });
+    }
   }
 
   async obtenerCierrePorFecha(fecha: Date): Promise<CierreCajaItem[]> {
-    const fechaISO = this.isoDate(fecha);
+    const { ini, fin } = this.rangoDia(fecha);
 
-    // 1) Buscar todos los "días" que correspondan a esa fecha
-    // (tu docId es Empresa_YYYY-MM-DD, pero el campo fecha existe según tu modelo)
-    const diasRef = collection(this.firestore, 'reportes_dia');
-    const qDias = query(diasRef, where('fecha', '==', fechaISO));
-    const diasSnap = await getDocs(qDias);
+    const qNuevos = query(
+      collectionGroup(this.firestore, 'pagos'),
+      where('createdAt', '>=', ini),
+      where('createdAt', '<=', fin),
+      orderBy('createdAt', 'asc')
+    );
 
-    const resultados: CierreCajaItem[] = [];
+    const qLegacy = query(
+      collectionGroup(this.firestore, 'pagosTotales'),
+      where('createdAt', '>=', ini),
+      where('createdAt', '<=', fin),
+      orderBy('createdAt', 'asc')
+    );
 
-    // 2) Recorrer cada empresa/día y leer sus unidades
-    for (const diaDoc of diasSnap.docs) {
-      const diaData = diaDoc.data() as any;
-      const empresa = this.normalizarEmpresa(diaData?.empresa);
+    const [snapNuevos, snapLegacy] = await Promise.all([
+      getDocs(qNuevos),
+      getDocs(qLegacy)
+    ]);
 
-      const unidadesRef = collection(this.firestore, `reportes_dia/${diaDoc.id}/unidades`);
-      const unidadesSnap = await getDocs(unidadesRef);
+    // ✅ dedupe por pago (no por líneas)
+    const pagosUnicos = new Map<string, any>();
 
-      for (const uDoc of unidadesSnap.docs) {
-        const uData = uDoc.data() as any;
-        const unidad = this.normalizarUnidad(uDoc.id, uData);
-
-        // IMPORTANTÍSIMO:
-        // El cierre DEBE sumar lo pagado (no lo asignado).
-        const adminPagada = Number(uData?.adminPagada || 0);
-        const minutosPagados = Number(uData?.minutosPagados || 0);
-        const minBasePagados = Number(uData?.minBasePagados || 0);
-        const multasPagadas = Number(uData?.multasPagadas || 0);
-
-        // Solo empujar filas si hay valor > 0
-        if (adminPagada > 0) {
-          resultados.push({ modulo: 'administracion', unidad, fecha: fechaISO as any, valor: adminPagada, empresa });
-        }
-        if (minutosPagados > 0) {
-          resultados.push({ modulo: 'minutosAtraso', unidad, fecha: fechaISO as any, valor: minutosPagados, empresa });
-        }
-        if (minBasePagados > 0) {
-          resultados.push({ modulo: 'minutosBase', unidad, fecha: fechaISO as any, valor: minBasePagados, empresa });
-        }
-        if (multasPagadas > 0) {
-          resultados.push({ modulo: 'multas', unidad, fecha: fechaISO as any, valor: multasPagadas, empresa });
-        }
-      }
+    // Primero metemos legacy (base)
+    for (const d of snapLegacy.docs) {
+      const p = d.data() as any;
+      const key = this.pagoKey(p, d.ref.path);
+      if (!pagosUnicos.has(key)) pagosUnicos.set(key, p);
     }
 
-    return resultados;
-  }
+    // Luego metemos nuevos, pero si trae legacy.ruta, reemplaza/une sin duplicar
+    for (const d of snapNuevos.docs) {
+      const p = d.data() as any;
+      const key = this.pagoKey(p, d.ref.path);
+      // preferimos el doc nuevo si existe
+      pagosUnicos.set(key, p);
+    }
 
-  async obtenerHistorialCierres(): Promise<any[]> {
-    const ref = collection(this.firestore, 'cierresCaja');
-    const snapshot = await getDocs(ref);
-    return snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    // Ahora convertimos a líneas por módulo
+    const resultados: CierreCajaItem[] = [];
+    for (const [key, p] of pagosUnicos.entries()) {
+      this.pushLineasPorModulo(resultados, p, key);
+    }
+
+    return resultados.filter(x => Number(x.valor) > 0);
   }
+async obtenerHistorialCierres(): Promise<any[]> {
+  const ref = collection(this.firestore, 'cierresCaja');
+  const snapshot = await getDocs(ref);
+  return snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+}
 }
