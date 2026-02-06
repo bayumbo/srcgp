@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import {
   Firestore,
   collection,
+  collectionGroup,
   getDocs,
   doc,
   getDoc,
@@ -15,7 +16,7 @@ import {
   writeBatch,
   where,
 } from '@angular/fire/firestore';
-import { Router,ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -84,6 +85,12 @@ export class ReporteListaComponent implements OnInit {
   fechaInicio = '';
   fechaFin = '';
   errorFecha = '';
+
+  // Reporte financiero (formato administrativo) - CONSOLIDA ambas empresas
+  mostrarOpcionesFinanciero = false;
+  periodoFinanciero: 'mensual' | 'trimestral' | 'semestral' | 'nonamestral' | 'anual' = 'mensual';
+  fechaInicioFinanciero = ''; // YYYY-MM-DD (seleccionada)
+  fechaFinFinanciero = '';    // YYYY-MM-DD (calculada)
   cargandoPDF = false;
 
   // Data
@@ -913,6 +920,48 @@ async ngOnInit(): Promise<void> {
     }
   }
 
+  /**
+   * Calcula fechaFinFinanciero en base a fechaInicioFinanciero + periodoFinanciero.
+   * Regla: fin = (inicio + N meses) - 1 día (inclusive).
+   */
+  actualizarRangoFinanciero(): void {
+    if (!this.fechaInicioFinanciero) {
+      this.fechaFinFinanciero = '';
+      return;
+    }
+
+    const inicio = new Date(`${this.fechaInicioFinanciero}T12:00:00`);
+    const meses =
+      this.periodoFinanciero === 'mensual' ? 1 :
+      this.periodoFinanciero === 'trimestral' ? 3 :
+      this.periodoFinanciero === 'semestral' ? 6 :
+      this.periodoFinanciero === 'nonamestral' ? 9 :
+      12; // anual
+
+    const fin = new Date(inicio);
+    fin.setMonth(fin.getMonth() + meses);
+    fin.setDate(fin.getDate() - 1); // inclusive
+    this.fechaFinFinanciero = this.isoDate(fin);
+  }
+
+  /**
+   * Wrapper UI: genera reporte financiero usando inicio + periodo (fin calculado).
+   * No aplica la restricción de 31 días (es un reporte administrativo).
+   */
+  async generarReporteFinancieroPorPeriodo(): Promise<void> {
+    if (!this.fechaInicioFinanciero) {
+      alert('Selecciona una fecha de inicio para el reporte financiero.');
+      return;
+    }
+    this.actualizarRangoFinanciero();
+    if (!this.fechaFinFinanciero) {
+      alert('No se pudo calcular la fecha de finalización.');
+      return;
+    }
+    await this.generarReporteFinancieroPDF(this.fechaInicioFinanciero, this.fechaFinFinanciero);
+  }
+
+
   async actualizarVistaPorRango() {
     if (!this.fechaInicio || !this.fechaFin || this.errorFecha) {
       this.reportes = [];
@@ -1644,5 +1693,540 @@ async generarReporteEmpresasPDF() {
 
   doc.save(`Reporte_${this.empresaSeleccionada}_${this.fechaInicio}_al_${this.fechaFin}.pdf`);
   this.cargandoPDF = false;
-}
+
+  }
+
+
+  // ==========================
+  // REPORTE FINANCIERO (Mensual / Trimestral / Semestral / Nonamestral)
+  // Formato EXACTO como el PDF administrativo: Ingresos/Egresos/Utilidad/CxC + Devoluciones
+  // ==========================
+
+  // Inputs (puedes exponerlos en tu HTML si los necesitas)
+  saldoAnteriorInput: number = 0;
+  totalEgresosInput: number = 0;
+
+  // “Depósitos / Otros ingresos” (líneas detalladas bajo el bloque Depósitos)
+  depositosOtrosIngresos: { detalle: string; valor: number }[] = [];
+
+  /**
+   * Genera el reporte financiero con el formato administrativo (NO es el “Reporte por Empresas”).
+   * Usa el rango actual fechaInicio/fechaFin (YYYY-MM-DD) y consolida ambas empresas.
+   */
+  async generarReporteFinancieroPDF(inicioISOArg?: string, finISOArg?: string): Promise<void> {
+    if (this.cargandoPDF) return;
+
+    const inicioISO = inicioISOArg ?? this.fechaInicio;
+    const finISO = finISOArg ?? this.fechaFin;
+
+    if (!inicioISO || !finISO) {
+      alert('Selecciona Fecha de inicio y Fecha de finalización.');
+      return;
+    }
+
+    // Validación básica (sin límite de días)
+    const inicioTmp = new Date(`${inicioISO}T12:00:00`);
+    const finTmp = new Date(`${finISO}T12:00:00`);
+    if (isNaN(inicioTmp.getTime()) || isNaN(finTmp.getTime()) || inicioTmp > finTmp) {
+      alert('Rango de fechas inválido. Verifica que la fecha de inicio no sea mayor que la fecha final.');
+      return;
+    }
+
+    this.cargandoPDF = true;
+
+    try {
+      const inicio = new Date(`${inicioISO}T12:00:00`);
+      const fin = new Date(`${finISO}T12:00:00`);
+      const fechaEmision = new Date();
+
+      // 1) Traer TODAS las unidades del rango (ambas empresas) desde la nueva estructura
+      const unidades = await this.cargarUnidadesEnRango(inicio, fin);
+
+      // 2) Calcular INGRESOS (suma de pagados) + CxC (asignado - pagado)
+      const ingresos = this.calcularIngresos(unidades);
+      const cuentasPorCobrar = this.calcularCuentasPorCobrar(unidades);
+
+      const totalIngresosSinSaldo = ingresos.totalIngresos;
+      const saldoAnterior = Number(this.saldoAnteriorInput ?? 0) || 0;
+
+      const totalDepositos = ingresos.totalDepositos;
+      const totalIngresos = saldoAnterior + totalIngresosSinSaldo; // como el PDF (Saldo anterior + ingresos del rango)
+
+      const totalEgresos = Number(this.totalEgresosInput ?? 0) || 0;
+
+      const utilidad = (totalIngresos - totalEgresos);
+
+      // 3) Devoluciones de administración (por año “devolución” = finYear - 2 para replicar tu ejemplo)
+      const anioDevolucion = Math.max((fin.getFullYear() - 2), 2000);
+      const devolAntisana = await this.calcularDevolucionAdministracionPorEmpresa('Expreso Antisana', anioDevolucion);
+      const devolPintag = await this.calcularDevolucionAdministracionPorEmpresa('General Pintag', anioDevolucion);
+
+      // 4) PDF (FORMATO)
+      this.renderReporteFinancieroPDF({
+        inicio,
+        fin,
+        fechaEmision,
+        saldoAnterior,
+        ingresos,
+        totalIngresos,
+        totalEgresos,
+        utilidad,
+        cuentasPorCobrar,
+        devolAntisana,
+        devolPintag,
+        anioDevolucion,
+      });
+
+    } catch (e) {
+      console.error('Error generarReporteFinancieroPDF:', e);
+      alert('No se pudo generar el reporte financiero. Revisa consola.');
+    } finally {
+      this.cargandoPDF = false;
+    }
+  }
+
+  // --------------------------
+  // DATA LOADERS
+  // --------------------------
+
+  private async cargarUnidadesEnRango(inicio: Date, fin: Date): Promise<any[]> {
+    // Se apoya en collectionGroup('unidades') con filtro por fecha (YYYY-MM-DD)
+    const inicioISO = this.isoDate(inicio);
+    const finISO = this.isoDate(fin);
+
+    const q = query(
+      collectionGroup(this.firestore, 'unidades'),
+      where('fecha', '>=', inicioISO),
+      where('fecha', '<=', finISO),
+    );
+
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, path: d.ref.path, ...(d.data() as any) }));
+  }
+
+  private async calcularDevolucionAdministracionPorEmpresa(
+    empresa: string,
+    anio: number
+  ): Promise<{ periodo: string; recaudacion: number; devolucion: number }[]> {
+
+    // Recaudación mensual = suma de adminPagada del año por empresa
+    const inicioISO = `${anio}-01-01`;
+    const finISO = `${anio}-12-31`;
+
+    const q = query(
+      collectionGroup(this.firestore, 'unidades'),
+      where('empresa', '==', empresa),
+      where('fecha', '>=', inicioISO),
+      where('fecha', '<=', finISO),
+    );
+
+    const snap = await getDocs(q);
+
+    const map = new Map<string, number>(); // key: YYYY-MM
+
+    for (const docu of snap.docs) {
+      const d: any = docu.data();
+      const fecha: string = (d.fecha ?? '').toString(); // YYYY-MM-DD
+      if (!fecha || fecha.length < 7) continue;
+
+      const key = fecha.slice(0, 7); // YYYY-MM
+      const adminPagada = Number(d.adminPagada ?? 0) || 0;
+
+      map.set(key, (map.get(key) ?? 0) + adminPagada);
+    }
+
+    const rows = Array.from(map.entries())
+      .map(([ym, rec]) => {
+        const [y, m] = ym.split('-').map(x => Number(x));
+        const mesNombre = this.nombreMesEs(m);
+        const periodo = `${y}, ${mesNombre}`;
+        const recaudacion = this.round2(rec);
+        const devolucion = this.round2(recaudacion / 3); // regla observada en tu PDF
+        return { periodo, recaudacion, devolucion, _m: m };
+      })
+      .sort((a, b) => (a._m - b._m));
+
+    // limpiar helper interno
+    return rows.map(({ _m, ...rest }) => rest);
+  }
+
+  // --------------------------
+  // CÁLCULOS
+  // --------------------------
+
+  private calcularIngresos(unidades: any[]): {
+    administracion: number;
+    minutosAtraso: number;
+    minutosBase: number;
+    multas: number;
+    totalDepositos: number;
+    depositosDetalle: { detalle: string; valor: number }[];
+    totalIngresos: number; // ingresos del rango (sin saldo anterior)
+  } {
+
+    let administracion = 0;
+    let minutosAtraso = 0;
+    let minutosBase = 0;
+    let multas = 0;
+
+    for (const u of unidades) {
+      administracion += Number(u.adminPagada ?? 0) || 0;
+      minutosAtraso  += Number(u.minutosPagados ?? 0) || 0;
+      minutosBase    += Number(u.minBasePagados ?? 0) || 0;
+      multas         += Number(u.multasPagadas ?? 0) || 0;
+    }
+
+    const depositosDetalle = (this.depositosOtrosIngresos ?? [])
+      .filter(x => (Number(x.valor ?? 0) || 0) !== 0)
+      .map(x => ({ detalle: String(x.detalle ?? '').trim(), valor: this.round2(Number(x.valor ?? 0) || 0) }));
+
+    const totalDepositos = this.round2(depositosDetalle.reduce((a, b) => a + (b.valor || 0), 0));
+
+    const totalIngresos = this.round2(administracion + minutosAtraso + minutosBase + multas + totalDepositos);
+
+    return {
+      administracion: this.round2(administracion),
+      minutosAtraso: this.round2(minutosAtraso),
+      minutosBase: this.round2(minutosBase),
+      multas: this.round2(multas),
+      totalDepositos,
+      depositosDetalle,
+      totalIngresos
+    };
+  }
+
+  private calcularCuentasPorCobrar(unidades: any[]): {
+    antisanas: { adm: number; min: number; base: number; multas: number };
+    pintag:    { adm: number; min: number; base: number; multas: number };
+    total: number;
+  } {
+
+    const acc = {
+      antisanas: { adm: 0, min: 0, base: 0, multas: 0 },
+      pintag:    { adm: 0, min: 0, base: 0, multas: 0 }
+    };
+
+    for (const u of unidades) {
+      const empresa = this.normalizarEmpresaCxc(String(u.empresa ?? ''));
+
+      const admSaldo   = (Number(u.administracion ?? 0) || 0) - (Number(u.adminPagada ?? 0) || 0);
+      const minSaldo   = (Number(u.minutosAtraso ?? 0) || 0) - (Number(u.minutosPagados ?? 0) || 0);
+      const baseSaldo  = (Number(u.minutosBase ?? 0) || 0) - (Number(u.minBasePagados ?? 0) || 0);
+      const mulSaldo   = (Number(u.multas ?? 0) || 0) - (Number(u.multasPagadas ?? 0) || 0);
+
+      if (empresa === 'Expreso Antisana') {
+        acc.antisanas.adm   += admSaldo;
+        acc.antisanas.min   += minSaldo;
+        acc.antisanas.base  += baseSaldo;
+        acc.antisanas.multas+= mulSaldo;
+      } else {
+        acc.pintag.adm      += admSaldo;
+        acc.pintag.min      += minSaldo;
+        acc.pintag.base     += baseSaldo;
+        acc.pintag.multas   += mulSaldo;
+      }
+    }
+
+    const total =
+      acc.antisanas.adm + acc.antisanas.min + acc.antisanas.base + acc.antisanas.multas +
+      acc.pintag.adm + acc.pintag.min + acc.pintag.base + acc.pintag.multas;
+
+    return {
+      antisanas: {
+        adm: this.round2(acc.antisanas.adm),
+        min: this.round2(acc.antisanas.min),
+        base: this.round2(acc.antisanas.base),
+        multas: this.round2(acc.antisanas.multas),
+      },
+      pintag: {
+        adm: this.round2(acc.pintag.adm),
+        min: this.round2(acc.pintag.min),
+        base: this.round2(acc.pintag.base),
+        multas: this.round2(acc.pintag.multas),
+      },
+      total: this.round2(total),
+    };
+  }
+
+  // --------------------------
+  // PDF RENDER (igual al formato del PDF que enviaste)
+  // --------------------------
+
+  private renderReporteFinancieroPDF(args: {
+    inicio: Date;
+    fin: Date;
+    fechaEmision: Date;
+    saldoAnterior: number;
+    ingresos: ReturnType<ReporteListaComponent['calcularIngresos']>;
+    totalIngresos: number;
+    totalEgresos: number;
+    utilidad: number;
+    cuentasPorCobrar: ReturnType<ReporteListaComponent['calcularCuentasPorCobrar']>;
+    devolAntisana: { periodo: string; recaudacion: number; devolucion: number }[];
+    devolPintag: { periodo: string; recaudacion: number; devolucion: number }[];
+    anioDevolucion: number;
+  }): void {
+
+    const {
+      inicio, fin, fechaEmision,
+      saldoAnterior, ingresos, totalIngresos, totalEgresos, utilidad,
+      cuentasPorCobrar, devolAntisana, devolPintag
+    } = args;
+
+    const doc = new jsPDF({ orientation: 'portrait' });
+
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const margin = 15;
+
+    const footerText = 'Consorcio Píntag Expresso | Píntag, Antisana S2-138 | consorciopinexpres@hotmail.com';
+
+    const drawFooter = () => {
+      doc.setDrawColor(180);
+      doc.line(margin, H - 12, W - margin, H - 12);
+      doc.setFontSize(7);
+      doc.setTextColor(120);
+      doc.text(footerText, margin, H - 8, { maxWidth: W - margin * 2 });
+    };
+
+    const drawHeader = () => {
+      doc.setTextColor(20);
+      doc.setFontSize(16);
+      doc.text('Reporte', margin, 16);
+
+      doc.setFontSize(10);
+      doc.text('Fecha de inicio:', margin, 24);
+      doc.text(this.formatoFechaLarga(inicio), margin, 29);
+
+      doc.text('Fecha de finalización:', margin, 36);
+      doc.text(this.formatoFechaLarga(fin), margin, 41);
+
+      doc.text('Fecha de emisión:', margin, 48);
+      doc.text(this.formatoFechaLarga(fechaEmision), margin, 53);
+
+      doc.setFontSize(11);
+      doc.text('Consorcio Píntag Expresso', margin, 62);
+      doc.setFontSize(10);
+      doc.text('Píntag, Antisana S2-138', margin, 67);
+      doc.text('consorciopinexpres@hotmail.com', margin, 72);
+    };
+
+    drawHeader();
+
+    let y = 78;
+
+    // INGRESOS
+    doc.setFontSize(12);
+    doc.text('INGRESOS', margin, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['', 'VALOR']],
+      body: [
+        ['Saldo anterior', this.money(saldoAnterior)],
+        ['Administración', this.money(ingresos.administracion)],
+        ['Minutos atraso', this.money(ingresos.minutosAtraso)],
+        ['Minutos base', this.money(ingresos.minutosBase)],
+        ['Multas', this.money(ingresos.multas)],
+        ['Otros ingresos', ''],
+        ['Depósitos', ''],
+        ...ingresos.depositosDetalle.map(d => [`➥ ${d.detalle}`, this.money(d.valor)]),
+        ['TOTAL', this.money(totalIngresos)]
+      ],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 1.2 },
+      headStyles: { fontStyle: 'bold', textColor: 40 },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'right' }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    // @ts-ignore
+    y = (doc as any).lastAutoTable.finalY + 6;
+
+    // EGRESOS
+    doc.setFontSize(12);
+    doc.text('EGRESOS', margin, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['', 'VALOR']],
+      body: [
+        ['TOTAL', this.money(totalEgresos)]
+      ],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 1.2 },
+      headStyles: { fontStyle: 'bold', textColor: 40 },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'right' }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    // @ts-ignore
+    y = (doc as any).lastAutoTable.finalY + 6;
+
+    // UTILIDAD/PÉRDIDA
+    doc.setFontSize(12);
+    doc.text('UTILIDAD/PÉRDIDA', margin, y);
+    doc.text(this.money(utilidad), W - margin, y, { align: 'right' });
+    y += 8;
+
+    // CUENTAS POR COBRAR
+    doc.setFontSize(12);
+    doc.text('CUENTAS POR COBRAR', margin, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['', 'VALOR']],
+      body: [
+        ['Cuentas por cobrar Adm. Cía. ExpreAntisana', this.money(cuentasPorCobrar.antisanas.adm)],
+        ['Cuentas por cobrar Minutos Cía. ExpreAntisana', this.money(cuentasPorCobrar.antisanas.min)],
+        ['Cuentas por cobrar Minutos Base Cía. ExpreAntisana', this.money(cuentasPorCobrar.antisanas.base)],
+        ['Cuentas por cobrar Multas Cía. ExpreAntisana', this.money(cuentasPorCobrar.antisanas.multas)],
+        ['Cuentas por cobrar Adm. Cooperativa General Pintag', this.money(cuentasPorCobrar.pintag.adm)],
+        ['Cuentas por cobrar Minutos Cooperativa General Pintag', this.money(cuentasPorCobrar.pintag.min)],
+        ['Cuentas por cobrar Minutos Base Cooperativa General Pintag', this.money(cuentasPorCobrar.pintag.base)],
+        ['Cuentas por cobrar Multas Cooperativa General Pintag', this.money(cuentasPorCobrar.pintag.multas)],
+        ['TOTAL', this.money(cuentasPorCobrar.total)]
+      ],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 1.2 },
+      headStyles: { fontStyle: 'bold', textColor: 40 },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'right' }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    drawFooter();
+
+    // ---------------------
+    // Página 2: DEVOLUCIONES
+    // ---------------------
+    doc.addPage();
+    let y2 = 18;
+
+    doc.setFontSize(11);
+    doc.text('DEVOLUCIÓN DE ADMINISTRACIÓN CÍA. EXPREANTISANA', margin, y2);
+    y2 += 4;
+
+    autoTable(doc, {
+      startY: y2,
+      head: [['', 'RECAUDACIÓN', 'DEVOLUCIÓN']],
+      body: [
+        ...devolAntisana.map(r => [r.periodo, this.money(r.recaudacion), this.money(r.devolucion)]),
+        ['TOTAL',
+          this.money(this.round2(devolAntisana.reduce((a, b) => a + (b.recaudacion || 0), 0))),
+          this.money(this.round2(devolAntisana.reduce((a, b) => a + (b.devolucion || 0), 0))),
+        ]
+      ],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 1.2 },
+      headStyles: { fontStyle: 'bold', textColor: 40 },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'right' },
+        2: { halign: 'right' }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    // @ts-ignore
+    y2 = (doc as any).lastAutoTable.finalY + 10;
+
+    doc.setFontSize(11);
+    doc.text('DEVOLUCIÓN DE ADMINISTRACIÓN PINTAG', margin, y2);
+    y2 += 4;
+
+    autoTable(doc, {
+      startY: y2,
+      head: [['', 'RECAUDACIÓN', 'DEVOLUCIÓN']],
+      body: [
+        ...devolPintag.map(r => [r.periodo, this.money(r.recaudacion), this.money(r.devolucion)]),
+        ['TOTAL',
+          this.money(this.round2(devolPintag.reduce((a, b) => a + (b.recaudacion || 0), 0))),
+          this.money(this.round2(devolPintag.reduce((a, b) => a + (b.devolucion || 0), 0))),
+        ]
+      ],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 1.2 },
+      headStyles: { fontStyle: 'bold', textColor: 40 },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'right' },
+        2: { halign: 'right' }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    drawFooter();
+
+    const fileName = `Reporte_${this.fechaInicio}__${this.fechaFin}__${this.isoDate(new Date())}_${this.horaMinSeg(new Date())}.pdf`;
+    doc.save(fileName);
+  }
+
+  // --------------------------
+  // HELPERS
+  // --------------------------
+
+  private isoDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private horaMinSeg(d: Date): string {
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${hh}_${mm}_${ss}`;
+  }
+
+  private round2(n: number): number {
+    const x = Number(n ?? 0);
+    return Math.round(x * 100) / 100;
+  }
+
+  private money(n: number): string {
+    const v = this.round2(Number(n ?? 0));
+    return `$ ${v.toFixed(2)}`;
+  }
+
+  private formatoFechaLarga(d: Date): string {
+    // Ej: Septiembre 01, 2025 (como en tu PDF)
+    const meses = [
+      'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+    ];
+    const mes = meses[d.getMonth()];
+    const dia = String(d.getDate()).padStart(2, '0');
+    const anio = d.getFullYear();
+    return `${mes} ${dia}, ${anio}`;
+  }
+
+  private nombreMesEs(m: number): string {
+    const meses = [
+      'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+    ];
+    return meses[Math.max(1, Math.min(12, m)) - 1] ?? `Mes ${m}`;
+  }
+
+  private normalizarEmpresaCxc(raw: string): 'Expreso Antisana' | 'General Pintag' {
+    const e = (raw || '').toLowerCase();
+    if (e.includes('antisana')) return 'Expreso Antisana';
+    // cubre: "General Píntag", "General Pintag", "Cooperativa General Pintag"
+    return 'General Pintag';
+  }
+
+
 }

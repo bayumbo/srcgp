@@ -18,7 +18,8 @@ import {
   where,
   getDocs,
   getDoc,
-  addDoc
+  addDoc,
+  serverTimestamp
 } from '@angular/fire/firestore';
 
 import { BehaviorSubject } from 'rxjs';
@@ -43,9 +44,11 @@ export interface Usuario {
   creadoEn: Date;
 }
 
+// LEGACY (ya no lo usamos para el modelo actual)
 export interface Unidad {
   nombre: string;
 }
+
 export interface UnidadGlobal {
   id: string;
   codigo: string;
@@ -57,9 +60,9 @@ export interface UnidadGlobal {
   createdAt?: any;
   updatedAt?: any;
 }
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
 
@@ -116,20 +119,21 @@ export class AuthService {
     await user.getIdToken(true);
     const token = await user.getIdTokenResult();
     const role = token.claims['role'] as string | null;
+
     this._currentUserRole.next(role);
     localStorage.setItem('userRole', role ?? '');
 
-    // Leer datos públicos
+    // Leer datos públicos (ahora sí guardamos rol/empresa/estado ahí también)
     const uid = user.uid;
     const docRef = doc(this.firestore, `usuariosPublicos/${uid}`);
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
       const data = snap.data();
-      const rol = data['rol'];
-      if (rol) {
-        this._currentUserRole.next(rol);
-        localStorage.setItem('userRole', rol);
+      const rolPublico = data['rol'];
+      if (rolPublico) {
+        this._currentUserRole.next(rolPublico);
+        localStorage.setItem('userRole', rolPublico);
       }
     }
 
@@ -165,53 +169,130 @@ export class AuthService {
     return sendPasswordResetEmail(this.auth, email);
   }
 
+  /**
+   * Guarda el usuario en:
+   * - usuarios/{uid} (privado)
+   * - usuariosPublicos/{uid} (público)
+   *
+   * Importante: guardamos también rol/empresa/estado aquí porque tu login los lee de usuariosPublicos.
+   */
   async guardarUsuarioEnFirestore(uid: string, usuario: Omit<Usuario, 'uid'>): Promise<void> {
-    // Guardar en la colección privada
+    // Privado
     const userRef = doc(this.firestore, 'usuarios', uid);
-    await setDoc(userRef, usuario);
+    await setDoc(userRef, usuario, { merge: true });
 
-    // Guardar en la colección pública
+    // Público (incluye rol/empresa/estado para consistencia)
     const userPublicoRef = doc(this.firestore, 'usuariosPublicos', uid);
-    await setDoc(userPublicoRef, {
-      nombres: usuario.nombres,
-      apellidos: usuario.apellidos,
-      cedula: usuario.cedula,
-      email: usuario.email
-    });
+    await setDoc(
+      userPublicoRef,
+      {
+        nombres: usuario.nombres,
+        apellidos: usuario.apellidos,
+        cedula: usuario.cedula,
+        email: usuario.email,
+        rol: usuario.rol,
+        empresa: usuario.empresa,
+        estado: usuario.estado,
+        creadoEn: usuario.creadoEn
+      },
+      { merge: true }
+    );
+  }
+async unidadDisponible(empresa: string, codigo: string): Promise<boolean> {
+  const empresaKey = String(empresa ?? '').trim().replace(/\s+/g, '');
+  const cod = String(codigo ?? '').trim().toUpperCase();
+  const unidadId = `${empresaKey}_${cod}`;
+
+  const snap = await getDoc(doc(this.firestore, 'unidades', unidadId));
+  return !snap.exists();
+}
+  /**
+   * ✅ NUEVO MODELO: crea unidad en colección global "unidades"
+   * DocID: {EmpresaSinEspacios}_{CODIGO}  ej: GeneralPintag_P01
+   */
+  async crearUnidadGlobal(params: {
+    uidPropietario: string;
+    propietarioNombre: string;
+    empresa: string;
+    codigo: string;        // ej: P01, E01
+    numeroOrden?: number;  // opcional
+  }): Promise<string> {
+    const empresa = String(params.empresa ?? '').trim();
+    const codigo = String(params.codigo ?? '').trim().toUpperCase();
+
+    if (!empresa || !codigo) throw new Error('empresa y codigo son obligatorios para crear una unidad.');
+
+    const empresaKey = empresa.replace(/\s+/g, ''); // "General Pintag" -> "GeneralPintag"
+    const unidadId = `${empresaKey}_${codigo}`;
+
+    const unidadRef = doc(this.firestore, 'unidades', unidadId);
+
+    // Validación: si existe y pertenece a otro propietario, no permitir
+    const snap = await getDoc(unidadRef);
+    if (snap.exists()) {
+      const data = snap.data() as any;
+      const owner = String(data?.uidPropietario ?? '');
+      if (owner && owner !== params.uidPropietario) {
+        throw new Error(`La unidad ${codigo} ya está asignada a otro propietario.`);
+      }
+    }
+
+    await setDoc(
+      unidadRef,
+      {
+        codigo,
+        empresa,
+        estado: true,
+        numeroOrden: Number(params.numeroOrden ?? 0),
+        propietarioNombre: params.propietarioNombre,
+        uidPropietario: params.uidPropietario,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    return unidadId;
   }
 
+  // =========================
+  // LEGACY: subcolección usuarios/{uid}/unidades
+  // =========================
+
+  /** @deprecated Modelo anterior. No usar para registro nuevo. */
   async guardarUnidadEnSubcoleccion(userId: string, unidad: Unidad): Promise<void> {
     const unidadesRef = collection(this.firestore, `usuarios/${userId}/unidades`);
     await addDoc(unidadesRef, unidad);
   }
 
+  /** @deprecated Modelo anterior. */
   async obtenerUnidadesDeUsuario(userId: string): Promise<Unidad[]> {
     const unidadesRef = collection(this.firestore, `usuarios/${userId}/unidades`);
     const q = query(unidadesRef);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Unidad);
   }
+
   async obtenerUnidadesGlobalesDeUsuario(userId: string): Promise<UnidadGlobal[]> {
-  const unidadesRef = collection(this.firestore, 'unidades');
-  const q = query(unidadesRef, where('uidPropietario', '==', userId));
-  const snap = await getDocs(q);
+    const unidadesRef = collection(this.firestore, 'unidades');
+    const q = query(unidadesRef, where('uidPropietario', '==', userId));
+    const snap = await getDocs(q);
 
-  return snap.docs.map(d => {
-    const data = d.data() as any;
-    return {
-      id: d.id,
-      codigo: data.codigo || '',
-      empresa: data.empresa || '',
-      estado: data.estado ?? true,
-      numeroOrden: data.numeroOrden ?? 0,
-      propietarioNombre: data.propietarioNombre || '',
-      uidPropietario: data.uidPropietario || userId,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt
-    } as UnidadGlobal;
-  });
-}
-
+    return snap.docs.map(d => {
+      const data = d.data() as any;
+      return {
+        id: d.id,
+        codigo: data.codigo || '',
+        empresa: data.empresa || '',
+        estado: data.estado ?? true,
+        numeroOrden: data.numeroOrden ?? 0,
+        propietarioNombre: data.propietarioNombre || '',
+        uidPropietario: data.uidPropietario || userId,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      } as UnidadGlobal;
+    });
+  }
 
   async correoExiste(email: string): Promise<boolean> {
     const usuariosRef = collection(this.firestore, 'usuariosPublicos');

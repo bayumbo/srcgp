@@ -79,6 +79,14 @@
       >
         Reporte Empresas
       </button>
+
+      <button
+        type="button"
+        class="btn-chip"
+        (click)="mostrarOpcionesFinanciero = !mostrarOpcionesFinanciero"
+      >
+        Reporte Financiero
+      </button>
     </div>
 
     <div class="filtro-fecha">
@@ -93,6 +101,7 @@
       <button type="button" class="btn-secundario" (click)="filtrarPorFechaPersonalizada()">
         Buscar
       </button>
+
     </div>
 
     <!-- ✅ Panel Reporte Empresas (restaurado) -->
@@ -202,6 +211,89 @@
     <button class="btn-limpiar-multi" type="button" (click)="limpiarSeleccion()">
       Limpiar selección
     </button>
+  </div>
+
+
+  <!-- ✅ Panel Reporte Financiero (consolida Pintag + Antisana) -->
+  <div class="panel-reporte-empresas" *ngIf="mostrarOpcionesFinanciero">
+    <hr class="separador" />
+
+    <div class="rango-fechas">
+      <div class="campo-fecha">
+        <label>Periodo:</label>
+        <select
+          class="input-fecha"
+          [(ngModel)]="periodoFinanciero"
+          name="periodoFinanciero"
+          (change)="actualizarRangoFinanciero()"
+        >
+          <option value="mensual">Mensual</option>
+          <option value="trimestral">Trimestral</option>
+          <option value="semestral">Semestral</option>
+          <option value="nonamestral">Nonamestral</option>
+          <option value="anual">Anual</option>
+        </select>
+      </div>
+
+      <div class="campo-fecha">
+        <label>Fecha inicio:</label>
+        <input
+          type="date"
+          class="input-fecha"
+          [(ngModel)]="fechaInicioFinanciero"
+          name="fechaInicioFinanciero"
+          (change)="actualizarRangoFinanciero()"
+        />
+      </div>
+
+      <div class="campo-fecha">
+        <label>Fecha fin (calculada):</label>
+        <input
+          type="date"
+          class="input-fecha"
+          [ngModel]="fechaFinFinanciero"
+          name="fechaFinFinanciero"
+          readonly
+        />
+      </div>
+    </div>
+
+    <div class="rango-fechas">
+      <div class="campo-fecha">
+        <label>Saldo anterior:</label>
+        <input
+          type="number"
+          class="input-fecha"
+          [(ngModel)]="saldoAnteriorInput"
+          name="saldoAnteriorInput"
+          min="0"
+          step="0.01"
+        />
+      </div>
+
+      <div class="campo-fecha">
+        <label>Total egresos:</label>
+        <input
+          type="number"
+          class="input-fecha"
+          [(ngModel)]="totalEgresosInput"
+          name="totalEgresosInput"
+          min="0"
+          step="0.01"
+        />
+      </div>
+    </div>
+
+    <div class="acciones-empresa">
+      <button
+        type="button"
+        class="btn-primario"
+        (click)="generarReporteFinancieroPorPeriodo()"
+        [disabled]="cargandoPDF || !fechaInicioFinanciero || !fechaFinFinanciero"
+      >
+        {{ cargandoPDF ? 'Generando PDF...' : 'Generar Reporte Financiero' }}
+      </button>
+    </div>
   </div>
 
   <!-- Tabla -->
