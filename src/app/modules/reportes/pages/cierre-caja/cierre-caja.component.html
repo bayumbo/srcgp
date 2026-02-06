@@ -2,157 +2,176 @@
   <div class="volver-wrapper">
     <button class="boton-volver" (click)="volver()">← Volver</button>
   </div>
-    <h2>Cierre de Caja - {{ tituloFecha }}</h2>
-  
-    <!-- Selección de fecha y generación de PDF -->
-    <div class="acciones">
-      <label for="fecha">Seleccionar fecha:</label>
-      <input
-        type="date"
-        id="fecha"
-        [value]="fechaSeleccionada | date: 'yyyy-MM-dd'"
-        (change)="onFechaChange($event)"
-      />
-      <button
-        class="generar"
-        (click)="generarPDF()"
-        [disabled]="cierreItems.length === 0"
-      >
+
+  <h2>Cierre de Caja - {{ tituloFecha }}</h2>
+
+  <!-- Selección de fecha y generación de PDF -->
+  <div class="acciones">
+    <label for="fecha">Seleccionar fecha:</label>
+    <input
+      type="date"
+      id="fecha"
+      [value]="fechaSeleccionada | date: 'yyyy-MM-dd'"
+      (change)="onFechaChange($event)"
+    />
+
+    <button
+      class="generar"
+      (click)="generarPDF()"
+      [disabled]="cierreItems.length === 0 || esSocio"
+    >
       <span class="material-icons">save</span> Guardar Cierre de Caja
-      </button>
-      <button
-        class="excel"
-        (click)="descargarExcel()"
-        [disabled]="cierreItems.length === 0"
-        [disabled]="esSocio"
-        >
-        <span class="material-icons">table_chart</span> Exportar a Excel
-        </button>
-    </div>
-  
-    <!-- Tabla de cierre diario -->
-    <div *ngIf="cargando">
-      <p>Cargando información del cierre...</p>
-    </div>
-  
-    <table *ngIf="!cargando && cierreItems.length > 0" class="tabla-cierre">
-      <thead>
-        <tr>
-          <th>Módulo</th>
-          <th>Unidad</th>
-          <th>Fecha</th>
-          <th>Valor</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of cierreItems">
-          <td>{{ item.modulo }}</td>
-          <td>{{ item.unidad }}</td>
-          <td>{{ item.fecha | date: 'shortDate' }}</td>
-          <td>{{ item.valor | currency:'USD' }}</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3"><strong>Total Ingresos</strong></td>
-          <td><strong>{{ calcularTotalGeneral() | currency:'USD' }}</strong></td>
-        </tr>
-      </tfoot>
-    </table>
-  
-    <div *ngIf="!cargando && cierreItems.length === 0">
-      <p>No se encontraron pagos registrados en la fecha seleccionada.</p>
-    </div>
-  
-    <!-- Registro de egresos -->
-    <h3 style="margin-top: 2rem;">➖ Registrar Egresos</h3>
-    <div class="form-egreso" >
-      <input type="text" placeholder="Detalle del egreso" [(ngModel)]="nuevoEgreso.modulo"  [disabled]="esSocio">
-      <input type="number" placeholder="Valor" [(ngModel)]="nuevoEgreso.valor"  [disabled]="esSocio">
-      <button (click)="agregarEgreso()"[disabled]="esSocio"><span class="material-icons">add_circle</span> Agregar</button>
-    </div>
-  
-    <table *ngIf="egresos.length > 0" class="tabla-egresos">
-        <thead>
-          <tr>
-            <th>Detalle</th>
-            <th>Valor</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let e of egresos; let i = index">
-            <ng-container *ngIf="egresoEnEdicion === i; else mostrarEgreso">
-              <td>
-                <input type="text" [(ngModel)]="egresoEditado.modulo">
-              </td>
-              <td>
-                <input type="number" [(ngModel)]="egresoEditado.valor">
-              </td>
-              <td>
-                <button (click)="guardarEgresoEditado(i)"> 
-                  <span class="material-icons">check_circle</span>
-                </button>
-                <button (click)="cancelarEdicion()">
-                  <span class="material-icons">delete_forever</span>
-                </button>
-              </td>
-            </ng-container>
-            <ng-template #mostrarEgreso>
-              <td>{{ e.modulo }}</td>
-              <td>{{ e.valor | currency:'USD' }}</td>
-              <td>
-                <button (click)="editarEgreso(i)">
-                  <span class="material-icons">edit</span>
-                </button>
-                <button (click)="eliminarEgreso(i)"> 
-                   <span class="material-icons">delete_forever</span>
-                  </button>
-              </td>
-            </ng-template>
-          </tr>
-        </tbody>
-      </table>
-  
-    <div *ngIf="egresos.length > 0">
-      <p><strong>Total Egresos:</strong> {{ calcularTotalEgresos() | currency:'USD' }}</p>
-    </div>
-  
-    <p><strong>Saldo Neto del Día:</strong> {{ calcularSaldoNeto() | currency:'USD' }}</p>
-  
-    <!-- Historial de cierres -->
-    <h3 style="margin-top: 2rem;">📋 Historial de Cierres</h3>
-  
-    <table *ngIf="cierresGuardados.length > 0" class="tabla-cierres">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Total</th>
-          <th>Registros</th>
-          <th>PDF</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let cierre of cierresGuardados">
-          <td>{{ cierre.id }}</td>
-          <td>{{ cierre.total | currency: 'USD' }}</td>
-          <td>{{ cierre.cantidadItems }}</td>
-          <td><a [href]="cierre.pdfUrl" target="_blank">
-            <span class="material-icons">visibility</span>
-          </a></td>
+    </button>
+
+    <button
+      class="excel"
+      (click)="descargarExcel()"
+      [disabled]="cierreItems.length === 0 || esSocio"
+    >
+      <span class="material-icons">table_chart</span> Exportar a Excel
+    </button>
+  </div>
+
+  <!-- Cargando -->
+  <div *ngIf="cargando">
+    <p>Cargando información del cierre...</p>
+  </div>
+
+  <!-- ✅ Tabla única -->
+  <table *ngIf="!cargando && cierreItems.length > 0" class="tabla-cierre">
+    <thead>
+      <tr>
+        <th>Módulo</th>
+        <th>Unidad</th>
+        <th>Fecha (deuda)</th>
+        <th>Valor</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let item of cierreItems">
+        <td>{{ item.modulo }}</td>
+        <td>{{ item.unidad }}</td>
+        <td>{{ formatearFechaISO(item.fecha || '') }}</td>
+        <td>{{ item.valor | currency:'USD' }}</td>
+      </tr>
+    </tbody>
+
+    <tfoot>
+      <tr>
+        <td colspan="3"><strong>Total Ingresos</strong></td>
+        <td><strong>{{ calcularTotalGeneral() | currency:'USD' }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div *ngIf="!cargando && cierreItems.length === 0">
+    <p>No se encontraron pagos registrados en la fecha seleccionada.</p>
+  </div>
+
+  <!-- Registro de egresos -->
+  <h3 style="margin-top: 2rem;">➖ Registrar Egresos</h3>
+  <div class="form-egreso">
+    <input
+      type="text"
+      placeholder="Detalle del egreso"
+      [(ngModel)]="nuevoEgreso.modulo"
+      [disabled]="esSocio"
+    />
+    <input
+      type="number"
+      placeholder="Valor"
+      [(ngModel)]="nuevoEgreso.valor"
+      [disabled]="esSocio"
+    />
+    <button (click)="agregarEgreso()" [disabled]="esSocio">
+      <span class="material-icons">add_circle</span> Agregar
+    </button>
+  </div>
+
+  <table *ngIf="egresos.length > 0" class="tabla-egresos">
+    <thead>
+      <tr>
+        <th>Detalle</th>
+        <th>Valor</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let e of egresos; let i = index">
+        <ng-container *ngIf="egresoEnEdicion === i; else mostrarEgreso">
+          <td><input type="text" [(ngModel)]="egresoEditado.modulo" /></td>
+          <td><input type="number" [(ngModel)]="egresoEditado.valor" /></td>
           <td>
-            <button (click)="descargar(cierre)"> <span class="material-icons">download</span></button>
-            <button (click)="eliminar(cierre)">
+            <button (click)="guardarEgresoEditado(i)">
+              <span class="material-icons">check_circle</span>
+            </button>
+            <button (click)="cancelarEdicion()">
               <span class="material-icons">delete_forever</span>
             </button>
           </td>
-        </tr>
-      </tbody>
-    </table>
-  
-    <div *ngIf="!cargando && cierresGuardados.length === 0">
-      <p>No hay cierres guardados aún.</p>
-    </div>
+        </ng-container>
+
+        <ng-template #mostrarEgreso>
+          <td>{{ e.modulo }}</td>
+          <td>{{ e.valor | currency:'USD' }}</td>
+          <td>
+            <button (click)="editarEgreso(i)">
+              <span class="material-icons">edit</span>
+            </button>
+            <button (click)="eliminarEgreso(i)">
+              <span class="material-icons">delete_forever</span>
+            </button>
+          </td>
+        </ng-template>
+      </tr>
+    </tbody>
+  </table>
+
+  <div *ngIf="egresos.length > 0">
+    <p><strong>Total Egresos:</strong> {{ calcularTotalEgresos() | currency:'USD' }}</p>
   </div>
-  
+
+  <p><strong>Saldo Neto del Día:</strong> {{ calcularSaldoNeto() | currency:'USD' }}</p>
+
+  <!-- Historial de cierres -->
+  <h3 style="margin-top: 2rem;">📋 Historial de Cierres</h3>
+
+  <table *ngIf="cierresGuardados.length > 0" class="tabla-cierres">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Total</th>
+        <th>Registros</th>
+        <th>PDF</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let cierre of cierresGuardados">
+        <td>{{ cierre.id }}</td>
+        <td>{{ cierre.total | currency: 'USD' }}</td>
+        <td>{{ cierre.cantidadItems }}</td>
+        <td>
+          <a [href]="cierre.pdfUrl" target="_blank">
+            <span class="material-icons">visibility</span>
+          </a>
+        </td>
+        <td>
+          <button (click)="descargar(cierre)">
+            <span class="material-icons">download</span>
+          </button>
+          <button (click)="eliminar(cierre)" [disabled]="esSocio">
+            <span class="material-icons">delete_forever</span>
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div *ngIf="!cargando && cierresGuardados.length === 0">
+    <p>No hay cierres guardados aún.</p>
+  </div>
+</div>

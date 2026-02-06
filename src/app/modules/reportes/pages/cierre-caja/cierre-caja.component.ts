@@ -67,7 +67,6 @@ export class CierreCajaComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Roles
     this.authService.currentUserRole$.subscribe(role => {
       this.esSocio = role === 'socio';
     });
@@ -77,33 +76,50 @@ export class CierreCajaComponent implements OnInit {
     this.cargarHistorial();
   }
 
-  /* ------------------------ CARGA DATOS ------------------------ */
+  /* ------------------------ Helpers fecha ------------------------ */
 
-async cargarCierre() {
-  this.cargando = true;
-  this.actualizarTituloFecha();
-
-  try {
-    const items = await this.cierreCajaService.obtenerCierrePorFecha(this.fechaSeleccionada);
-
-    this.cierreItems = items.map(item => {
-      const f: any = (item as any).fecha;
-
-      const fechaObj =
-        f?.toDate ? f.toDate() :
-        (f instanceof Date ? f : new Date(f));
-
-      return {
-        ...item,
-        fecha: isNaN(fechaObj.getTime()) ? null : fechaObj
-      } as any;
-    });
-
-  } finally {
-    this.cargando = false;
+  private parseISODate(iso: string): Date | null {
+    if (!iso || typeof iso !== 'string') return null;
+    if (iso === '—') return null;
+    const dt = new Date(`${iso}T00:00:00`);
+    return isNaN(dt.getTime()) ? null : dt;
   }
+private fechaIdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
+  formatearFechaISO(iso: string): string {
+    const dt = this.parseISODate(iso);
+    return dt ? dt.toLocaleDateString('es-EC') : '—';
+  }
+
+  /* ------------------------ CARGA DATOS ------------------------ */
+
+  async cargarCierre() {
+    this.cargando = true;
+    this.actualizarTituloFecha();
+
+    try {
+      const items = await this.cierreCajaService.obtenerCierrePorFecha(this.fechaSeleccionada);
+
+      // ✅ fecha viene como ISO ("YYYY-MM-DD") de la deuda/reporte
+      this.cierreItems = (items || []).map(i => ({
+        ...i,
+        fecha: String((i as any).fecha || '—')
+      })) as any;
+
+      // opcional: ordenar por fecha deuda
+      this.cierreItems.sort((a: any, b: any) => String(a.fecha).localeCompare(String(b.fecha)));
+      console.log('Filas cierre:', this.cierreItems.length);
+      console.log('PagoKeys únicos:', new Set(this.cierreItems.map(x => (x as any).pagoKey)).size);
+
+    } finally {
+      this.cargando = false;
+    }
+  }
 
   async cargarHistorial() {
     this.cierresGuardados = await this.cierreCajaService.obtenerHistorialCierres();
@@ -152,24 +168,23 @@ async cargarCierre() {
 
   /* ------------------------ CÁLCULOS ------------------------ */
 
-calcularTotalGeneral(): number {
-  const vistos = new Set<string>();
-  let total = 0;
+  calcularTotalGeneral(): number {
+    const vistos = new Set<string>();
+    let total = 0;
 
-  for (const item of this.cierreItems) {
-    const key = (item as any).pagoKey;
-    const pagoTotal = Number((item as any).pagoTotal ?? 0);
+    for (const item of this.cierreItems) {
+      const key = (item as any).pagoKey;
+      const pagoTotal = Number((item as any).pagoTotal ?? 0);
 
-    if (!key) continue; // por seguridad
-    if (vistos.has(key)) continue;
+      if (!key) continue;
+      if (vistos.has(key)) continue;
 
-    vistos.add(key);
-    total += pagoTotal;
+      vistos.add(key);
+      total += pagoTotal;
+    }
+
+    return total;
   }
-
-  return total;
-}
-
 
   calcularTotalEgresos(): number {
     return this.egresos.reduce((total, e) => total + e.valor, 0);
@@ -182,7 +197,6 @@ calcularTotalGeneral(): number {
   /* ------------------------ PDF ------------------------ */
 
   async generarPDF() {
-    // Guard UI (evita "insufficient permissions" para rol socio)
     if (this.esSocio) {
       alert('No tienes permisos para generar cierres de caja.');
       return;
@@ -194,17 +208,15 @@ calcularTotalGeneral(): number {
     }
 
     const pdfDoc = new jsPDF();
-    const fechaId = this.fechaSeleccionada.toISOString().split('T')[0];
+    const fechaId = this.fechaIdLocal(this.fechaSeleccionada); // ✅ local
     const fechaTexto = this.fechaSeleccionada.toLocaleDateString('es-EC');
 
-    // Cargar logos
     const logoPintag = await this.cargarImagenBase64('/assets/img/LogoPintag.png');
     const logoExpress = await this.cargarImagenBase64('/assets/img/LogoAntisana.png');
 
     pdfDoc.addImage(logoPintag, 'PNG', 10, 10, 30, 30);
     pdfDoc.addImage(logoExpress, 'PNG', 170, 10, 30, 30);
 
-    // Encabezado
     pdfDoc.setFontSize(16);
     pdfDoc.setTextColor(40, 40, 40);
     pdfDoc.text('Consorcio Pintag Express', 75, 20);
@@ -214,27 +226,15 @@ calcularTotalGeneral(): number {
 
     const startY = 45;
 
-const body = this.cierreItems.map(item => {
-  const fecha: any = item.fecha;
-
-  const fechaObj =
-    fecha?.toDate ? fecha.toDate() :
-    (fecha instanceof Date ? fecha : new Date(fecha));
-
-  const fechaStr = isNaN(fechaObj.getTime())
-    ? '—'
-    : fechaObj.toLocaleDateString('es-EC');
-
-  return [
-    item.modulo,
-    item.unidad,
-    fechaStr,
-    `$${Number(item.valor).toFixed(2)}`
-  ];
-});
+    const body = this.cierreItems.map(item => ([
+      (item as any).modulo,
+      (item as any).unidad,
+      this.formatearFechaISO(String((item as any).fecha || '—')),
+      `$${Number((item as any).valor || 0).toFixed(2)}`
+    ]));
 
     (pdfDoc as any).autoTable({
-      head: [['Módulo', 'Unidad', 'Fecha', 'Valor']],
+      head: [['Módulo', 'Unidad', 'Fecha (deuda)', 'Valor']],
       body,
       startY,
       styles: { fontSize: 10, cellPadding: 3, halign: 'center' },
@@ -271,7 +271,6 @@ const body = this.cierreItems.map(item => {
       egresosY = lastY + 20;
     }
 
-    // Totales y saldo neto
     pdfDoc.setTextColor(0, 0, 0);
     pdfDoc.text(`Total Egresos: $${totalEgresos.toFixed(2)}`, 14, egresosY + 10);
 
@@ -279,35 +278,24 @@ const body = this.cierreItems.map(item => {
     pdfDoc.setTextColor(33, 150, 83);
     pdfDoc.text(`Saldo Neto del Día: $${saldoNeto.toFixed(2)}`, 14, egresosY + 20);
 
-    // Resumen por empresa
-    const resumenY = this.agregarResumenPorEmpresa(
-      pdfDoc,
-      this.cierreItems,
-      egresosY + 30
-    );
-
-    // Firma
     pdfDoc.setDrawColor(150);
-    pdfDoc.line(14, resumenY + 20, 100, resumenY + 20);
+    pdfDoc.line(14, egresosY + 35, 100, egresosY + 35);
     pdfDoc.setFontSize(10);
     pdfDoc.setTextColor(100);
-    pdfDoc.text('Firma Responsable', 14, resumenY + 25);
+    pdfDoc.text('Firma Responsable', 14, egresosY + 40);
 
-    // Guardar PDF local
     pdfDoc.save(`CierreCaja-${fechaId}.pdf`);
 
-    // Subir PDF a Storage
     const pdfBlob = pdfDoc.output('blob');
     const archivoRef = ref(this.storage, `cierres/${fechaId}.pdf`);
     await uploadBytes(archivoRef, pdfBlob);
     const pdfUrl = await getDownloadURL(archivoRef);
 
-    // Guardar metadata en Firestore
     await setDoc(
       doc(this.firestore, `cierresCaja/${fechaId}`),
       {
         fechaId,
-        fecha: fechaId, // recomendado como string YYYY-MM-DD
+        fecha: fechaId,
         total,
         cantidadItems: this.cierreItems.length,
         egresos: this.egresos,
@@ -319,52 +307,9 @@ const body = this.cierreItems.map(item => {
       { merge: true }
     );
 
-    alert('PDF generado, guardado y descargado con éxito');
+
     await this.cargarHistorial();
-  }
-
-  agregarResumenPorEmpresa(pdfDoc: jsPDF, cierreItems: CierreCajaItem[], startY: number): number {
-    const empresas = ['General Píntag', 'Expreso Antisana'];
-    const modulos = ['Administración', 'Minutos', 'Minutos Base', 'Multas'];
-
-    const categorizarModulo = (nombre: string): string => {
-      const nombreLimpio = (nombre || '').toLowerCase();
-      if (nombreLimpio.includes('administracion')) return 'Administración';
-      if (nombreLimpio.includes('minutosatraso')) return 'Minutos';
-      if (nombreLimpio.includes('minutosbase')) return 'Minutos Base';
-      if (nombreLimpio.includes('multa')) return 'Multas';
-      return 'Otros';
-    };
-
-    let currentY = startY;
-
-    pdfDoc.setFontSize(12);
-    pdfDoc.setTextColor(0);
-    pdfDoc.setFont('helvetica', 'bold');
-
-    modulos.forEach(modulo => {
-      pdfDoc.text(`TOTAL ${modulo.toUpperCase()}`, 14, currentY);
-      currentY += 6;
-
-      empresas.forEach(empresa => {
-        const valor = cierreItems
-          .filter(i => {
-            const emp = (i as any).empresa || '';
-            return (
-              categorizarModulo(i.modulo) === modulo &&
-              emp.toLowerCase().includes(empresa.toLowerCase())
-            );
-          })
-          .reduce((acc, i) => acc + Number(i.valor || 0), 0);
-
-        pdfDoc.setFont('helvetica', 'normal');
-        pdfDoc.text(`  ${modulo.toUpperCase()} COOP. ${empresa.toUpperCase()}`, 20, currentY);
-        pdfDoc.text(`$${valor.toFixed(2)}`, 190, currentY, { align: 'right' });
-        currentY += 6;
-      });
-    });
-
-    return currentY;
+    alert('PDF generado, guardado y descargado con éxito');
   }
 
   cargarImagenBase64(url: string): Promise<string> {
@@ -392,7 +337,6 @@ const body = this.cierreItems.map(item => {
   /* ------------------------ HISTORIAL: ELIMINAR / DESCARGAR ------------------------ */
 
   async eliminar(cierre: any) {
-    // Guard UI (evita "insufficient permissions" para rol socio)
     if (this.esSocio) {
       alert('No tienes permisos para eliminar cierres de caja.');
       return;
@@ -407,7 +351,6 @@ const body = this.cierreItems.map(item => {
       return;
     }
 
-    // 1) Borrar PDF en Storage (si existe)
     try {
       const archivoRef = ref(this.storage, `cierres/${id}.pdf`);
       await deleteObject(archivoRef);
@@ -415,7 +358,6 @@ const body = this.cierreItems.map(item => {
       console.warn('No se pudo borrar el PDF en Storage:', e);
     }
 
-    // 2) Borrar documento en Firestore
     await deleteDoc(doc(this.firestore, `cierresCaja/${id}`));
 
     alert('Cierre eliminado');
@@ -435,28 +377,13 @@ const body = this.cierreItems.map(item => {
   descargarExcel() {
     const fechaId = this.fechaSeleccionada.toISOString().split('T')[0];
 
-    // Hoja ingresos
-const ingresosData = this.cierreItems.map(item => {
-  const fecha: any = item.fecha;
+    const ingresosData = this.cierreItems.map(item => ({
+      Módulo: (item as any).modulo,
+      Unidad: (item as any).unidad,
+      'Fecha deuda': this.formatearFechaISO(String((item as any).fecha || '—')),
+      Valor: Number((item as any).valor || 0)
+    }));
 
-  const fechaObj =
-    fecha?.toDate ? fecha.toDate() :
-    (fecha instanceof Date ? fecha : new Date(fecha));
-
-  const fechaStr = isNaN(fechaObj.getTime())
-    ? '—'
-    : fechaObj.toLocaleDateString('es-EC');
-
-  return {
-    Módulo: item.modulo,
-    Unidad: item.unidad,
-    Fecha: fechaStr,
-    Valor: Number(item.valor || 0)
-  };
-});
-
-
-    // Hoja egresos
     const egresosData = this.egresos.map(item => ({
       Detalle: item.modulo,
       Valor: Number(item.valor || 0)

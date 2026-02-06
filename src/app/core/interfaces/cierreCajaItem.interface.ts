@@ -1,17 +1,14 @@
 export interface CierreCajaItem {
   modulo: string;
   unidad: string;
-  fecha: any;        // Date | Timestamp | null
+
+  // ✅ fecha del REPORTE (día contable)
+  fecha: string; // "YYYY-MM-DD"
+
   valor: number;
   empresa?: string;
 
-  // ✅ opcionales para total real por pago
-  pagoKey?: string;   // llave dedupe
-  pagoTotal?: number; // total del pago (doc)
-}
-
-
-export interface Egreso {
-modulo: string;
-valor: number;
+  // dedupe / total real por pago
+  pagoKey?: string;
+  pagoTotal?: number;
 }
